@@ -27,4 +27,9 @@ Output
      Notes on accounts
      Attaching supporting documents
      
-     
+--------------------
+PS C:\Users\theso\Documents\nn\Nilavaram> clasp create --title "Nilavaram" --type standalone
+Created new script: https://script.google.com/d/1F-zmrZn1QC3r4TcD7PaDEqtUpFklGS1qy6ReRJwMgWASDXfv7gq6hqA-/edit
+└─ appsscript.json
+Cloned one file..
+--------------------  
