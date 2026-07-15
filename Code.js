@@ -1,48 +1,34 @@
 /**
- * Code.gs
- * Nilavaram startup and Firestore connection tests.
+ * Code.js
+ * Nilavaram application entry points.
  */
 
 /**
- * Writes a test document to Firestore.
+ * This project is intentionally standalone and does not rely on a
+ * Google Sheet or any spreadsheet UI. The web app entry point is
+ * doGet() below.
  */
-function testFirestoreWrite() {
-  const result = firestoreSetDocument_(
-    'system',
-    'connection-test',
-    {
-      projectName: {
-        stringValue: 'Nilavaram'
-      },
-      appsScriptProject: {
-        stringValue: 'nn'
-      },
-      connected: {
-        booleanValue: true
-      },
-      administratorEmail: {
-        stringValue:
-          Session.getEffectiveUser().getEmail() || 'Not available'
-      },
-      connectedAt: {
-        timestampValue: new Date().toISOString()
-      }
-    }
-  );
 
-  console.log(JSON.stringify(result, null, 2));
-  return result;
+/**
+ * Allows HTML files to include reusable HTML fragments later.
+ *
+ * @param {string} filename HTML filename without extension.
+ * @returns {string}
+ */
+function include(filename) {
+  return HtmlService
+    .createHtmlOutputFromFile(filename)
+    .getContent();
 }
 
 /**
- * Reads the test document back from Firestore.
+ * Web application entry point.
+ *
+ * @returns {GoogleAppsScript.HTML.HtmlOutput}
  */
-function testFirestoreRead() {
-  const result = firestoreGetDocument_(
-    'system',
-    'connection-test'
-  );
-
-  console.log(JSON.stringify(result, null, 2));
-  return result;
+function doGet() {
+  return HtmlService
+    .createTemplateFromFile('Dashboard')
+    .evaluate()
+    .setTitle('Nilavaram Administration');
 }

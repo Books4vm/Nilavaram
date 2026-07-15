@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<base target="_top">
+
+<style>
+
+body{
+
+    font-family:Arial;
+
+    background:#f3f4f6;
+
+    margin:20px;
+
+}
+
+.header{
+
+    background:white;
+
+    border-radius:8px;
+
+    padding:15px;
+
+    margin-bottom:20px;
+
+}
+
+.section{
+
+    background:white;
+
+    border-radius:8px;
+
+    margin-bottom:20px;
+
+    padding:15px;
+
+}
+
+button{
+
+    width:170px;
+
+    height:42px;
+
+    margin:6px;
+
+    cursor:pointer;
+
+}
+
+#output{
+
+    background:white;
+
+    border-radius:8px;
+
+    padding:15px;
+
+    min-height:180px;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+
+<h2>Nilavaram Administration</h2>
+
+<div id="startup"></div>
+
+</div>
+
+<div id="menu"></div>
+
+<div id="output">
+
+Ready.
+
+</div>
+
+<script>
+
+window.onload=function(){
+
+    loadStartup();
+
+    loadMenu();
+
+}
+
+
+function loadStartup(){
+
+google.script.run
+
+.withSuccessHandler(function(data){
+
+document.getElementById("startup").innerHTML=
+
+"<b>User :</b> "
+
++data.user+
+
+"<br>"
+
++"<b>Version :</b> "
+
++data.version+
+
+"<br>"
+
++"<b>Status :</b> "
+
++data.status;
+
+})
+
+.getDashboardInfo();
+
+}
+
+
+
+function loadMenu(){
+
+google.script.run
+
+.withSuccessHandler(buildMenu)
+
+.getNavigation();
+
+}
+
+
+
+function buildMenu(data){
+
+let html="";
+
+data.forEach(function(sec){
+
+html+="<div class='section'>";
+
+html+="<h3>"+sec.heading+"</h3>";
+
+sec.buttons.forEach(function(btn){
+
+html+="<button onclick=\"openButton('"+btn+"')\">"
+
++btn+
+
+"</button>";
+
+});
+
+html+="</div>";
+
+});
+
+document.getElementById("menu").innerHTML=html;
+
+}
+
+
+
+function openButton(name){
+
+document.getElementById("output").innerHTML="Loading "+name+" ...";
+
+
+if(name=="Firestore"){
+
+google.script.run
+
+.withSuccessHandler(function(r){
+
+document.getElementById("output").innerHTML=
+
+"<pre>"+JSON.stringify(r,null,4)+"</pre>";
+
+})
+
+.testFirestore();
+
+return;
+
+}
+
+
+google.script.run
+
+.withSuccessHandler(function(r){
+
+document.getElementById("output").innerHTML=r.message;
+
+})
+
+.openModule(name);
+
+}
+
+</script>
+
+</body>
+
+</html>
