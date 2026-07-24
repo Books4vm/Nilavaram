@@ -1,0 +1,8 @@
+git remote -v
+
+
+
+
+clasp --version           3.3.0
+clasp status              confilrms the linked file names
+clasp push                to push the code to Apps Script
