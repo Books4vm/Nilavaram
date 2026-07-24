@@ -1,0 +1,18 @@
+Open VSCode
+main working copy should be the files in
+Check & set the folder name as
+     C:\Users\theso\Documents\nn\Nilavaram
+
+clasp is designed to write the code locally & Sync
+
+GitHub - for version history
+  GitHub stores the source files
+  GitHub does not execute the code
+
+use Firestore to store centralized applicaion data
+
+Firestore stores 
+  Users, Roles, Permissions, Files, Modules
+  Settings, Menus, Sessions, AuditLogs
+
+use Google Sheets & Google Docs for data, reports, etc
