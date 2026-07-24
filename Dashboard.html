@@ -1,216 +1,307 @@
 <!DOCTYPE html>
-
 <html>
-
 <head>
-
-<base target="_top">
-
-<style>
-
-body{
-
-    font-family:Arial;
-
-    background:#f3f4f6;
-
-    margin:20px;
-
-}
-
-.header{
-
-    background:white;
-
-    border-radius:8px;
-
-    padding:15px;
-
-    margin-bottom:20px;
-
-}
-
-.section{
-
-    background:white;
-
-    border-radius:8px;
-
-    margin-bottom:20px;
-
-    padding:15px;
-
-}
-
-button{
-
-    width:170px;
-
-    height:42px;
-
-    margin:6px;
-
-    cursor:pointer;
-
-}
-
-#output{
-
-    background:white;
-
-    border-radius:8px;
-
-    padding:15px;
-
-    min-height:180px;
-
-}
-
-</style>
-
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+      margin: 0;
+    }
+    .header {
+      background: #ffffff;
+      border-bottom: 1px solid #d1d5db;
+      padding: 16px 22px;
+    }
+    .header h2 { margin: 0 0 8px; }
+    .layout {
+      display: grid;
+      grid-template-columns: 250px 1fr;
+      min-height: calc(100vh - 94px);
+    }
+    .sidebar {
+      background: #ffffff;
+      border-right: 1px solid #d1d5db;
+      padding: 14px;
+    }
+    .menu-section h3 {
+      font-size: 14px;
+      margin: 18px 8px 6px;
+      text-transform: uppercase;
+      color: #6b7280;
+    }
+    .menu-button {
+      background: transparent;
+      border: 0;
+      border-radius: 6px;
+      cursor: pointer;
+      display: block;
+      padding: 10px;
+      text-align: left;
+      width: 100%;
+    }
+    .menu-button:hover { background: #eef2ff; }
+    .content { padding: 22px; }
+    .panel {
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 18px;
+      min-height: 220px;
+    }
+    .error { color: #b91c1c; }
+    .success { color: #166534; }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input, select {
+      border: 1px solid #9ca3af;
+      border-radius: 5px;
+      padding: 9px;
+      width: 100%;
+    }
+    .primary-button {
+      background: #1d4ed8;
+      border: 0;
+      border-radius: 5px;
+      color: #ffffff;
+      cursor: pointer;
+      padding: 10px 16px;
+    }
+    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
+    th, td {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 9px;
+      text-align: left;
+    }
+    @media (max-width: 700px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { border-bottom: 1px solid #d1d5db; border-right: 0; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
-
 <body>
-
-<div class="header">
-
-<h2>Nilavaram Administration</h2>
-
-<div id="startup"></div>
-
-</div>
-
-<div id="menu"></div>
-
-<div id="output">
-
-Ready.
-
-</div>
-
-<script>
-
-window.onload=function(){
-
-    loadStartup();
-
-    loadMenu();
-
-}
-
-
-function loadStartup(){
-
-google.script.run
-
-.withSuccessHandler(function(data){
-
-document.getElementById("startup").innerHTML=
-
-"<b>User :</b> "
-
-+data.user+
-
-"<br>"
-
-+"<b>Version :</b> "
-
-+data.version+
-
-"<br>"
-
-+"<b>Status :</b> "
-
-+data.status;
-
-})
-
-.getDashboardInfo();
-
-}
-
-
-
-function loadMenu(){
-
-google.script.run
-
-.withSuccessHandler(buildMenu)
-
-.getNavigation();
-
-}
-
-
-
-function buildMenu(data){
-
-let html="";
-
-data.forEach(function(sec){
-
-html+="<div class='section'>";
-
-html+="<h3>"+sec.heading+"</h3>";
-
-sec.buttons.forEach(function(btn){
-
-html+="<button onclick=\"openButton('"+btn+"')\">"
-
-+btn+
-
-"</button>";
-
-});
-
-html+="</div>";
-
-});
-
-document.getElementById("menu").innerHTML=html;
-
-}
-
-
-
-function openButton(name){
-
-document.getElementById("output").innerHTML="Loading "+name+" ...";
-
-
-if(name=="Firestore"){
-
-google.script.run
-
-.withSuccessHandler(function(r){
-
-document.getElementById("output").innerHTML=
-
-"<pre>"+JSON.stringify(r,null,4)+"</pre>";
-
-})
-
-.testFirestore();
-
-return;
-
-}
-
-
-google.script.run
-
-.withSuccessHandler(function(r){
-
-document.getElementById("output").innerHTML=r.message;
-
-})
-
-.openModule(name);
-
-}
-
-</script>
-
+  <header class="header">
+    <h2>Nilavaram Administration</h2>
+    <div id="startup">Loading...</div>
+  </header>
+
+  <div class="layout">
+    <nav id="menu" class="sidebar" aria-label="Main navigation">
+      Loading menu...
+    </nav>
+    <main class="content">
+      <div id="output" class="panel">Ready.</div>
+    </main>
+  </div>
+
+  <script>
+    window.onload = function() {
+      loadStartup();
+    };
+
+    function escapeHtml(value) {
+      const element = document.createElement('div');
+      element.textContent = String(value == null ? '' : value);
+      return element.innerHTML;
+    }
+
+    function showError(error) {
+      const message = error && error.message ? error.message : String(error);
+      document.getElementById('output').innerHTML =
+        '<p class="error">' + escapeHtml(message) + '</p>';
+    }
+
+    function loadStartup() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          document.getElementById('startup').innerHTML =
+            '<b>User:</b> ' + escapeHtml(data.user) +
+            ' &nbsp; <b>Role:</b> ' + escapeHtml(data.role) +
+            ' &nbsp; <b>Version:</b> ' + escapeHtml(data.version);
+
+          if (data.accessStatus === 'invited') {
+            document.getElementById('menu').textContent = '';
+            document.getElementById('output').innerHTML =
+              '<h2>Invitation found</h2>' +
+              '<p>Your Google account has been invited to Nilavaram as ' +
+              escapeHtml(data.role) + '.</p>' +
+              '<button class="primary-button" type="button" ' +
+              'onclick="acceptInvitation()">Accept invitation</button>';
+            return;
+          }
+          if (data.accessStatus !== 'active') {
+            document.getElementById('menu').textContent = '';
+            document.getElementById('output').innerHTML =
+              '<h2>Access unavailable</h2>' +
+              '<p class="error">This Google account has not been invited.</p>';
+            return;
+          }
+          loadMenu();
+        })
+        .withFailureHandler(showError)
+        .getDashboardInfo();
+    }
+
+    function acceptInvitation() {
+      google.script.run
+        .withSuccessHandler(function() { window.location.reload(); })
+        .withFailureHandler(showError)
+        .acceptMyInvitation();
+    }
+
+    function loadMenu() {
+      google.script.run
+        .withSuccessHandler(buildMenu)
+        .withFailureHandler(showError)
+        .getNavigation();
+    }
+
+    function buildMenu(data) {
+      const menu = document.getElementById('menu');
+      menu.textContent = '';
+
+      data.forEach(function(section) {
+        const wrapper = document.createElement('section');
+        wrapper.className = 'menu-section';
+        const heading = document.createElement('h3');
+        heading.textContent = section.heading;
+        wrapper.appendChild(heading);
+
+        section.buttons.forEach(function(item) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'menu-button';
+          button.textContent = item.label;
+          button.onclick = function() { openModule(item.moduleId, item.label); };
+          wrapper.appendChild(button);
+        });
+        menu.appendChild(wrapper);
+      });
+    }
+
+    function openModule(moduleId, label) {
+      document.getElementById('output').textContent = 'Loading ' + label + '...';
+
+      if (moduleId === 'users') {
+        showUsers();
+        return;
+      }
+      if (moduleId === 'firestore') {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            document.getElementById('output').innerHTML =
+              '<pre>' + escapeHtml(JSON.stringify(result, null, 2)) + '</pre>';
+          })
+          .withFailureHandler(showError)
+          .testFirestore();
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          document.getElementById('output').textContent = result.message;
+        })
+        .withFailureHandler(showError)
+        .openModule(moduleId);
+    }
+
+    function showUsers() {
+      document.getElementById('output').innerHTML =
+        '<h2>Users</h2>' +
+        '<p>Invite one Google account and assign its access.</p>' +
+        '<form id="user-form">' +
+          '<div class="form-grid">' +
+            '<div><label for="email">Gmail address</label>' +
+              '<input id="email" type="email" required></div>' +
+            '<div><label for="displayName">Name</label>' +
+              '<input id="displayName" type="text"></div>' +
+            '<div><label for="role">Role</label>' +
+              '<select id="role">' +
+                '<option value="editor">Editor</option>' +
+                '<option value="reader">Reader</option>' +
+                '<option value="ltd">Ltd</option>' +
+                '<option value="admin">Admin</option>' +
+                '<option value="disabled">Disabled</option>' +
+              '</select></div>' +
+            '<div><label for="allowedModules">Ltd modules</label>' +
+              '<input id="allowedModules" placeholder="Example: files, reports"></div>' +
+          '</div>' +
+          '<button class="primary-button" type="submit">Save user</button>' +
+          '<span id="user-message"></span>' +
+        '</form>' +
+        '<div id="users-list">Loading users...</div>';
+
+      document.getElementById('user-form').onsubmit = saveUserForm;
+      loadUsers();
+    }
+
+    function saveUserForm(event) {
+      event.preventDefault();
+      const modules = document.getElementById('allowedModules').value
+        .split(',')
+        .map(function(value) { return value.trim(); })
+        .filter(Boolean);
+      const input = {
+        email: document.getElementById('email').value,
+        displayName: document.getElementById('displayName').value,
+        role: document.getElementById('role').value,
+        allowedModules: modules
+      };
+      document.getElementById('user-message').textContent = ' Saving...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          document.getElementById('user-message').innerHTML =
+            ' <span class="success">' + escapeHtml(result.message) + '</span>';
+          document.getElementById('user-form').reset();
+          loadUsers();
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('user-message').innerHTML =
+            ' <span class="error">' + escapeHtml(error.message) + '</span>';
+        })
+        .saveUser(input);
+    }
+
+    function loadUsers() {
+      google.script.run
+        .withSuccessHandler(function(users) {
+          window.nilavaramUsers = users;
+          let html = '<table><thead><tr><th>Email</th><th>Name</th>' +
+            '<th>Role</th><th>Status</th><th>Ltd modules</th><th></th></tr></thead><tbody>';
+          users.forEach(function(user, index) {
+            html += '<tr><td>' + escapeHtml(user.email) + '</td>' +
+              '<td>' + escapeHtml(user.displayName) + '</td>' +
+              '<td>' + escapeHtml(user.role) + '</td>' +
+              '<td>' + escapeHtml(user.status) + '</td>' +
+              '<td>' + escapeHtml((user.allowedModules || []).join(', ')) + '</td>' +
+              '<td><button type="button" onclick="editUser(' + index + ')">Edit</button></td></tr>';
+          });
+          html += '</tbody></table>';
+          document.getElementById('users-list').innerHTML = html;
+        })
+        .withFailureHandler(showError)
+        .getUsers();
+    }
+
+    function editUser(index) {
+      const user = (window.nilavaramUsers || [])[index];
+      if (!user) return;
+      document.getElementById('email').value = user.email || '';
+      document.getElementById('displayName').value = user.displayName || '';
+      document.getElementById('role').value = user.role || 'reader';
+      document.getElementById('allowedModules').value =
+        (user.allowedModules || []).join(', ');
+      document.getElementById('email').focus();
+    }
+  </script>
 </body>
-
 </html>

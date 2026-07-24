@@ -12,6 +12,24 @@
  * Dashboard startup information.
  */
 function getDashboardInfo() {
+  const email = getCurrentEmail_();
+  let currentUser = getUserByEmail_(email);
+
+  /*
+   * First-run bootstrap:
+   * If one of the two explicitly approved initial Admins opens Nilavaram
+   * before setup has been run, create the initial Firestore records
+   * automatically and then read the newly created Admin record.
+   */
+  if (
+    !currentUser &&
+    NILAVARAM_INITIAL_ADMIN_EMAILS
+      .map(normalizeEmail_)
+      .indexOf(email) !== -1
+  ) {
+    setupNilavaram();
+    currentUser = getUserByEmail_(email);
+  }
 
   return {
 
@@ -21,11 +39,17 @@ function getDashboardInfo() {
 
     project: "nn",
 
-    user: Session.getActiveUser().getEmail(),
+    user: email,
+
+    role: currentUser ? currentUser.role : 'none',
+
+    accessStatus: currentUser ? currentUser.status : 'not-invited',
 
     dateTime: new Date().toLocaleString(),
 
-    status: "Ready"
+    status: currentUser && currentUser.status === 'active'
+      ? "Ready"
+      : "Access not active"
 
   };
 
@@ -36,6 +60,7 @@ function getDashboardInfo() {
  * Temporary response until the module is implemented.
  */
 function openModule(moduleId) {
+  requireCurrentUser_();
 
   return {
 
@@ -54,6 +79,7 @@ function openModule(moduleId) {
 function testFirestore() {
 
   try {
+    requireAdmin_();
 
     const result = firestoreGetDocument_(
 
