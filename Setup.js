@@ -8,7 +8,7 @@ const NILAVARAM_INITIAL_ADMIN_EMAILS = [
   'mangai8100@gmail.com',
   'vm8100@gmail.com'
 ];
-const NILAVARAM_NAVIGATION_VERSION = 9;
+const NILAVARAM_NAVIGATION_VERSION = 13;
 
 /**
  * Creates or refreshes the Firestore-driven navigation.
@@ -49,6 +49,8 @@ function setupNavigation_() {
     { id: 'journal-decisions', menuId: 'private-journal', parentId: 'private-journal', level: 2, label: 'Decisions', description: 'Records private decisions with reasons and version history.', moduleId: 'journal-decisions', order: 10, enabled: true, roles: ['admin'] },
     { id: 'strategy-reviews', menuId: 'private-journal', parentId: 'private-journal', level: 2, label: 'Strategy Reviews', description: 'Reviews and updates private strategies over time.', moduleId: 'strategy-reviews', order: 20, enabled: true, roles: ['admin'] },
     { id: 'journal-follow-ups', menuId: 'private-journal', parentId: 'private-journal', level: 2, label: 'Follow-up Dates', description: 'Tracks dates for reconsidering private decisions.', moduleId: 'journal-follow-ups', order: 30, enabled: true, roles: ['admin'] },
+    { id: 'chart-of-accounts', menuId: 'accounting', parentId: 'accounting', level: 2, label: 'Chart of Accounts', description: 'Views and maintains the five-digit Firestore Chart of Accounts.', moduleId: 'chart-of-accounts', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'new-transaction', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'New Transaction', description: 'Records what happened in plain language and prepares a balanced draft entry.', moduleId: 'new-transaction', order: 10, enabled: true, roles: ['admin', 'editor'] },
     { id: 'archive-library', menuId: 'documents', parentId: 'documents', level: 2, label: 'Archive Library', description: 'Lists preserved documents and their metadata.', moduleId: 'archive-library', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'upload-documents', menuId: 'documents', parentId: 'documents', level: 2, label: 'Upload Documents', description: 'Adds documents to approved cloud storage.', moduleId: 'upload-documents', order: 20, enabled: true, roles: ['admin', 'editor'] },
     { id: 'missing-documents', menuId: 'documents', parentId: 'documents', level: 2, label: 'Missing / To Retrieve', description: 'Records expected documents that have not yet been located.', moduleId: 'missing-documents', order: 30, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
@@ -59,6 +61,7 @@ function setupNavigation_() {
     { id: 'navigation-guide', menuId: 'help', parentId: 'help', level: 2, label: 'Navigation Guide', description: 'Explains the menus available to the signed-in user.', moduleId: 'navigation-guide', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'project-foundation', menuId: 'help', parentId: 'help', level: 2, label: 'Project Foundation', description: 'Explains Nilavaram’s core purpose, privacy and archive principles.', moduleId: '', type: 'group', order: 15, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'project-start', menuId: 'help', parentId: 'project-foundation', level: 3, label: 'Project Start', description: 'Records the agreed core purpose of Nilavaram.', moduleId: 'project-start', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'nilavaram-core', menuId: 'help', parentId: 'project-foundation', level: 3, label: 'Core of Nilavaram', description: 'Explains the universal design and the current M family accounting profile.', moduleId: 'nilavaram-core', order: 20, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'getting-started', menuId: 'help', parentId: 'help', level: 2, label: 'Getting Started', description: 'Introduces first login, business selection and dashboard basics.', moduleId: 'getting-started', order: 20, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'users-access-guide', menuId: 'help', parentId: 'help', level: 2, label: 'Users & Access', description: 'Explains invitations, roles and permissions.', moduleId: 'users-access-guide', order: 30, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'accounting-guide', menuId: 'help', parentId: 'help', level: 2, label: 'Accounting Guide', description: 'Explains Nilavaram accounting concepts and workflow.', moduleId: 'accounting-guide', order: 40, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
@@ -132,6 +135,8 @@ function setupNavigation_() {
 
   setupProjectIntentTasks_();
   setupInitialReminders_();
+  setupAccountingFoundation_();
+  setupTransactionFoundation_();
 
   return {
     menus: menus.length,

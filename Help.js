@@ -5,6 +5,33 @@
 
 function getHelpArticleDefaults_() {
   return {
+    'nilavaram-core': {
+      title: 'Core of Nilavaram',
+      content: [
+        '# Core of Nilavaram',
+        '',
+        'Nilavaram means the current status: what exists, what is payable, the resulting net worth, and in whose name each item is held.',
+        '',
+        '## Universal design',
+        '- Nilavaram records assets, payables, net worth and supporting details.',
+        '- Every item identifies the person, trust, business or other name in which it is held.',
+        '- Each user or family may select an accounting profile appropriate to their needs.',
+        '- Codes 40000 Income and 50000 Expenses remain available for people, businesses or associates who require Profit and Loss reporting.',
+        '- Separate ownership, access, legal identity and tax-reporting responsibilities must remain identifiable.',
+        '',
+        '## M family profile',
+        '- M is the Family Head under the family’s Saiva and Tamil cultural tradition. This is an internal administrative description.',
+        '- Income belongs to the member who earns or receives it.',
+        '- Member earnings appear in that member’s net-worth section.',
+        '- Payments identify the member concerned.',
+        '- Nilavaram does not prepare a combined family Profit and Loss account for this profile.',
+        '- The intended combined net income in Nilavaram is zero.',
+        '- Codes 40000 and 50000 are therefore marked Not Used — Nilavaram for this profile.',
+        '',
+        '## Important clarification',
+        'Nilavaram records the stated current position. It does not determine legal ownership, federal or state tax treatment, or the separate reporting duties of a person, business or irrevocable trust.'
+      ].join('\n')
+    },
     'project-start': {
       title: 'Project Start',
       content: [
@@ -27,6 +54,14 @@ function getHelpArticleDefaults_() {
         '- Visibility is decided separately for every record and document.',
         '- OneDrive or Google Drive may hold original files; Firestore holds their organized details, links and permissions.',
         '- Missing documents remain listed so they can be retrieved later if they become available.',
+        '',
+        '## Dynamic accounting direction',
+        '- Accounting input may originate from relevant pages throughout Nilavaram.',
+        '- Every entry follows one visible flow: Input, Reconciliation, Account Assignment, Posting and Reports.',
+        '- The workflow updates as records change; it does not wait for batch processing.',
+        '- Posting requires balanced debits and credits under double-entry bookkeeping.',
+        '- Each person, trust and business remains separate while authorized reports may compile the family as a whole.',
+        '- Payables include due dates and adjustable reminders so upcoming obligations remain visible.',
         '',
         '**Status:** This is the agreed foundation for Nilavaram.'
       ].join('\n')

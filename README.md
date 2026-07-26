@@ -122,6 +122,11 @@ Stores visible project-development intentions, assignments and due dates.
 Tasks may be completed in a flexible sequence. The Private Decision Journal is
 due `2026-08-10`; Safe Automated Backup is due `2026-08-16`.
 
+The dynamic-accounting development program is assigned to
+`mangai8100@gmail.com` from `2026-08-02` through `2026-08-11`. It covers the
+live Dashboard, family record structure, continuous input, double-entry
+controls, reconciliation, account coding, payables and family reports.
+
 ### `reminders`
 
 Stores private or selectively shared reminders. The initial trust-tax filing

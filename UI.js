@@ -55,6 +55,18 @@ function getDashboardInfo() {
 
 }
 
+/**
+ * Returns the startup identity and navigation in one browser-to-server call.
+ * This reduces the time spent waiting between separate startup requests.
+ */
+function getDashboardShell() {
+  const info = getDashboardInfo();
+  return {
+    info: info,
+    navigation: info.accessStatus === 'active' ? getNavigation() : []
+  };
+}
+
 
 /**
  * Temporary response until the module is implemented.

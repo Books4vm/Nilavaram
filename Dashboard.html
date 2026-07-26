@@ -59,15 +59,22 @@
     body {
       background: var(--page-background);
       color: var(--text);
+      display: flex;
+      flex-direction: column;
       font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
       font-size: var(--font-size-base);
+      height: 100vh;
       margin: 0;
+      overflow: hidden;
       transition: background-color 160ms ease, color 160ms ease;
     }
     .header {
       background: var(--surface-strong);
       border-bottom: 1px solid var(--border);
+      flex: 0 0 auto;
       padding: 18px 24px;
+      position: relative;
+      z-index: 10;
     }
     .header-top {
       align-items: center;
@@ -124,12 +131,14 @@
     }
     .layout {
       display: grid;
+      flex: 1 1 auto;
       grid-template-columns: minmax(280px, 330px) 1fr;
-      min-height: calc(100vh - 125px);
+      min-height: 0;
     }
     .sidebar {
       background: var(--surface);
       border-right: 1px solid var(--border);
+      overflow-y: auto;
       padding: 16px;
     }
     .menu-section { margin-bottom: 3px; }
@@ -170,13 +179,61 @@
       font: inherit;
     }
     .menu-button:hover { background: var(--hover); }
-    .content { padding: 24px; }
+    .menu-main-heading,
+    .menu-button.menu-level-1 {
+      background: transparent;
+      border: 0;
+      border-bottom: 3px solid var(--primary);
+      border-radius: 0;
+      color: var(--text);
+      display: block;
+      font: inherit;
+      font-weight: 800;
+      margin-top: 12px;
+      padding: 10px 8px 7px;
+      text-align: left;
+      width: 100%;
+    }
+    .menu-button.menu-level-1 { cursor: pointer; }
+    .menu-subheading {
+      color: var(--text);
+      font-size: .9em;
+      font-weight: 650;
+      padding: 9px 8px 3px 16px;
+    }
+    .menu-open-list {
+      display: block;
+      margin: 0;
+    }
+    .menu-button.menu-level-2 {
+      font-size: .9em;
+      padding: 7px 8px 7px 16px;
+    }
+    .menu-button.menu-level-3 {
+      font-size: .84em;
+      padding: 6px 8px 6px 27px;
+    }
+    .content {
+      min-height: 0;
+      overflow-y: auto;
+      padding: 24px;
+      scroll-behavior: smooth;
+    }
     .panel {
       background: var(--surface-strong);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 22px;
       min-height: 220px;
+    }
+    .panel > h2:first-child {
+      background: var(--surface-strong);
+      border-bottom: 1px solid var(--border);
+      margin: -22px 0 18px;
+      padding: 22px 0 12px;
+      position: sticky;
+      top: -24px;
+      z-index: 3;
     }
     .error { color: var(--error); }
     .success { color: var(--success); }
@@ -247,9 +304,15 @@
       outline-offset: 2px;
     }
     @media (max-width: 700px) {
+      body { height: auto; min-height: 100vh; overflow: auto; }
       .header-top { align-items: flex-start; flex-direction: column; }
       .layout { grid-template-columns: 1fr; }
-      .sidebar { border-bottom: 1px solid var(--border); border-right: 0; }
+      .sidebar {
+        border-bottom: 1px solid var(--border);
+        border-right: 0;
+        max-height: 45vh;
+      }
+      .content { overflow: visible; }
       .form-grid { grid-template-columns: 1fr; }
       .appearance-controls { width: 100%; }
       .appearance-field { flex: 1 1 150px; }
@@ -298,7 +361,10 @@
       Loading menu...
     </nav>
     <main class="content">
-      <div id="output" class="panel">Ready.</div>
+      <div id="output" class="panel" tabindex="-1">
+        <h2>Dashboard</h2>
+        <p>Nilavaram is opening. You may begin here while the menu loads.</p>
+      </div>
     </main>
   </div>
 
@@ -308,8 +374,22 @@
 
     window.onload = function() {
       initializeDisplayPreferences();
+      showDefaultDashboard();
       loadStartup();
     };
+
+    function showDefaultDashboard() {
+      document.getElementById('output').innerHTML =
+        '<h2>Dashboard</h2>' +
+        '<p>This is the default window. Only this right-side panel changes when you choose a menu item.</p>' +
+        '<p id="dashboard-loading" class="help-meta">Connecting securely and loading the menu...</p>';
+    }
+
+    function moveContentToTop() {
+      const content = document.querySelector('.content');
+      if (content) content.scrollTop = 0;
+      window.scrollTo(0, 0);
+    }
 
     function readPreference(key, fallback) {
       try {
@@ -456,7 +536,8 @@
 
     function loadStartup() {
       google.script.run
-        .withSuccessHandler(function(data) {
+        .withSuccessHandler(function(shell) {
+          const data = shell.info;
           window.nilavaramDashboardInfo = data;
           renderStartupInfo(data);
           if (startupTimerId !== null) {
@@ -483,10 +564,12 @@
               '<p class="error">This Google account has not been invited.</p>';
             return;
           }
-          loadMenu();
+          buildMenu(shell.navigation || []);
+          const loading = document.getElementById('dashboard-loading');
+          if (loading) loading.textContent = 'Menu ready.';
         })
         .withFailureHandler(showError)
-        .getDashboardInfo();
+        .getDashboardShell();
     }
 
     function acceptInvitation() {
@@ -573,68 +656,86 @@
       menu.textContent = '';
       window.nilavaramNavigation = data;
       data.forEach(function(section) {
-        menu.appendChild(createNavigationNode(section, true));
+        menu.appendChild(createNavigationNode(section, 1));
       });
     }
 
-    function createNavigationNode(node, isTopLevel) {
+    function sentenceStyleMenuLabel(value) {
+      const text = String(value || '').trim();
+      if (!text) return '';
+      let result = text.charAt(0).toUpperCase() +
+        text.slice(1).toLowerCase();
+      [
+        ['csv', 'CSV'],
+        ['pdf', 'PDF'],
+        ['faq', 'FAQ'],
+        ['nilavaram', 'Nilavaram'],
+        ['firestore', 'Firestore'],
+        ['github', 'GitHub']
+      ].forEach(function(item) {
+        result = result.replace(
+          new RegExp('\\b' + item[0] + '\\b', 'gi'),
+          item[1]
+        );
+      });
+      return result;
+    }
+
+    function createNavigationNode(node, level) {
+      const children = node.children || [];
       if (node.type === 'link' && (!node.children || !node.children.length)) {
         const directButton = document.createElement('button');
         directButton.type = 'button';
-        directButton.className = 'menu-button';
-        directButton.textContent = node.label;
+        directButton.className = 'menu-button menu-level-' + level;
+        directButton.textContent = level >= 3
+          ? '\u2014 ' + sentenceStyleMenuLabel(node.label)
+          : (level === 2
+            ? sentenceStyleMenuLabel(node.label)
+            : node.label);
         directButton.onclick = function() {
           openModule(node.moduleId, node.label);
         };
         return directButton;
       }
 
-      const wrapper = document.createElement(isTopLevel ? 'section' : 'div');
+      const wrapper = document.createElement(level === 1 ? 'section' : 'div');
       wrapper.className = 'menu-section';
-      const groupButton = document.createElement('button');
-      groupButton.type = 'button';
-      groupButton.className = 'menu-group-button';
-      groupButton.setAttribute('aria-expanded', 'false');
-
-      const label = document.createElement('span');
-      label.textContent = node.label;
-      const arrow = document.createElement('span');
-      arrow.className = 'menu-arrow';
-      arrow.textContent = '\u2193';
-      arrow.setAttribute('aria-hidden', 'true');
-      groupButton.appendChild(label);
-      groupButton.appendChild(arrow);
+      const heading = document.createElement('div');
+      heading.className = level === 1
+        ? 'menu-main-heading'
+        : 'menu-subheading';
+      heading.textContent = level >= 3
+        ? '\u2014 ' + sentenceStyleMenuLabel(node.label)
+        : (level === 2
+          ? sentenceStyleMenuLabel(node.label)
+          : node.label);
 
       const submenu = document.createElement('div');
-      submenu.className = 'submenu';
-      (node.children || []).forEach(function(child) {
-        submenu.appendChild(createNavigationNode(child, false));
+      submenu.className = 'menu-open-list';
+      children.forEach(function(child) {
+        submenu.appendChild(createNavigationNode(child, level + 1));
       });
 
-      if (!node.children || node.children.length === 0) {
+      if (children.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'submenu-empty';
         empty.textContent = 'Modules will be added next.';
         submenu.appendChild(empty);
       }
 
-      groupButton.onclick = function() {
-        const isOpen = submenu.classList.toggle('is-open');
-        groupButton.setAttribute('aria-expanded', String(isOpen));
-        arrow.textContent = isOpen ? '\u2191' : '\u2193';
-      };
-
-      wrapper.appendChild(groupButton);
+      wrapper.appendChild(heading);
       wrapper.appendChild(submenu);
       return wrapper;
     }
 
     function openModule(moduleId, label) {
+      moveContentToTop();
       document.getElementById('output').textContent = 'Loading ' + label + '...';
 
       if (moduleId === 'dashboard') {
-        document.getElementById('output').innerHTML =
-          '<h2>Dashboard</h2><p>Nilavaram is ready.</p>';
+        showDefaultDashboard();
+        const loading = document.getElementById('dashboard-loading');
+        if (loading) loading.textContent = 'Menu ready.';
         return;
       }
       if (moduleId === 'all-businesses') {
@@ -657,6 +758,7 @@
         return;
       }
       if ([
+        'nilavaram-core',
         'project-start',
         'navigation-guide',
         'getting-started',
@@ -678,6 +780,14 @@
       }
       if (moduleId === 'reminders') {
         showReminders();
+        return;
+      }
+      if (moduleId === 'chart-of-accounts') {
+        showChartOfAccounts();
+        return;
+      }
+      if (moduleId === 'new-transaction') {
+        showSimpleTransaction();
         return;
       }
       if (moduleId === 'users') {
@@ -1048,6 +1158,341 @@
 
       document.getElementById('user-form').onsubmit = saveUserForm;
       loadUsers();
+    }
+
+    function showChartOfAccounts() {
+      document.getElementById('output').textContent =
+        'Loading Chart of Accounts...';
+      google.script.run
+        .withSuccessHandler(renderChartOfAccounts)
+        .withFailureHandler(showError)
+        .getChartOfAccountsData();
+    }
+
+    function renderChartOfAccounts(data) {
+      window.nilavaramChartData = data;
+      const output = document.getElementById('output');
+      output.innerHTML =
+        '<h2>Chart of Accounts</h2>' +
+        '<p>The five-digit account master is stored in Firestore. ' +
+        'Existing transactions will refer to the account record, so its name ' +
+        'may be corrected without losing history.</p>' +
+        '<article class="alert-item">' +
+          '<h3>' + escapeHtml(data.foundation.title) + '</h3>' +
+          '<p><b>Family Head:</b> ' + escapeHtml(data.foundation.familyHead) +
+            ' — ' + escapeHtml(data.foundation.familyHeadBasis) + '</p>' +
+          '<p><b>Accounting model:</b> ' +
+            escapeHtml(data.foundation.accountingModel) + '</p>' +
+          '<ul>' +
+            (data.foundation.policyStatements || []).map(function(statement) {
+              return '<li>' + escapeHtml(statement) + '</li>';
+            }).join('') +
+          '</ul>' +
+          '<p class="help-meta">' +
+            escapeHtml(data.foundation.clarification) + '</p>' +
+        '</article>';
+
+      if (data.canEdit) {
+        let entityOptions = '';
+        data.entities.forEach(function(entity) {
+          entityOptions += '<option value="' + escapeHtml(entity.id) + '">' +
+            escapeHtml(entity.name) + '</option>';
+        });
+        output.innerHTML +=
+          '<form id="account-form">' +
+            '<input id="account-id" type="hidden">' +
+            '<div class="form-grid">' +
+              '<div><label for="account-entity">Who or which organization?</label>' +
+                '<select id="account-entity">' + entityOptions + '</select></div>' +
+              '<div><label for="account-purpose">What are you adding?</label>' +
+                '<select id="account-purpose">' +
+                  '<option value="bank">Bank account</option>' +
+                  '<option value="credit-card">Credit card</option>' +
+                  '<option value="loan">Loan</option>' +
+                  '<option value="paycheck">Paycheck source</option>' +
+                  '<option value="property">Property</option>' +
+                  '<option value="investment">Investment</option>' +
+                  '<option value="expense">Expense category</option>' +
+                  '<option value="equity">Trust or member net worth</option>' +
+                  '<option value="other">Something else</option>' +
+                '</select></div>' +
+              '<div><label for="account-name">Plain account name</label>' +
+                '<input id="account-name" required></div>' +
+              '<div><label for="account-last-four">Last four digits, if applicable</label>' +
+                '<input id="account-last-four" inputmode="numeric" maxlength="4"></div>' +
+            '</div>' +
+            '<button class="secondary-button" id="account-suggest" type="button">' +
+              'Suggest accounting details</button>' +
+            '<p id="account-suggestion" class="help-meta"></p>' +
+            '<details id="account-advanced"><summary>Review accounting details</summary>' +
+            '<div class="form-grid">' +
+              '<div><label for="account-code">Five-digit code</label>' +
+                '<input id="account-code" inputmode="numeric" maxlength="5" required></div>' +
+              '<div><label for="account-type">Account type</label>' +
+                '<select id="account-type">' +
+                  '<option value="group">Group / heading</option>' +
+                  '<option value="asset">Asset</option>' +
+                  '<option value="liability">External liability</option>' +
+                  '<option value="net-worth">Core-member net worth</option>' +
+                  '<option value="income">Income</option>' +
+                  '<option value="expense">Expense</option>' +
+                  '<option value="clearing">Clearing</option>' +
+                '</select></div>' +
+              '<div><label for="account-parent">Parent code</label>' +
+                '<input id="account-parent" inputmode="numeric" maxlength="5"></div>' +
+              '<div><label for="account-status">Status</label>' +
+                '<select id="account-status">' +
+                  '<option value="active">Active</option>' +
+                  '<option value="inactive">Inactive</option>' +
+                '</select></div>' +
+            '</div>' +
+            '</details>' +
+            '<label for="account-notes">Notes</label>' +
+            '<textarea id="account-notes" style="min-height:100px"></textarea>' +
+            '<div class="button-row">' +
+              '<button class="primary-button" type="submit">Save account</button>' +
+              '<button class="secondary-button" id="account-cancel" type="button">Clear</button>' +
+              '<span id="account-message"></span>' +
+            '</div>' +
+          '</form>';
+      }
+
+      output.innerHTML += '<div id="accounts-list"></div>';
+      renderAccountsTable(data);
+      if (data.canEdit) {
+        document.getElementById('account-form').onsubmit = saveAccountForm;
+        document.getElementById('account-cancel').onclick = clearAccountForm;
+        document.getElementById('account-suggest').onclick = suggestAccountDetails;
+      }
+    }
+
+    function renderAccountsTable(data) {
+      const entityNames = {};
+      data.entities.forEach(function(entity) {
+        entityNames[entity.id] = entity.name;
+      });
+      let html = '<table><thead><tr><th>Code</th><th>Account</th>' +
+        '<th>Entity</th><th>Visible mark</th><th>Parent</th><th>Explanation</th>';
+      if (data.canEdit) html += '<th></th>';
+      html += '</tr></thead><tbody>';
+
+      data.accounts.forEach(function(account, index) {
+        html += '<tr><td>' + escapeHtml(account.code) + '</td>' +
+          '<td>' + escapeHtml(account.name) + '</td>' +
+          '<td>' + escapeHtml(entityNames[account.entityId] || account.entityId) + '</td>' +
+          '<td><b>' + escapeHtml(account.displayMark) + '</b></td>' +
+          '<td>' + escapeHtml(account.parentCode || '') + '</td>' +
+          '<td>' + escapeHtml(account.displayExplanation) + '</td>';
+        if (data.canEdit) {
+          html += '<td><button type="button" onclick="editChartAccount(' +
+            index + ')">Edit</button></td>';
+        }
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('accounts-list').innerHTML = html;
+    }
+
+    function editChartAccount(index) {
+      const account = window.nilavaramChartData.accounts[index];
+      if (!account) return;
+      document.getElementById('account-id').value = account.id || '';
+      document.getElementById('account-entity').value = account.entityId || '';
+      document.getElementById('account-code').value = account.code || '';
+      document.getElementById('account-name').value = account.name || '';
+      document.getElementById('account-type').value = account.accountType || 'group';
+      document.getElementById('account-parent').value = account.parentCode || '';
+      document.getElementById('account-status').value = account.status || 'active';
+      document.getElementById('account-notes').value = account.notes || '';
+      document.getElementById('account-advanced').open = true;
+      document.getElementById('account-code').focus();
+    }
+
+    function clearAccountForm() {
+      document.getElementById('account-form').reset();
+      document.getElementById('account-id').value = '';
+      document.getElementById('account-message').textContent = '';
+      document.getElementById('account-suggestion').textContent = '';
+    }
+
+    function suggestAccountDetails() {
+      const input = {
+        entityId: document.getElementById('account-entity').value,
+        purpose: document.getElementById('account-purpose').value,
+        name: document.getElementById('account-name').value,
+        lastFour: document.getElementById('account-last-four').value
+      };
+      document.getElementById('account-suggestion').textContent =
+        'Preparing a suggestion...';
+      google.script.run
+        .withSuccessHandler(function(suggestion) {
+          document.getElementById('account-code').value = suggestion.code;
+          document.getElementById('account-name').value = suggestion.name;
+          document.getElementById('account-type').value = suggestion.accountType;
+          document.getElementById('account-parent').value = suggestion.parentCode;
+          document.getElementById('account-suggestion').textContent =
+            suggestion.code + ' — ' + suggestion.name + '. ' +
+            suggestion.explanation;
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('account-suggestion').innerHTML =
+            '<span class="error">' + escapeHtml(error.message) + '</span>';
+        })
+        .suggestChartAccount(input);
+    }
+
+    function saveAccountForm(event) {
+      event.preventDefault();
+      const input = {
+        id: document.getElementById('account-id').value,
+        entityId: document.getElementById('account-entity').value,
+        code: document.getElementById('account-code').value,
+        name: document.getElementById('account-name').value,
+        accountType: document.getElementById('account-type').value,
+        parentCode: document.getElementById('account-parent').value,
+        status: document.getElementById('account-status').value,
+        notes: document.getElementById('account-notes').value
+      };
+      document.getElementById('account-message').textContent = ' Saving...';
+      google.script.run
+        .withSuccessHandler(function(result) {
+          document.getElementById('account-message').innerHTML =
+            ' <span class="success">' + escapeHtml(result.message) + '</span>';
+          showChartOfAccounts();
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('account-message').innerHTML =
+            ' <span class="error">' + escapeHtml(error.message) + '</span>';
+        })
+        .saveChartAccount(input);
+    }
+
+    function showSimpleTransaction() {
+      document.getElementById('output').textContent =
+        'Preparing New Transaction...';
+      google.script.run
+        .withSuccessHandler(renderSimpleTransaction)
+        .withFailureHandler(showError)
+        .getSimpleTransactionSetup();
+    }
+
+    function renderSimpleTransaction(data) {
+      window.nilavaramTransactionSetup = data;
+      let entities = '';
+      data.entities.forEach(function(entity) {
+        entities += '<option value="' + escapeHtml(entity.id) + '">' +
+          escapeHtml(entity.name) + '</option>';
+      });
+      let accounts = '';
+      data.accounts.forEach(function(account) {
+        accounts += '<option value="' + escapeHtml(account.code) + '">' +
+          escapeHtml(account.code + ' — ' + account.name) + '</option>';
+      });
+
+      document.getElementById('output').innerHTML =
+        '<h2>New Transaction</h2>' +
+        '<p>Describe what happened. Nilavaram can reuse a previously approved pattern and prepares both accounting sides.</p>' +
+        '<form id="transaction-form">' +
+          '<div class="form-grid">' +
+            '<div><label for="transaction-kind">What happened?</label>' +
+              '<select id="transaction-kind">' +
+                '<option value="paycheck">Paycheck received</option>' +
+                '<option value="bill">Bill paid</option>' +
+                '<option value="purchase">Purchase made</option>' +
+                '<option value="transfer">Money transferred</option>' +
+                '<option value="receipt">Money received</option>' +
+                '<option value="loan">Loan payment</option>' +
+                '<option value="other">Something else</option>' +
+              '</select></div>' +
+            '<div><label for="transaction-entity">Who or which organization?</label>' +
+              '<select id="transaction-entity">' + entities + '</select></div>' +
+            '<div><label for="transaction-description">Description from bank, CSV or PDF</label>' +
+              '<input id="transaction-description" placeholder="Example: CTU PAYROLL" required></div>' +
+            '<div><label for="transaction-amount">Amount</label>' +
+              '<input id="transaction-amount" type="number" min="0.01" step="0.01" required></div>' +
+            '<div><label for="transaction-date">Date</label>' +
+              '<input id="transaction-date" type="date" required></div>' +
+            '<div><label for="transaction-document">Document or PDF name, if available</label>' +
+              '<input id="transaction-document"></div>' +
+          '</div>' +
+          '<button class="secondary-button" id="find-pattern" type="button">Find previous pattern</button>' +
+          '<p id="pattern-message" class="help-meta"></p>' +
+          '<details id="transaction-accounting"><summary>View or change accounting entry</summary>' +
+            '<div class="form-grid">' +
+              '<div><label for="transaction-debit">Money received into / Debit</label>' +
+                '<select id="transaction-debit">' + accounts + '</select></div>' +
+              '<div><label for="transaction-credit">Source or ownership / Credit</label>' +
+                '<select id="transaction-credit">' + accounts + '</select></div>' +
+            '</div>' +
+          '</details>' +
+          '<div class="button-row">' +
+            '<button class="primary-button" type="submit">Save as draft</button>' +
+            '<span id="transaction-message"></span>' +
+          '</div>' +
+        '</form>';
+
+      document.getElementById('find-pattern').onclick = findPreviousPattern;
+      document.getElementById('transaction-description').onblur =
+        findPreviousPattern;
+      document.getElementById('transaction-form').onsubmit =
+        saveSimpleTransactionForm;
+    }
+
+    function findPreviousPattern() {
+      const description =
+        document.getElementById('transaction-description').value;
+      if (!description.trim()) return;
+      document.getElementById('pattern-message').textContent =
+        'Looking for a previous pattern...';
+      google.script.run
+        .withSuccessHandler(function(suggestion) {
+          if (!suggestion) {
+            document.getElementById('pattern-message').textContent =
+              'No approved pattern was found. Open the accounting details and select the accounts.';
+            document.getElementById('transaction-accounting').open = true;
+            return;
+          }
+          document.getElementById('transaction-kind').value =
+            suggestion.transactionType;
+          document.getElementById('transaction-entity').value =
+            suggestion.memberEntityId;
+          document.getElementById('transaction-debit').value =
+            suggestion.debitAccountCode;
+          document.getElementById('transaction-credit').value =
+            suggestion.creditAccountCode;
+          document.getElementById('pattern-message').textContent =
+            suggestion.explanation;
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('pattern-message').innerHTML =
+            '<span class="error">' + escapeHtml(error.message) + '</span>';
+        })
+        .findTransactionSuggestion(description);
+    }
+
+    function saveSimpleTransactionForm(event) {
+      event.preventDefault();
+      const input = {
+        entityId: document.getElementById('transaction-entity').value,
+        description: document.getElementById('transaction-description').value,
+        amount: document.getElementById('transaction-amount').value,
+        date: document.getElementById('transaction-date').value,
+        sourceDocumentName: document.getElementById('transaction-document').value,
+        debitAccountCode: document.getElementById('transaction-debit').value,
+        creditAccountCode: document.getElementById('transaction-credit').value
+      };
+      document.getElementById('transaction-message').textContent = ' Saving...';
+      google.script.run
+        .withSuccessHandler(function(result) {
+          document.getElementById('transaction-message').innerHTML =
+            ' <span class="success">' + escapeHtml(result.message) + '</span>';
+          document.getElementById('transaction-form').reset();
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('transaction-message').innerHTML =
+            ' <span class="error">' + escapeHtml(error.message) + '</span>';
+        })
+        .saveSimpleTransaction(input);
     }
 
     function saveUserForm(event) {

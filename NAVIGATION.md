@@ -152,6 +152,9 @@ Provides expandable user guidance.
 
 - **Project Foundation**
   - **Project Start:** Records Nilavaram's agreed purpose, privacy and archive principles.
+  - **Core of Nilavaram:** Explains the universal current-status design and
+    the M family accounting profile. It also explains that Income and Expense
+    accounts remain available for other user profiles.
 - **Navigation Guide:** Reads the visible Firestore navigation and explains the
   menus available to the signed-in user's role. Admins and Editors can correct
   its content; prior versions, audits and Admin alerts are retained.

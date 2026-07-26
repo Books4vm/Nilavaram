@@ -114,6 +114,22 @@ function firestoreGetDocument_(collectionName, documentId) {
 }
 
 /**
+ * Deletes one exact Firestore document.
+ *
+ * @param {string} collectionName Firestore collection.
+ * @param {string} documentId Firestore document ID.
+ * @returns {Object}
+ */
+function firestoreDeleteDocument_(collectionName, documentId) {
+  const url =
+    getFirestoreBaseUrl_() +
+    '/' + encodeURIComponent(collectionName) +
+    '/' + encodeURIComponent(documentId);
+
+  return firestoreRequest_(url, 'delete');
+}
+
+/**
  * Reads every document in a Firestore collection.
  *
  * @param {string} collectionName Firestore collection.
