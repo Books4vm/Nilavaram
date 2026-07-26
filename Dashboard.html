@@ -4,34 +4,158 @@
   <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    :root {
+      --font-size-base: 20px;
+      --page-background: #d9f2ff;
+      --surface: #f7fcff;
+      --surface-strong: #ffffff;
+      --text: #050505;
+      --muted-text: #344054;
+      --border: #7eb8d4;
+      --hover: #bde8fb;
+      --primary: #075985;
+      --primary-text: #ffffff;
+      --focus: #005fcc;
+      --error: #a40000;
+      --success: #075f2c;
+      color-scheme: light;
+    }
+    :root[data-font-size="standard"] { --font-size-base: 18px; }
+    :root[data-font-size="small"] { --font-size-base: 16px; }
+    :root[data-font-size="large"] { --font-size-base: 20px; }
+    :root[data-theme="dark"] {
+      --page-background: #08111f;
+      --surface: #111c2d;
+      --surface-strong: #172338;
+      --text: #f8fafc;
+      --muted-text: #cbd5e1;
+      --border: #52647d;
+      --hover: #243b5a;
+      --primary: #38bdf8;
+      --primary-text: #06111d;
+      --focus: #7dd3fc;
+      --error: #fca5a5;
+      --success: #86efac;
+      color-scheme: dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root[data-theme="system"] {
+        --page-background: #08111f;
+        --surface: #111c2d;
+        --surface-strong: #172338;
+        --text: #f8fafc;
+        --muted-text: #cbd5e1;
+        --border: #52647d;
+        --hover: #243b5a;
+        --primary: #38bdf8;
+        --primary-text: #06111d;
+        --focus: #7dd3fc;
+        --error: #fca5a5;
+        --success: #86efac;
+        color-scheme: dark;
+      }
+    }
     * { box-sizing: border-box; }
     body {
-      font-family: Arial, sans-serif;
-      background: #f3f4f6;
-      color: #1f2937;
+      background: var(--page-background);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+      font-size: var(--font-size-base);
       margin: 0;
+      transition: background-color 160ms ease, color 160ms ease;
     }
     .header {
-      background: #ffffff;
-      border-bottom: 1px solid #d1d5db;
-      padding: 16px 22px;
+      background: var(--surface-strong);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 24px;
     }
-    .header h2 { margin: 0 0 8px; }
+    .header-top {
+      align-items: center;
+      display: flex;
+      gap: 20px;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .brand {
+      align-items: center;
+      display: flex;
+      gap: 12px;
+    }
+    .brand-icon {
+      color: var(--primary);
+      flex: 0 0 auto;
+      height: 34px;
+      width: 34px;
+    }
+    .header h1 {
+      font-size: 1.55em;
+      line-height: 1.2;
+      margin: 0;
+    }
+    .appearance-controls {
+      align-items: end;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .appearance-field span {
+      display: block;
+      font-size: .78em;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .appearance-field select {
+      min-width: 145px;
+      width: auto;
+    }
+    #startup { color: var(--muted-text); }
+    .startup-line {
+      align-items: baseline;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 18px;
+    }
+    .startup-time-line {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 6px;
+    }
     .layout {
       display: grid;
-      grid-template-columns: 250px 1fr;
-      min-height: calc(100vh - 94px);
+      grid-template-columns: minmax(280px, 330px) 1fr;
+      min-height: calc(100vh - 125px);
     }
     .sidebar {
-      background: #ffffff;
-      border-right: 1px solid #d1d5db;
-      padding: 14px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 16px;
     }
-    .menu-section h3 {
-      font-size: 14px;
-      margin: 18px 8px 6px;
-      text-transform: uppercase;
-      color: #6b7280;
+    .menu-section { margin-bottom: 3px; }
+    .menu-group-button {
+      align-items: center;
+      background: transparent;
+      border: 0;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      font-weight: bold;
+      justify-content: space-between;
+      padding: 11px 10px;
+      text-align: left;
+      width: 100%;
+      color: var(--text);
+      font: inherit;
+    }
+    .menu-group-button:hover { background: var(--hover); }
+    .menu-arrow { font-size: 1.1em; }
+    .submenu { display: none; margin-left: 14px; }
+    .submenu.is-open { display: block; }
+    .submenu-empty {
+      color: var(--muted-text);
+      font-size: .8em;
+      padding: 6px 10px 10px;
     }
     .menu-button {
       background: transparent;
@@ -42,17 +166,20 @@
       padding: 10px;
       text-align: left;
       width: 100%;
+      color: var(--text);
+      font: inherit;
     }
-    .menu-button:hover { background: #eef2ff; }
-    .content { padding: 22px; }
+    .menu-button:hover { background: var(--hover); }
+    .content { padding: 24px; }
     .panel {
-      background: #ffffff;
-      border-radius: 8px;
-      padding: 18px;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
       min-height: 220px;
     }
-    .error { color: #b91c1c; }
-    .success { color: #166534; }
+    .error { color: var(--error); }
+    .success { color: var(--success); }
     .form-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(180px, 1fr));
@@ -60,36 +187,109 @@
       margin-bottom: 14px;
     }
     label { display: block; font-weight: bold; margin-bottom: 4px; }
-    input, select {
-      border: 1px solid #9ca3af;
-      border-radius: 5px;
-      padding: 9px;
+    input, select, button {
+      font: inherit;
+    }
+    input, select, textarea {
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      min-height: 44px;
+      padding: 9px 11px;
       width: 100%;
     }
+    textarea {
+      font: inherit;
+      min-height: 260px;
+      resize: vertical;
+    }
     .primary-button {
-      background: #1d4ed8;
+      background: var(--primary);
       border: 0;
-      border-radius: 5px;
-      color: #ffffff;
+      border-radius: 7px;
+      color: var(--primary-text);
       cursor: pointer;
-      padding: 10px 16px;
+      min-height: 44px;
+      padding: 10px 18px;
+    }
+    .secondary-button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      cursor: pointer;
+      min-height: 44px;
+      padding: 10px 18px;
+    }
+    .help-content { white-space: pre-wrap; }
+    .help-meta { color: var(--muted-text); }
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .alert-item {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 0;
     }
     table { border-collapse: collapse; margin-top: 20px; width: 100%; }
     th, td {
-      border-bottom: 1px solid #e5e7eb;
-      padding: 9px;
+      border-bottom: 1px solid var(--border);
+      padding: 11px;
       text-align: left;
     }
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
     @media (max-width: 700px) {
+      .header-top { align-items: flex-start; flex-direction: column; }
       .layout { grid-template-columns: 1fr; }
-      .sidebar { border-bottom: 1px solid #d1d5db; border-right: 0; }
+      .sidebar { border-bottom: 1px solid var(--border); border-right: 0; }
       .form-grid { grid-template-columns: 1fr; }
+      .appearance-controls { width: 100%; }
+      .appearance-field { flex: 1 1 150px; }
+      .appearance-field select { width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body { transition: none; }
     }
   </style>
 </head>
 <body>
   <header class="header">
-    <h2>Nilavaram Administration</h2>
+    <div class="header-top">
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5z"/>
+          <path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z"/>
+        </svg>
+        <h1>Nilavaram Administration</h1>
+      </div>
+      <div class="appearance-controls" aria-label="Display preferences">
+        <label class="appearance-field" for="theme-choice">
+          <span>Appearance</span>
+          <select id="theme-choice">
+            <option value="sky">Sky blue</option>
+            <option value="dark">Dark</option>
+            <option value="system">Device setting</option>
+          </select>
+        </label>
+        <label class="appearance-field" for="font-choice">
+          <span>Text size</span>
+          <select id="font-choice">
+            <option value="large">Large</option>
+            <option value="standard">Standard</option>
+            <option value="small">Small</option>
+          </select>
+        </label>
+      </div>
+    </div>
     <div id="startup">Loading...</div>
   </header>
 
@@ -103,9 +303,51 @@
   </div>
 
   <script>
+    const PAGE_VIEW_STARTED_AT = new Date();
+    let startupTimerId = null;
+
     window.onload = function() {
+      initializeDisplayPreferences();
       loadStartup();
     };
+
+    function readPreference(key, fallback) {
+      try {
+        return window.localStorage.getItem(key) || fallback;
+      } catch (error) {
+        return fallback;
+      }
+    }
+
+    function savePreference(key, value) {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch (error) {
+        // The selected preference still applies for this page session.
+      }
+    }
+
+    function applyDisplayPreferences(theme, fontSize) {
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.dataset.fontSize = fontSize;
+      document.getElementById('theme-choice').value = theme;
+      document.getElementById('font-choice').value = fontSize;
+    }
+
+    function initializeDisplayPreferences() {
+      const theme = readPreference('nilavaram-theme', 'sky');
+      const fontSize = readPreference('nilavaram-font-size', 'large');
+      applyDisplayPreferences(theme, fontSize);
+
+      document.getElementById('theme-choice').addEventListener('change', function(event) {
+        document.documentElement.dataset.theme = event.target.value;
+        savePreference('nilavaram-theme', event.target.value);
+      });
+      document.getElementById('font-choice').addEventListener('change', function(event) {
+        document.documentElement.dataset.fontSize = event.target.value;
+        savePreference('nilavaram-font-size', event.target.value);
+      });
+    }
 
     function escapeHtml(value) {
       const element = document.createElement('div');
@@ -119,13 +361,110 @@
         '<p class="error">' + escapeHtml(message) + '</p>';
     }
 
+    function getPacificViewTime(date) {
+      const dateParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        weekday: 'long'
+      }).formatToParts(date);
+      const timeParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }).formatToParts(date);
+      const part = function(parts, type) {
+        const found = parts.find(function(item) { return item.type === type; });
+        return found ? found.value : '';
+      };
+
+      return {
+        date:
+          part(dateParts, 'day') + '-' +
+          part(dateParts, 'month').toUpperCase() + '-' +
+          part(dateParts, 'year'),
+        weekday: part(dateParts, 'weekday'),
+        time:
+          part(timeParts, 'hour') + ':' +
+          part(timeParts, 'minute') + ' ' +
+          part(timeParts, 'dayPeriod')
+      };
+    }
+
+    function renderStartupInfo(data) {
+      const started = getPacificViewTime(PAGE_VIEW_STARTED_AT);
+      const current = getPacificViewTime(new Date());
+
+      document.getElementById('startup').innerHTML =
+        '<div class="startup-line">' +
+          '<span><b>User:</b> ' + escapeHtml(data.user) + '</span>' +
+          '<span><b>Role:</b> ' + escapeHtml(data.role) + '</span>' +
+          '<span>' + escapeHtml(started.date) + ' ' +
+            escapeHtml(started.weekday) + '</span>' +
+        '</div>' +
+        '<div class="startup-time-line">' +
+          '<span><b>Started viewing:</b> ' + escapeHtml(started.time) +
+            ' PACIFIC TIME</span>' +
+          '<span><b>Current time:</b> ' + escapeHtml(current.time) +
+            ' PACIFIC TIME</span>' +
+          '<button class="secondary-button" type="button" ' +
+            'onclick="copySessionDetails()">Copy session details</button>' +
+          '<span id="copy-session-result" aria-live="polite"></span>' +
+        '</div>';
+    }
+
+    function getSessionDetailsText() {
+      const data = window.nilavaramDashboardInfo;
+      const started = getPacificViewTime(PAGE_VIEW_STARTED_AT);
+      const current = getPacificViewTime(new Date());
+      return [
+        'User: ' + data.user,
+        'Role: ' + data.role,
+        started.date + ' ' + started.weekday,
+        'Started viewing: ' + started.time + ' PACIFIC TIME',
+        'Current time: ' + current.time + ' PACIFIC TIME'
+      ].join('\n');
+    }
+
+    function copySessionDetails() {
+      const text = getSessionDetailsText();
+      const showCopied = function() {
+        const result = document.getElementById('copy-session-result');
+        if (result) result.textContent = 'Copied.';
+      };
+      const fallbackCopy = function() {
+        const field = document.createElement('textarea');
+        field.value = text;
+        field.setAttribute('readonly', '');
+        field.style.position = 'absolute';
+        field.style.left = '-9999px';
+        document.body.appendChild(field);
+        field.select();
+        document.execCommand('copy');
+        document.body.removeChild(field);
+        showCopied();
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(showCopied).catch(fallbackCopy);
+      } else {
+        fallbackCopy();
+      }
+    }
+
     function loadStartup() {
       google.script.run
         .withSuccessHandler(function(data) {
-          document.getElementById('startup').innerHTML =
-            '<b>User:</b> ' + escapeHtml(data.user) +
-            ' &nbsp; <b>Role:</b> ' + escapeHtml(data.role) +
-            ' &nbsp; <b>Version:</b> ' + escapeHtml(data.version);
+          window.nilavaramDashboardInfo = data;
+          renderStartupInfo(data);
+          if (startupTimerId !== null) {
+            window.clearInterval(startupTimerId);
+          }
+          startupTimerId = window.setInterval(function() {
+            renderStartupInfo(data);
+          }, 1000);
 
           if (data.accessStatus === 'invited') {
             document.getElementById('menu').textContent = '';
@@ -164,16 +503,42 @@
         .getNavigation();
     }
 
-    function buildMenu(data) {
+    function buildMenuLegacy(data) {
       const menu = document.getElementById('menu');
       menu.textContent = '';
+      window.nilavaramNavigation = data;
 
       data.forEach(function(section) {
+        if (section.type === 'link') {
+          const directButton = document.createElement('button');
+          directButton.type = 'button';
+          directButton.className = 'menu-button';
+          directButton.textContent = section.label;
+          directButton.onclick = function() {
+            openModule(section.moduleId, section.label);
+          };
+          menu.appendChild(directButton);
+          return;
+        }
+
         const wrapper = document.createElement('section');
         wrapper.className = 'menu-section';
-        const heading = document.createElement('h3');
-        heading.textContent = section.heading;
-        wrapper.appendChild(heading);
+        const groupButton = document.createElement('button');
+        groupButton.type = 'button';
+        groupButton.className = 'menu-group-button';
+        groupButton.setAttribute('aria-expanded', 'false');
+
+        const label = document.createElement('span');
+        label.textContent = section.label;
+        const arrow = document.createElement('span');
+        arrow.className = 'menu-arrow';
+        arrow.textContent = '↓';
+        arrow.setAttribute('aria-hidden', 'true');
+        groupButton.appendChild(label);
+        groupButton.appendChild(arrow);
+
+        const submenu = document.createElement('div');
+        submenu.className = 'submenu';
 
         section.buttons.forEach(function(item) {
           const button = document.createElement('button');
@@ -181,15 +546,140 @@
           button.className = 'menu-button';
           button.textContent = item.label;
           button.onclick = function() { openModule(item.moduleId, item.label); };
-          wrapper.appendChild(button);
+          submenu.appendChild(button);
         });
+
+        if (section.buttons.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'submenu-empty';
+          empty.textContent = 'Modules will be added next.';
+          submenu.appendChild(empty);
+        }
+
+        groupButton.onclick = function() {
+          const isOpen = submenu.classList.toggle('is-open');
+          groupButton.setAttribute('aria-expanded', String(isOpen));
+          arrow.textContent = isOpen ? '↑' : '↓';
+        };
+
+        wrapper.appendChild(groupButton);
+        wrapper.appendChild(submenu);
         menu.appendChild(wrapper);
       });
+    }
+
+    function buildMenu(data) {
+      const menu = document.getElementById('menu');
+      menu.textContent = '';
+      window.nilavaramNavigation = data;
+      data.forEach(function(section) {
+        menu.appendChild(createNavigationNode(section, true));
+      });
+    }
+
+    function createNavigationNode(node, isTopLevel) {
+      if (node.type === 'link' && (!node.children || !node.children.length)) {
+        const directButton = document.createElement('button');
+        directButton.type = 'button';
+        directButton.className = 'menu-button';
+        directButton.textContent = node.label;
+        directButton.onclick = function() {
+          openModule(node.moduleId, node.label);
+        };
+        return directButton;
+      }
+
+      const wrapper = document.createElement(isTopLevel ? 'section' : 'div');
+      wrapper.className = 'menu-section';
+      const groupButton = document.createElement('button');
+      groupButton.type = 'button';
+      groupButton.className = 'menu-group-button';
+      groupButton.setAttribute('aria-expanded', 'false');
+
+      const label = document.createElement('span');
+      label.textContent = node.label;
+      const arrow = document.createElement('span');
+      arrow.className = 'menu-arrow';
+      arrow.textContent = '\u2193';
+      arrow.setAttribute('aria-hidden', 'true');
+      groupButton.appendChild(label);
+      groupButton.appendChild(arrow);
+
+      const submenu = document.createElement('div');
+      submenu.className = 'submenu';
+      (node.children || []).forEach(function(child) {
+        submenu.appendChild(createNavigationNode(child, false));
+      });
+
+      if (!node.children || node.children.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'submenu-empty';
+        empty.textContent = 'Modules will be added next.';
+        submenu.appendChild(empty);
+      }
+
+      groupButton.onclick = function() {
+        const isOpen = submenu.classList.toggle('is-open');
+        groupButton.setAttribute('aria-expanded', String(isOpen));
+        arrow.textContent = isOpen ? '\u2191' : '\u2193';
+      };
+
+      wrapper.appendChild(groupButton);
+      wrapper.appendChild(submenu);
+      return wrapper;
     }
 
     function openModule(moduleId, label) {
       document.getElementById('output').textContent = 'Loading ' + label + '...';
 
+      if (moduleId === 'dashboard') {
+        document.getElementById('output').innerHTML =
+          '<h2>Dashboard</h2><p>Nilavaram is ready.</p>';
+        return;
+      }
+      if (moduleId === 'all-businesses') {
+        document.getElementById('output').innerHTML =
+          '<h2>All Businesses</h2>' +
+          '<p>Business records and management actions will be added next.</p>';
+        return;
+      }
+      if (moduleId === 'system-status') {
+        const data = window.nilavaramDashboardInfo;
+        document.getElementById('output').innerHTML =
+          '<h2>System Status</h2>' +
+          '<p><b>Application:</b> Nilavaram</p>' +
+          '<p><b>Version:</b> ' + escapeHtml(data.version) + '</p>' +
+          '<p><b>Status:</b> ' + escapeHtml(data.status) + '</p>';
+        return;
+      }
+      if (moduleId === 'pending-features') {
+        showPendingFeatures();
+        return;
+      }
+      if ([
+        'project-start',
+        'navigation-guide',
+        'getting-started',
+        'users-access-guide',
+        'accounting-guide',
+        'documents-imports-guide',
+        'inactivity-sign-in',
+        'project-architecture',
+        'faq',
+        'about-version-history',
+        'admin-technical-guide'
+      ].indexOf(moduleId) !== -1) {
+        showHelpArticle(moduleId, label);
+        return;
+      }
+      if (moduleId === 'alerts') {
+        showAlerts();
+        return;
+      }
+      if (moduleId === 'reminders') {
+        showReminders();
+        return;
+      }
       if (moduleId === 'users') {
         showUsers();
         return;
@@ -211,6 +701,323 @@
         })
         .withFailureHandler(showError)
         .openModule(moduleId);
+    }
+
+    function showHelpArticle(articleId, label) {
+      document.getElementById('output').textContent =
+        'Loading ' + (label || 'Help article') + '...';
+      google.script.run
+        .withSuccessHandler(renderHelpArticle)
+        .withFailureHandler(showError)
+        .getHelpArticle(articleId);
+    }
+
+    function renderHelpArticle(article) {
+      window.nilavaramHelpArticle = article;
+      const output = document.getElementById('output');
+      output.textContent = '';
+
+      const heading = document.createElement('h2');
+      heading.textContent = article.title;
+      output.appendChild(heading);
+
+      const meta = document.createElement('p');
+      meta.className = 'help-meta';
+      meta.textContent =
+        'Version ' + article.version + ' · Updated by ' + article.updatedBy;
+      output.appendChild(meta);
+
+      const content = document.createElement('div');
+      content.className = 'help-content';
+      renderMarkdown(content, article.content);
+      output.appendChild(content);
+
+      if (article.canEdit) {
+        const buttons = document.createElement('div');
+        buttons.className = 'button-row';
+        const editButton = document.createElement('button');
+        editButton.type = 'button';
+        editButton.className = 'primary-button';
+        editButton.textContent = 'Edit Help Content';
+        editButton.onclick = showHelpEditor;
+        buttons.appendChild(editButton);
+        output.appendChild(buttons);
+      }
+    }
+
+    function appendMarkdownText(element, text) {
+      String(text).split(/(\*\*[^*]+\*\*)/).forEach(function(part) {
+        if (
+          part.indexOf('**') === 0 &&
+          part.lastIndexOf('**') === part.length - 2
+        ) {
+          const strong = document.createElement('strong');
+          strong.textContent = part.slice(2, -2);
+          element.appendChild(strong);
+        } else {
+          element.appendChild(document.createTextNode(part));
+        }
+      });
+    }
+
+    function renderMarkdown(container, markdown) {
+      container.textContent = '';
+      let list = null;
+      let codeBlock = null;
+
+      String(markdown || '').split(/\r?\n/).forEach(function(line) {
+        if (line.trim() === '```') {
+          if (codeBlock) {
+            container.appendChild(codeBlock);
+            codeBlock = null;
+          } else {
+            codeBlock = document.createElement('pre');
+            codeBlock.appendChild(document.createElement('code'));
+          }
+          return;
+        }
+        if (codeBlock) {
+          codeBlock.firstChild.textContent +=
+            (codeBlock.firstChild.textContent ? '\n' : '') + line;
+          return;
+        }
+
+        const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+        if (headingMatch) {
+          list = null;
+          const heading = document.createElement('h' + headingMatch[1].length);
+          appendMarkdownText(heading, headingMatch[2]);
+          container.appendChild(heading);
+          return;
+        }
+
+        const listMatch = line.match(/^\s*-\s+(.+)$/);
+        if (listMatch) {
+          if (!list) {
+            list = document.createElement('ul');
+            container.appendChild(list);
+          }
+          const item = document.createElement('li');
+          appendMarkdownText(item, listMatch[1]);
+          list.appendChild(item);
+          return;
+        }
+
+        list = null;
+        if (!line.trim()) return;
+        const paragraph = document.createElement('p');
+        appendMarkdownText(paragraph, line);
+        container.appendChild(paragraph);
+      });
+
+      if (codeBlock) container.appendChild(codeBlock);
+    }
+
+    function showHelpEditor() {
+      const article = window.nilavaramHelpArticle;
+      if (!article) return;
+
+      document.getElementById('output').innerHTML =
+        '<h2>Edit Help Content</h2>' +
+        '<form id="help-form">' +
+          '<label for="help-title">Title</label>' +
+          '<input id="help-title" required>' +
+          '<label for="help-content">Content</label>' +
+          '<textarea id="help-content" required></textarea>' +
+          '<label for="help-reason">Reason for correction (optional)</label>' +
+          '<input id="help-reason" placeholder="You may leave this blank">' +
+          '<div class="button-row">' +
+            '<button class="primary-button" type="submit">Save Changes</button>' +
+            '<button class="secondary-button" id="cancel-help" type="button">Cancel</button>' +
+          '</div>' +
+          '<p id="help-message"></p>' +
+        '</form>';
+
+      document.getElementById('help-title').value = article.title;
+      document.getElementById('help-content').value = article.content;
+      document.getElementById('help-form').onsubmit = saveHelpForm;
+      document.getElementById('cancel-help').onclick = function() {
+        renderHelpArticle(article);
+      };
+    }
+
+    function saveHelpForm(event) {
+      event.preventDefault();
+      document.getElementById('help-message').textContent = 'Saving...';
+      google.script.run
+        .withSuccessHandler(function() {
+          showHelpArticle(window.nilavaramHelpArticle.articleId);
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('help-message').innerHTML =
+            '<span class="error">' + escapeHtml(error.message) + '</span>';
+        })
+        .saveHelpArticle({
+          articleId: window.nilavaramHelpArticle.articleId,
+          title: document.getElementById('help-title').value,
+          content: document.getElementById('help-content').value,
+          reason: document.getElementById('help-reason').value
+        });
+    }
+
+    function showPendingFeatures() {
+      document.getElementById('output').textContent =
+        'Loading pending features...';
+      google.script.run
+        .withSuccessHandler(renderDevelopmentTasks)
+        .withFailureHandler(showError)
+        .getDevelopmentTasks();
+    }
+
+    function renderDevelopmentTasks(tasks) {
+      const output = document.getElementById('output');
+      output.innerHTML = '<h2>Pending Features</h2>';
+      tasks.forEach(function(task) {
+        const article = document.createElement('article');
+        article.className = 'alert-item';
+        const heading = document.createElement('h3');
+        heading.textContent = task.title;
+        article.appendChild(heading);
+
+        const details = document.createElement('p');
+        details.textContent =
+          'Assigned to: ' + task.assignedTo +
+          ' \u00B7 Due: ' + formatStoredDate(task.dueDate) +
+          ' \u00B7 Status: ' + task.status;
+        article.appendChild(details);
+
+        const list = document.createElement('ul');
+        (task.requirements || []).forEach(function(requirement) {
+          const item = document.createElement('li');
+          item.textContent = requirement;
+          list.appendChild(item);
+        });
+        article.appendChild(list);
+        output.appendChild(article);
+      });
+    }
+
+    function formatStoredDate(value) {
+      const parts = String(value || '').split('-');
+      if (parts.length !== 3) return String(value || '');
+      const months = [
+        'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+        'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'
+      ];
+      return parts[2] + '-' + months[Number(parts[1]) - 1] + '-' + parts[0];
+    }
+
+    function showAlerts() {
+      document.getElementById('output').textContent = 'Loading alerts...';
+      google.script.run
+        .withSuccessHandler(renderAlerts)
+        .withFailureHandler(showError)
+        .getMyAlerts();
+    }
+
+    function showReminders() {
+      document.getElementById('output').textContent = 'Loading reminders...';
+      google.script.run
+        .withSuccessHandler(renderReminders)
+        .withFailureHandler(showError)
+        .getMyReminders();
+    }
+
+    function renderReminders(reminders) {
+      const output = document.getElementById('output');
+      output.innerHTML = '<h2>Reminders</h2>' +
+        '<p>Only reminders you own or that have been specifically shared with you are shown.</p>';
+
+      if (!reminders.length) {
+        output.innerHTML += '<p>No reminders.</p>';
+        return;
+      }
+
+      reminders.forEach(function(reminder) {
+        const article = document.createElement('article');
+        article.className = 'alert-item';
+
+        const heading = document.createElement('h3');
+        heading.textContent = reminder.title;
+        article.appendChild(heading);
+
+        const details = document.createElement('p');
+        details.textContent =
+          'Status: ' + reminder.status +
+          ' \u00B7 Visibility: ' + reminder.visibility +
+          ' \u00B7 Assigned to: ' + reminder.assignedTo;
+        article.appendChild(details);
+
+        const dates = document.createElement('p');
+        dates.textContent =
+          'Preparation due: ' + formatStoredDate(reminder.preparationDueDate) +
+          ' \u00B7 Filing deadline: ' +
+          (reminder.filingDueDate
+            ? formatStoredDate(reminder.filingDueDate)
+            : 'Needs confirmation');
+        article.appendChild(dates);
+
+        const schedule = document.createElement('p');
+        schedule.textContent =
+          'Planned email reminders: ' +
+          (reminder.emailReminderOffsetsDays || []).map(function(days) {
+            return days + ' day' + (days === 1 ? '' : 's') + ' before';
+          }).join(', ') +
+          '. Email delivery is ' +
+          (reminder.emailEnabled ? 'enabled.' : 'not yet enabled.');
+        article.appendChild(schedule);
+
+        const notes = document.createElement('p');
+        notes.textContent = reminder.notes || '';
+        article.appendChild(notes);
+        output.appendChild(article);
+      });
+    }
+
+    function renderAlerts(alerts) {
+      const output = document.getElementById('output');
+      output.innerHTML = '<h2>Alerts</h2>';
+      if (!alerts.length) {
+        output.innerHTML += '<p>No alerts.</p>';
+        return;
+      }
+
+      alerts.forEach(function(alert) {
+        const item = document.createElement('article');
+        item.className = 'alert-item';
+        const heading = document.createElement('h3');
+        heading.textContent =
+          (alert.status === 'unread' ? 'Unread — ' : '') + alert.title;
+        const message = document.createElement('p');
+        message.textContent = alert.message;
+        const pacific = getPacificViewTime(new Date(alert.createdAt));
+        const created = document.createElement('p');
+        created.className = 'help-meta';
+        created.textContent =
+          pacific.date + ' ' + pacific.weekday + ' · ' +
+          pacific.time + ' Pacific Time';
+        const reason = document.createElement('p');
+        reason.textContent = 'Reason: ' + (alert.reason || 'No reason provided');
+        item.appendChild(heading);
+        item.appendChild(message);
+        item.appendChild(created);
+        item.appendChild(reason);
+
+        if (alert.status === 'unread') {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'secondary-button';
+          button.textContent = 'Mark as read';
+          button.onclick = function() {
+            google.script.run
+              .withSuccessHandler(showAlerts)
+              .withFailureHandler(showError)
+              .markAlertRead(alert.id);
+          };
+          item.appendChild(button);
+        }
+        output.appendChild(item);
+      });
     }
 
     function showUsers() {

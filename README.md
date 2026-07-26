@@ -3,6 +3,17 @@
 Nilavaram is an invitation-only, Firestore-driven administration application
 built with Google Apps Script.
 
+The approved tentative menu hierarchy and the purpose of each section are
+documented in `NAVIGATION.md`.
+
+The agreed Project Start defines Nilavaram as a private, long-term Personal,
+Family and Business Information System. The UI records development intentions
+that may be completed in any practical sequence.
+
+Admin development and credential-location notes are maintained in `notes_ref1`
+and `notes_ref2` and displayed safely under System → Project Development →
+Admin Technical Guide. Secret credential values must never be stored there.
+
 ## Current foundation
 
 - Source code is maintained in VS Code and synchronized with Apps Script using
@@ -58,6 +69,24 @@ roles: ["admin"]
 The `menuId` connects a button to its heading. The `roles` list controls which
 roles may see the button.
 
+Top-level menu documents use `type: "group"` for expandable sections and
+`type: "link"` for direct destinations such as Dashboard and Help. Closed
+groups show a down arrow; open groups show an up arrow. The current top-level
+order is Dashboard, Businesses, Security, Transactions, Accounting, Customers
+& Vendors, Documents, Tasks, Reports, System and Help.
+
+## Display preferences
+
+The default dashboard appearance uses a sky-blue background, black text and
+large type. Each user can select Sky blue, Dark or Device setting and can select
+Large, Standard or Small text. The browser remembers these choices locally.
+The interface uses semantic HTML, responsive CSS, accessible focus indicators
+and scalable inline SVG graphics.
+
+The header records when the current page view started, displays the live
+Pacific Time and provides a button for copying the session details. Application
+version information is displayed under System Status instead of the header.
+
 ### `users`
 
 One document for each invited Google account. The normalized email address is
@@ -79,6 +108,30 @@ For a `ltd` user, `allowedModules` contains module IDs such as `files`.
 
 Records setup, invitations, accepted invitations and role changes. Each record
 contains the actor, target, action, details and date.
+
+### `helpArticles`, `helpHistory` and `alerts`
+
+`helpArticles` stores the current editable Help content. Every save copies the
+previous version to `helpHistory`, writes an `auditLog` record and creates an
+unread `alerts` record for every active Admin. A correction reason is optional;
+blank reasons are stored as `No reason provided`.
+
+### `developmentTasks`
+
+Stores visible project-development intentions, assignments and due dates.
+Tasks may be completed in a flexible sequence. The Private Decision Journal is
+due `2026-08-10`; Safe Automated Backup is due `2026-08-16`.
+
+### `reminders`
+
+Stores private or selectively shared reminders. The initial trust-tax filing
+review asks the owner to confirm the trust, tax years, required form and actual
+deadline. Its five planned email offsets are 30, 14, 7, 3 and 1 days before the
+confirmed deadline; email delivery remains disabled until those facts are
+entered.
+
+Help articles are stored as Markdown text and rendered safely by the dashboard.
+Raw user-entered HTML is not executed.
 
 ## First-time setup
 

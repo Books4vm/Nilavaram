@@ -1,8 +1,45 @@
+NILAVARAM COMMAND AND CREDENTIAL REFERENCE
+
+CLASP
+
+clasp --version
+  Shows the installed clasp version.
+
+clasp status
+  Shows which local files are linked to Apps Script.
+
+clasp push
+  Uploads the current Apps Script source files.
+
+The project link is stored in .clasp.json. The personal .clasprc.json OAuth
+credential file is stored outside the repository and must never be shared,
+displayed in the UI or committed.
+
+GIT AND GITHUB
+
+git status
+git add .
+git commit -m "Clear milestone description"
+git pull --rebase origin main
+git push origin main
 git remote -v
 
+GitHub authentication belongs in Git or the operating-system credential
+manager. Never save a GitHub password or access token in project files.
 
+FIRESTORE
 
+The Firestore Project ID is read from the Apps Script Property:
+FIRESTORE_PROJECT_ID
 
-clasp --version           3.3.0
-clasp status              confilrms the linked file names
-clasp push                to push the code to Apps Script
+Firestore requests use temporary Google OAuth access tokens. Never copy those
+tokens into project notes or the user interface.
+
+CURRENT CREDENTIAL STATUS
+
+- Apps Script project link: configured.
+- clasp developer authentication: configured for the current authorized user.
+- Firestore Project ID Script Property: configured and connection tested.
+- GitHub remote: configured.
+- GitHub authentication: managed outside project files.
+- OneDrive/Microsoft Graph authentication: not yet configured.

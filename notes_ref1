@@ -1,18 +1,29 @@
-Open VSCode
-main working copy should be the files in
-Check & set the folder name as
-     C:\Users\theso\Documents\nn\Nilavaram
+NILAVARAM DEVELOPMENT FLOW
 
-clasp is designed to write the code locally & Sync
+Main working copy:
+C:\Users\theso\Documents\nn\Nilavaram
 
-GitHub - for version history
-  GitHub stores the source files
-  GitHub does not execute the code
+VS Code is the primary place for editing source files.
 
-use Firestore to store centralized applicaion data
+Application flow:
+VS Code -> clasp push -> Google Apps Script -> /dev testing -> deployment
+                                      |
+                                      -> Firestore application data
 
-Firestore stores 
-  Users, Roles, Permissions, Files, Modules
-  Settings, Menus, Sessions, AuditLogs
+Version-control flow:
+VS Code -> git commit -> GitHub
 
-use Google Sheets & Google Docs for data, reports, etc
+GitHub stores source history but does not execute the application.
+
+Firestore stores centralized structured data, including menus, users,
+permissions, Help articles, alerts, audit records and development tasks.
+
+Google Docs supports collaborative teaching documents. Google Sheets supports
+imports, exports and temporary analysis. OneDrive or Google Drive should store
+large PDFs, scans and attachments, while Firestore stores their metadata and
+links.
+
+Credential rule:
+Record the credential name, purpose, owner, location and status. Never record
+passwords, OAuth tokens, private keys or service-account secrets in these notes,
+the UI, Firestore or GitHub.
