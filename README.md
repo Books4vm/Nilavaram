@@ -10,6 +10,10 @@ The agreed Project Start defines Nilavaram as a private, long-term Personal,
 Family and Business Information System. The UI records development intentions
 that may be completed in any practical sequence.
 
+Help → About and Version History reads the GitHub `main` commit history. It
+shows only code changes that were successfully pushed, including the commit
+date, message, short commit ID and GitHub details link.
+
 Admin development and credential-location notes are maintained in `notes_ref1`
 and `notes_ref2` and displayed safely under System → Project Development →
 Admin Technical Guide. Secret credential values must never be stored there.

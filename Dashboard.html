@@ -757,6 +757,10 @@
         showPendingFeatures();
         return;
       }
+      if (moduleId === 'about-version-history') {
+        showCodeChangeHistory();
+        return;
+      }
       if ([
         'nilavaram-core',
         'project-start',
@@ -820,6 +824,65 @@
         .withSuccessHandler(renderHelpArticle)
         .withFailureHandler(showError)
         .getHelpArticle(articleId);
+    }
+
+    function showCodeChangeHistory() {
+      document.getElementById('output').textContent =
+        'Loading code change history from GitHub...';
+      google.script.run
+        .withSuccessHandler(renderCodeChangeHistory)
+        .withFailureHandler(showError)
+        .getCodeChangeHistory();
+    }
+
+    function renderCodeChangeHistory(data) {
+      const output = document.getElementById('output');
+      output.innerHTML =
+        '<h2>About and Version History</h2>' +
+        '<p>This page lists code commits that were successfully pushed to the GitHub <b>main</b> branch. A local-only commit does not appear here.</p>';
+
+      if (!data.commits.length) {
+        output.innerHTML += '<p>No pushed commits were found.</p>';
+        return;
+      }
+
+      const table = document.createElement('table');
+      const head = document.createElement('thead');
+      head.innerHTML =
+        '<tr><th>Date and time</th><th>Change</th><th>Commit</th><th>Author</th></tr>';
+      table.appendChild(head);
+      const body = document.createElement('tbody');
+
+      data.commits.forEach(function(commit) {
+        const row = document.createElement('tr');
+        const dateCell = document.createElement('td');
+        const pacific = getPacificViewTime(new Date(commit.committedAt));
+        dateCell.textContent =
+          pacific.date + ' ' + pacific.weekday + ' ' +
+          pacific.time + ' Pacific Time';
+
+        const messageCell = document.createElement('td');
+        messageCell.textContent = commit.message;
+
+        const commitCell = document.createElement('td');
+        const link = document.createElement('a');
+        link.href = commit.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = commit.shortSha;
+        commitCell.appendChild(link);
+
+        const authorCell = document.createElement('td');
+        authorCell.textContent = commit.authorName;
+
+        row.appendChild(dateCell);
+        row.appendChild(messageCell);
+        row.appendChild(commitCell);
+        row.appendChild(authorCell);
+        body.appendChild(row);
+      });
+      table.appendChild(body);
+      output.appendChild(table);
     }
 
     function renderHelpArticle(article) {
