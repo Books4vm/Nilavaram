@@ -1,9 +1,29 @@
 /**
  * Accounts.js
- * Firestore-backed entities and editable five-digit Chart of Accounts.
+ * Firestore-backed entities and editable five-character Chart of Accounts.
  */
 
-const NILAVARAM_ACCOUNTING_FOUNDATION_VERSION = 5;
+const NILAVARAM_ACCOUNTING_FOUNDATION_VERSION = 7;
+
+function numericMemberCodeToVisible_(code) {
+  const value = String(code || '').toUpperCase();
+  const memberLetters = { '71': 'M', '72': 'A', '73': 'S', '74': 'R' };
+  return memberLetters[value.slice(0, 2)] && /^\d{5}$/.test(value)
+    ? '7' + memberLetters[value.slice(0, 2)] + value.slice(2)
+    : value;
+}
+
+function visibleMemberCodeToNumeric_(code) {
+  const value = String(code || '').toUpperCase();
+  const memberNumbers = { M: '1', A: '2', S: '3', R: '4' };
+  return /^7[MASR]\d{3}$/.test(value)
+    ? '7' + memberNumbers[value.charAt(1)] + value.slice(2)
+    : value;
+}
+
+function isValidAccountCode_(code) {
+  return /^\d{5}$/.test(code) || /^7[MASR]\d{3}$/.test(code);
+}
 
 function getDocumentOrNull_(collectionName, documentId) {
   try {
@@ -82,6 +102,8 @@ function setupAccountingFoundation_() {
 
   removeKnownDuplicateAccounts_();
   migrateNilavaramTerminology_();
+  setupApprovedMemberUseAccounts_();
+  migrateMemberAccountCodes_();
   applyAccountClassificationNotes_();
   firestoreSetDocument_(
     'system',
@@ -122,6 +144,243 @@ function setupAccountingFoundation_() {
       updatedAt: new Date()
     })
   );
+}
+
+function migrateMemberAccountCodes_() {
+  const accountWrites = [];
+  firestoreGetCollection_('accounts')
+    .map(fromFirestoreDocument_)
+    .forEach(function(account) {
+      const visibleCode = numericMemberCodeToVisible_(account.code);
+      const visibleParent = numericMemberCodeToVisible_(account.parentCode);
+      if (visibleCode === account.code &&
+          visibleParent === String(account.parentCode || '')) return;
+      const updated = {};
+      Object.keys(account).forEach(function(key) {
+        if (key !== 'id') updated[key] = account[key];
+      });
+      if (visibleCode !== account.code) {
+        updated.exportCode = account.exportCode || account.code;
+        updated.code = visibleCode;
+      }
+      if (visibleParent !== String(account.parentCode || '')) {
+        updated.parentCode = visibleParent;
+      }
+      updated.updatedAt = new Date();
+      accountWrites.push({
+        id: account.id,
+        fields: toFirestoreFields_(updated)
+      });
+    });
+  for (let index = 0; index < accountWrites.length; index += 400) {
+    firestoreBatchSetDocuments_(
+      'accounts',
+      accountWrites.slice(index, index + 400)
+    );
+  }
+
+  ['transactionRules', 'transactions'].forEach(function(collectionName) {
+    const writes = [];
+    firestoreGetCollection_(collectionName)
+      .map(fromFirestoreDocument_)
+      .forEach(function(record) {
+        const updated = {};
+        Object.keys(record).forEach(function(key) {
+          if (key !== 'id') updated[key] = record[key];
+        });
+        let changed = false;
+        ['debitAccountCode', 'creditAccountCode'].forEach(function(field) {
+          if (!record[field]) return;
+          const visible = numericMemberCodeToVisible_(record[field]);
+          if (visible !== record[field]) {
+            updated[field] = visible;
+            changed = true;
+          }
+        });
+        if (Array.isArray(record.lines)) {
+          updated.lines = record.lines.map(function(line) {
+            const migratedLine = {};
+            Object.keys(line).forEach(function(key) {
+              migratedLine[key] = line[key];
+            });
+            const visible = numericMemberCodeToVisible_(line.accountCode);
+            if (visible !== line.accountCode) {
+              migratedLine.accountCode = visible;
+              changed = true;
+            }
+            return migratedLine;
+          });
+        }
+        if (changed) {
+          updated.updatedAt = new Date();
+          writes.push({
+            id: record.id,
+            fields: toFirestoreFields_(updated)
+          });
+        }
+      });
+    for (let index = 0; index < writes.length; index += 400) {
+      firestoreBatchSetDocuments_(
+        collectionName,
+        writes.slice(index, index + 400)
+      );
+    }
+  });
+}
+
+function setupApprovedMemberUseAccounts_() {
+  const existingAccounts = firestoreGetCollection_('accounts')
+    .map(fromFirestoreDocument_);
+  const existingCodes = {};
+  existingAccounts.forEach(function(account) {
+    existingCodes[account.code] = true;
+  });
+
+  const pending = [];
+  const addAccount = function(code, name, accountType, parentCode, entityId,
+      categoryFamily, categorySuffix) {
+    if (existingCodes[code]) return;
+    const mark = accountType === 'group' ? 'SUBGROUP' : 'ENTRY ACCOUNT';
+    const explanation = accountType === 'group'
+      ? 'Organizes related accounts. Transactions cannot be entered here.'
+      : 'May be selected when entering a transaction.';
+    pending.push({
+      id: 'approved-' + code,
+      fields: toFirestoreFields_({
+        code: code,
+        name: name,
+        accountType: accountType,
+        parentCode: parentCode,
+        entityId: entityId,
+        status: 'active',
+        openingDate: '2025-01-01',
+        categoryFamily: categoryFamily,
+        categorySuffix: categorySuffix || '',
+        taxReviewRequired: true,
+        notes: '[Classification] ' + mark + ': ' + explanation,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+    });
+    existingCodes[code] = true;
+  };
+
+  const members = [
+    { letter: 'M', entityId: 'member-m', base: 71000, autoBase: 71200 },
+    { letter: 'A', entityId: 'member-a', base: 72000, autoBase: 72200 },
+    { letter: 'S', entityId: 'member-s', base: 73000, autoBase: 73200 },
+    { letter: 'R', entityId: 'member-r', base: 74000, autoBase: 74200 }
+  ];
+  const directCategories = [
+    ['01', 'Advertising'],
+    ['08', 'Renters insurance'],
+    ['10', 'Interest expense'],
+    ['11', 'Legal expenses'],
+    ['12', 'Professional fees'],
+    ['14', 'Vehicle rent/lease'],
+    ['15', 'Apartment rent/lease'],
+    ['16', 'Repairs and maintenance'],
+    ['17', 'Supplies'],
+    ['18', 'Taxes and licenses'],
+    ['19', 'Travel'],
+    ['20', 'Meals and restaurants'],
+    ['21', 'Utilities'],
+    ['23', 'Other business-related use'],
+    ['24', 'Equipment rent/lease'],
+    ['30', 'Health insurance'],
+    ['31', 'Medical and dental'],
+    ['32', 'Pharmacy and prescriptions'],
+    ['33', 'Vision care'],
+    ['34', 'Other health costs'],
+    ['40', 'Mortgage interest'],
+    ['41', 'Apartment utilities'],
+    ['42', 'Household repairs']
+  ];
+  const autoCategories = [
+    ['01', 'Gas'],
+    ['02', 'Parking'],
+    ['03', 'Repairs'],
+    ['04', 'Registration and tags'],
+    ['05', 'Tolls'],
+    ['06', 'Insurance'],
+    ['07', 'Parts'],
+    ['08', 'Wash and detailing'],
+    ['09', 'Roadside assistance'],
+    ['10', 'Other auto use']
+  ];
+
+  members.forEach(function(member) {
+    directCategories.forEach(function(category) {
+      const code = String(member.base + Number(category[0])).padStart(5, '0');
+      addAccount(
+        code,
+        member.letter + ' — ' + category[1],
+        'net-worth',
+        String(member.base),
+        member.entityId,
+        'member-use',
+        category[0]
+      );
+    });
+
+    const autoParent = String(member.autoBase);
+    addAccount(
+      autoParent,
+      member.letter + ' — Auto',
+      'group',
+      String(member.base),
+      member.entityId,
+      'auto',
+      ''
+    );
+    autoCategories.forEach(function(category) {
+      const code = String(member.autoBase + Number(category[0]))
+        .padStart(5, '0');
+      addAccount(
+        code,
+        member.letter + ' — Auto ' + category[1],
+        'net-worth',
+        autoParent,
+        member.entityId,
+        'auto',
+        category[0]
+      );
+    });
+  });
+
+  addAccount(
+    '75100',
+    'VAV Tr — Property',
+    'group',
+    '75000',
+    'trust-vav',
+    'property',
+    ''
+  );
+  [
+    ['75101', 'Property insurance'],
+    ['75102', 'Property tax'],
+    ['75103', 'Property repairs'],
+    ['75104', 'Property utilities'],
+    ['75105', 'Property mortgage interest']
+  ].forEach(function(item) {
+    addAccount(
+      item[0],
+      'VAV Tr — ' + item[1],
+      'net-worth',
+      '75100',
+      'trust-vav',
+      'property',
+      item[0].slice(-2)
+    );
+  });
+
+  for (let index = 0; index < pending.length; index += 400) {
+    firestoreBatchSetDocuments_(
+      'accounts',
+      pending.slice(index, index + 400)
+    );
+  }
 }
 
 function migrateNilavaramTerminology_() {
@@ -260,6 +519,8 @@ function applyAccountClassificationNotes_() {
         classification.explanation
     ].filter(Boolean).join(' ');
     updated.updatedAt = new Date();
+    const nameChanged = updated.name !== account.name;
+    if (!nameChanged && updated.notes === String(account.notes || '')) return;
     firestoreSetDocument_(
       'accounts',
       account.id,
@@ -296,7 +557,20 @@ function suggestChartAccount(input) {
   const definition = definitions[purpose];
   if (!definition) throw new Error('Select what you are adding.');
 
-  if (purpose === 'equity') {
+  const memberBases = {
+    'member-m': 71000,
+    'member-a': 72000,
+    'member-s': 73000,
+    'member-r': 74000
+  };
+  if (memberBases[entityId] &&
+      (purpose === 'paycheck' || purpose === 'equity')) {
+    definition.parent = String(memberBases[entityId]);
+    definition.start = memberBases[entityId] + 110;
+    definition.end = memberBases[entityId] + 990;
+  }
+
+  if (purpose === 'equity' && !memberBases[entityId]) {
     const trustParents = {
       'trust-vav': '75000',
       'trust-om-nama-sivaya': '76000',
@@ -310,6 +584,7 @@ function suggestChartAccount(input) {
   const used = {};
   accounts.forEach(function(account) {
     used[account.code] = true;
+    if (account.exportCode) used[account.exportCode] = true;
   });
   let suggestedCode = '';
   for (let code = definition.start; code <= definition.end; code += 10) {
@@ -321,6 +596,13 @@ function suggestChartAccount(input) {
   }
   if (!suggestedCode) throw new Error('No available code remains in this category.');
 
+  const exportCode = suggestedCode;
+  if (['member-m', 'member-a', 'member-s', 'member-r']
+      .indexOf(entityId) !== -1) {
+    suggestedCode = numericMemberCodeToVisible_(suggestedCode);
+    definition.parent = numericMemberCodeToVisible_(definition.parent);
+  }
+
   let suggestedName = name;
   if (purpose === 'bank' && lastFour && name.indexOf('*') === -1) {
     suggestedName += ' * ' + lastFour;
@@ -328,10 +610,11 @@ function suggestChartAccount(input) {
 
   return {
     code: suggestedCode,
+    exportCode: exportCode,
     name: suggestedName,
     accountType: definition.type,
     parentCode: definition.parent,
-    explanation: 'Nilavaram selected the next available five-digit code and its accounting group. You may review the advanced details before saving.'
+    explanation: 'Nilavaram selected the next available five-character code and its accounting group. You may review the advanced details before saving.'
   };
 }
 
@@ -342,7 +625,8 @@ function getChartOfAccountsData() {
     .map(fromFirestoreDocument_)
     .filter(function(account) { return account.status === 'active'; })
     .sort(function(a, b) {
-      return a.code.localeCompare(b.code);
+      return String(a.exportCode || a.code)
+        .localeCompare(String(b.exportCode || b.code));
     });
   activeAccounts.forEach(function(account) {
     const classification = getAccountClassification_(
@@ -369,16 +653,18 @@ function getChartOfAccountsData() {
 function saveChartAccount(input) {
   const admin = requireAdmin_();
   const id = String(input && input.id || '').trim();
-  const code = String(input && input.code || '').trim();
+  const code = String(input && input.code || '').trim().toUpperCase();
   const name = String(input && input.name || '').trim();
   const entityId = String(input && input.entityId || '').trim();
   const accountType = String(input && input.accountType || '').trim();
-  const parentCode = String(input && input.parentCode || '').trim();
+  const parentCode = String(input && input.parentCode || '').trim().toUpperCase();
   const status = String(input && input.status || 'active').trim();
   const notes = String(input && input.notes || '').trim();
 
-  if (!/^\d{5}$/.test(code)) {
-    throw new Error('Account code must contain exactly five numbers.');
+  if (!isValidAccountCode_(code)) {
+    throw new Error(
+      'Account code must contain five characters, such as 11110 or 7M020.'
+    );
   }
   if (!name) throw new Error('Enter an account name.');
   if (!getDocumentOrNull_('entities', entityId)) {
@@ -388,8 +674,8 @@ function saveChartAccount(input) {
       .indexOf(accountType) === -1) {
     throw new Error('Select a valid account type.');
   }
-  if (parentCode && !/^\d{5}$/.test(parentCode)) {
-    throw new Error('Parent code must be blank or contain five numbers.');
+  if (parentCode && !isValidAccountCode_(parentCode)) {
+    throw new Error('Parent code must be blank or contain five characters.');
   }
   if (['active', 'inactive'].indexOf(status) === -1) {
     throw new Error('Select a valid status.');
@@ -397,14 +683,22 @@ function saveChartAccount(input) {
 
   const accounts = firestoreGetCollection_('accounts')
     .map(fromFirestoreDocument_);
+  const exportCode = visibleMemberCodeToNumeric_(code);
   const duplicate = accounts.some(function(account) {
-    return account.id !== id &&
-      account.code === code;
+    if (account.id === id) return false;
+    const existingVisible = String(account.code || '').toUpperCase();
+    const existingExport = String(
+      account.exportCode || visibleMemberCodeToNumeric_(existingVisible)
+    ).toUpperCase();
+    return existingVisible === code ||
+      existingExport === exportCode ||
+      existingVisible === exportCode ||
+      existingExport === code;
   });
   if (duplicate) {
     throw new Error(
       'Account code ' + code +
-      ' is already in use. Every five-digit code must be unique.'
+      ' is already in use. Every five-character code must be unique.'
     );
   }
 
@@ -425,6 +719,7 @@ function saveChartAccount(input) {
 
   const savedAccount = {
     code: code,
+    exportCode: exportCode,
     name: name,
     entityId: entityId,
     accountType: accountType,

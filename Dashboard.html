@@ -1237,7 +1237,7 @@
       const output = document.getElementById('output');
       output.innerHTML =
         '<h2>Chart of Accounts</h2>' +
-        '<p>The five-digit account master is stored in Firestore. ' +
+        '<p>The five-character account master is stored in Firestore. ' +
         'Existing transactions will refer to the account record, so its name ' +
         'may be corrected without losing history.</p>' +
         '<article class="alert-item">' +
@@ -1253,6 +1253,17 @@
           '</ul>' +
           '<p class="help-meta">' +
             escapeHtml(data.foundation.clarification) + '</p>' +
+        '</article>' +
+        '<article class="alert-item">' +
+          '<h3>How to read this Chart</h3>' +
+          '<p><b>Main group</b> is a large heading. <b>Subgroup</b> organizes related accounts. Only an <b>Entry account</b> may be selected for a transaction.</p>' +
+          '<p>The same final digits have the same meaning for each member. Example: <b>20</b> means Meals and restaurants.</p>' +
+          '<pre>M: 7M020   A: 7A020   S: 7S020   R: 7R020</pre>' +
+          '<h3>Illustrated entry</h3>' +
+          '<p>If M pays $60 at a restaurant from BOA Ch * 0137, Nilavaram prepares:</p>' +
+          '<pre>Debit   7M020  M — Meals and restaurants   $60\\n' +
+          'Credit  11110  BOA Ch * 0137               $60</pre>' +
+          '<p>This reduces M’s recorded net-worth position. The category name alone does not make a payment tax-deductible; purpose and evidence must be reviewed separately.</p>' +
         '</article>';
 
       if (data.canEdit) {
@@ -1289,8 +1300,8 @@
             '<p id="account-suggestion" class="help-meta"></p>' +
             '<details id="account-advanced"><summary>Review accounting details</summary>' +
             '<div class="form-grid">' +
-              '<div><label for="account-code">Five-digit code</label>' +
-                '<input id="account-code" inputmode="numeric" maxlength="5" required></div>' +
+              '<div><label for="account-code">Five-character code</label>' +
+                '<input id="account-code" maxlength="5" required></div>' +
               '<div><label for="account-type">Account type</label>' +
                 '<select id="account-type">' +
                   '<option value="group">Group / heading</option>' +
@@ -1302,7 +1313,7 @@
                   '<option value="clearing">Clearing</option>' +
                 '</select></div>' +
               '<div><label for="account-parent">Parent code</label>' +
-                '<input id="account-parent" inputmode="numeric" maxlength="5"></div>' +
+                '<input id="account-parent" maxlength="5"></div>' +
               '<div><label for="account-status">Status</label>' +
                 '<select id="account-status">' +
                   '<option value="active">Active</option>' +

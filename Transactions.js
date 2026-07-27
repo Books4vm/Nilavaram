@@ -10,7 +10,7 @@ function setupTransactionFoundation_() {
     transactionType: 'paycheck',
     memberEntityId: 'member-m',
     debitAccountCode: '11110',
-    creditAccountCode: '71110',
+    creditAccountCode: '7M110',
     status: 'active',
     confidence: 'approved-example'
   });
@@ -96,7 +96,10 @@ function getSimpleTransactionSetup() {
           account.accountType !== 'group' &&
           !parentCodes[account.code];
       })
-      .sort(function(a, b) { return a.code.localeCompare(b.code); })
+      .sort(function(a, b) {
+        return String(a.exportCode || a.code)
+          .localeCompare(String(b.exportCode || b.code));
+      })
   };
 }
 

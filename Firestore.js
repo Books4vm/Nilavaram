@@ -130,6 +130,38 @@ function firestoreDeleteDocument_(collectionName, documentId) {
 }
 
 /**
+ * Creates or updates several Firestore documents in one request.
+ *
+ * @param {string} collectionName Firestore collection.
+ * @param {Object[]} records Records containing id and fields.
+ * @returns {Object}
+ */
+function firestoreBatchSetDocuments_(collectionName, records) {
+  if (!records || records.length === 0) return { writeResults: [] };
+  const projectId = getFirestoreProjectId_();
+  const databaseName =
+    'projects/' + projectId + '/databases/(default)';
+  const url =
+    'https://firestore.googleapis.com/v1/' +
+    databaseName +
+    '/documents:batchWrite';
+  const writes = records.map(function(record) {
+    return {
+      update: {
+        name:
+          databaseName +
+          '/documents/' +
+          collectionName +
+          '/' +
+          record.id,
+        fields: record.fields
+      }
+    };
+  });
+  return firestoreRequest_(url, 'post', { writes: writes });
+}
+
+/**
  * Reads every document in a Firestore collection.
  *
  * @param {string} collectionName Firestore collection.
