@@ -856,6 +856,7 @@
     function renderMicrosoftConnection(status) {
       const output = document.getElementById('output');
       const access = window.nilavaramAdminAccessInfo || {};
+      const akoya = CONNECTIONS_BOOTSTRAP.akoyaStatus || {};
       let html = '<h2>Connections</h2>' +
         '<h3>Storage and Developer Access</h3>' +
         '<p><b>VS Code project folder:</b><br><code>' +
@@ -926,6 +927,40 @@
             '?validateOneDrive=1">Validate live OneDrive quota</a>' +
           '</div>';
       }
+
+      html += '<h3>Akoya Bank Feed</h3>' +
+        '<p><b>Purpose:</b> Secure, consumer-permissioned bank transaction ' +
+        'downloads for validation before accounting entries are posted.</p>' +
+        '<p><b>Environment:</b> ' +
+        escapeHtml(akoya.environment || 'sandbox') + '</p>';
+      if (!akoya.configured) {
+        html += '<p class="error"><b>Configuration required.</b></p>' +
+          '<p>Missing secure settings: ' +
+          escapeHtml((akoya.missingProperties || []).join(', ')) + '</p>';
+      } else if (!akoya.connected) {
+        html += '<p><b>Status:</b> Ready for sandbox authorization.</p>' +
+          '<div class="button-row">' +
+          '<a class="primary-button" ' +
+          'href="' + escapeHtml(access.appsScriptWebApp || '#') +
+          '?startAkoya=1">Connect Akoya Sandbox</a>' +
+          '</div>' +
+          '<p>Use Akoya sandbox test credentials only. Real Bank of America ' +
+          'credentials are not used during this test.</p>';
+      } else {
+        html += '<p class="success"><b>Connected.</b></p>' +
+          '<p><b>Sandbox provider:</b> ' +
+          escapeHtml(akoya.provider || '') + '</p>' +
+          '<p><b>Connection status:</b> ' +
+          escapeHtml(akoya.validationState || '') + '</p>' +
+          '<p><b>Sandbox accounts available:</b> ' +
+          escapeHtml(akoya.accountCount == null ? '' : akoya.accountCount) +
+          '</p>' +
+          '<div class="button-row">' +
+          '<a class="secondary-button" ' +
+          'href="' + escapeHtml(access.appsScriptWebApp || '#') +
+          '?validateAkoya=1">Validate live Akoya Sandbox connection</a>' +
+          '</div>';
+      }
       output.innerHTML = html;
       if (CONNECTIONS_BOOTSTRAP.liveValidationPassed) {
         output.insertAdjacentHTML(
@@ -937,6 +972,18 @@
           'afterbegin',
           '<p class="error"><b>Live Microsoft Graph validation failed:</b> ' +
           escapeHtml(CONNECTIONS_BOOTSTRAP.liveValidationError) + '</p>'
+        );
+      }
+      if (CONNECTIONS_BOOTSTRAP.akoyaValidationPassed) {
+        output.insertAdjacentHTML(
+          'afterbegin',
+          '<p class="success"><b>Live Akoya Sandbox validation passed.</b></p>'
+        );
+      } else if (CONNECTIONS_BOOTSTRAP.akoyaValidationError) {
+        output.insertAdjacentHTML(
+          'afterbegin',
+          '<p class="error"><b>Live Akoya Sandbox validation failed:</b> ' +
+          escapeHtml(CONNECTIONS_BOOTSTRAP.akoyaValidationError) + '</p>'
         );
       }
     }

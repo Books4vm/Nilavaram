@@ -95,7 +95,7 @@ function buildConnectionsBootstrap_() {
       .getProperty('MICROSOFT_REFRESH_TOKEN')
   );
   return {
-    build: 13,
+    build: 14,
     accessInfo: buildStorageAccessInfo_(),
     hasRefreshToken: hasRefreshToken,
     microsoftStatus: {
@@ -108,7 +108,10 @@ function buildConnectionsBootstrap_() {
       quotaState: hasRefreshToken ? 'Live quota check pending' : ''
     },
     liveValidationPassed: false,
-    liveValidationError: ''
+    liveValidationError: '',
+    akoyaStatus: getAkoyaConnectionStatus_(),
+    akoyaValidationPassed: false,
+    akoyaValidationError: ''
   };
 }
 

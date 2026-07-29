@@ -28,6 +28,57 @@ function include(filename) {
  */
 function doGet(e) {
   const parameters = e && e.parameter || {};
+  if (parameters.startAkoya === '1') {
+    try {
+      const authorizationUrl = getAkoyaAuthorizationUrl_();
+      return HtmlService.createHtmlOutput(
+        '<!doctype html><html><head><base target="_top">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>Connect Akoya Sandbox</title></head><body>' +
+        '<h1>Connect Akoya Sandbox</h1>' +
+        '<p>You are leaving Nilavaram for Akoya’s secure sandbox ' +
+        'authorization page.</p>' +
+        '<p><a href="' + escapeHtmlServer_(authorizationUrl) +
+        '" target="_top">Continue to Akoya Sandbox</a></p>' +
+        '<p>Use only Akoya sandbox test credentials. Do not enter a real ' +
+        'bank password during sandbox testing.</p>' +
+        '</body></html>'
+      ).setTitle('Connect Akoya Sandbox');
+    } catch (error) {
+      return buildAuthorizationErrorPage_(
+        'Akoya Sandbox Connection',
+        error
+      );
+    }
+  }
+  if (
+    parameters.provider === 'akoya' &&
+    (parameters.code || parameters.error)
+  ) {
+    try {
+      const akoyaStatus = completeAkoyaAuthorization_(parameters);
+      return HtmlService.createHtmlOutput(
+        '<!doctype html><html><head><base target="_top">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>Akoya Sandbox Connected</title></head><body>' +
+        '<h1>Akoya Sandbox connected</h1>' +
+        '<p>Provider: ' +
+        escapeHtmlServer_(akoyaStatus.provider) + '.</p>' +
+        '<p>The authorization token is stored securely. No sandbox ' +
+        'transactions have been posted to the books.</p>' +
+        '<p><a href="' + escapeHtmlServer_(
+          buildStorageAccessInfo_().appsScriptWebApp
+        ) + '?validateAkoya=1" target="_top">' +
+        'Validate the sandbox account connection</a></p>' +
+        '</body></html>'
+      ).setTitle('Akoya Sandbox Connected');
+    } catch (error) {
+      return buildAuthorizationErrorPage_(
+        'Akoya Sandbox Connection',
+        error
+      );
+    }
+  }
   if (parameters.code || parameters.error) {
     try {
       const summary = completeMicrosoftAuthorization_(parameters);
@@ -57,6 +108,7 @@ function doGet(e) {
   }
   const template = HtmlService.createTemplateFromFile('Dashboard');
   const validateOneDrive = parameters.validateOneDrive === '1';
+  const validateAkoya = parameters.validateAkoya === '1';
   let connectionsBootstrap = buildConnectionsBootstrap_();
   if (validateOneDrive) {
     try {
@@ -68,11 +120,35 @@ function doGet(e) {
         String(error && error.message || error);
     }
   }
+  if (validateAkoya) {
+    try {
+      connectionsBootstrap.akoyaStatus =
+        validateAkoyaConnectionForUi();
+      connectionsBootstrap.akoyaValidationPassed = true;
+    } catch (error) {
+      connectionsBootstrap.akoyaValidationError =
+        String(error && error.message || error);
+    }
+  }
   template.connectionsBootstrapJson = JSON.stringify(
     connectionsBootstrap
   ).replace(/</g, '\\u003c');
-  template.openConnectionsOnLoadJson = JSON.stringify(validateOneDrive);
+  template.openConnectionsOnLoadJson = JSON.stringify(
+    validateOneDrive || validateAkoya
+  );
   return template.evaluate().setTitle('Nilavaram');
+}
+
+function buildAuthorizationErrorPage_(title, error) {
+  return HtmlService.createHtmlOutput(
+    '<!doctype html><html><head><base target="_top">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>' + escapeHtmlServer_(title) + '</title></head><body>' +
+    '<h1>Connection not completed</h1><p>' +
+    escapeHtmlServer_(error && error.message || error) + '</p>' +
+    '<p>Return to Nilavaram Connections and try again.</p>' +
+    '</body></html>'
+  ).setTitle(title);
 }
 
 function escapeHtmlServer_(value) {
