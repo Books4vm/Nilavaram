@@ -8,7 +8,7 @@ const NILAVARAM_INITIAL_ADMIN_EMAILS = [
   'mangai8100@gmail.com',
   'vm8100@gmail.com'
 ];
-const NILAVARAM_NAVIGATION_VERSION = 13;
+const NILAVARAM_NAVIGATION_VERSION = 15;
 
 /**
  * Creates or refreshes the Firestore-driven navigation.
@@ -22,7 +22,7 @@ function setupNavigation_() {
     { id: 'businesses', label: 'Businesses', description: 'Manages the businesses maintained in Nilavaram.', order: 30, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'assets-estate', label: 'Assets & Estate', description: 'Organizes properties, accounts, trusts, ownership and estate documents.', order: 40, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'security', label: 'Security', description: 'Controls users, roles, permissions and access monitoring.', order: 50, type: 'group', roles: ['admin'] },
-    { id: 'transactions', label: 'Transactions', description: 'Handles transaction entry, review, categorization and posting.', order: 60, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'transactions', label: 'Transactions', description: 'Runs the controlled source, reconciliation, account-assignment and posting workflow.', order: 60, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'accounting', label: 'Accounting', description: 'Contains bookkeeping, reconciliation and period-closing functions.', order: 70, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'contacts', label: 'Customers & Vendors', description: 'Manages buyers, suppliers, receivables and payables.', order: 80, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'private-journal', label: 'Private Journal', description: 'Keeps private decisions, strategy reviews and follow-up dates.', order: 90, type: 'group', roles: ['admin'] },
@@ -50,7 +50,11 @@ function setupNavigation_() {
     { id: 'strategy-reviews', menuId: 'private-journal', parentId: 'private-journal', level: 2, label: 'Strategy Reviews', description: 'Reviews and updates private strategies over time.', moduleId: 'strategy-reviews', order: 20, enabled: true, roles: ['admin'] },
     { id: 'journal-follow-ups', menuId: 'private-journal', parentId: 'private-journal', level: 2, label: 'Follow-up Dates', description: 'Tracks dates for reconsidering private decisions.', moduleId: 'journal-follow-ups', order: 30, enabled: true, roles: ['admin'] },
     { id: 'chart-of-accounts', menuId: 'accounting', parentId: 'accounting', level: 2, label: 'Chart of Accounts', description: 'Views and maintains the five-character Firestore Chart of Accounts.', moduleId: 'chart-of-accounts', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
-    { id: 'new-transaction', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'New Transaction', description: 'Records what happened in plain language and prepares a balanced draft entry.', moduleId: 'new-transaction', order: 10, enabled: true, roles: ['admin', 'editor'] },
+    { id: 'transaction-workbench', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Transaction Workbench', description: 'Shows the four-stage source-to-books workflow and pending alerts.', moduleId: 'transaction-workbench', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'source-input', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Step 1 - Source Input', description: 'Registers manual, CSV, PDF or image source records and evidence outside the books.', moduleId: 'source-input', order: 20, enabled: true, roles: ['admin', 'editor'] },
+    { id: 'reconciliation-validation', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Step 2 - Reconciliation', description: 'Validates balances, matches, duplicates and differences.', moduleId: 'reconciliation-validation', order: 30, enabled: true, roles: ['admin', 'editor', 'reader'] },
+    { id: 'account-rule-review', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Step 3 - Account Rules', description: 'Displays versioned suggestions, confidence and approvals.', moduleId: 'account-rule-review', order: 40, enabled: true, roles: ['admin', 'editor', 'reader'] },
+    { id: 'manual-journal-entry', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Manual / Correction Journal Entry', description: 'Records evidence-backed entries with mandatory audit notes.', moduleId: 'manual-journal-entry', order: 50, enabled: true, roles: ['admin', 'editor'] },
     { id: 'archive-library', menuId: 'documents', parentId: 'documents', level: 2, label: 'Archive Library', description: 'Lists preserved documents and their metadata.', moduleId: 'archive-library', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'upload-documents', menuId: 'documents', parentId: 'documents', level: 2, label: 'Upload Documents', description: 'Adds documents to approved cloud storage.', moduleId: 'upload-documents', order: 20, enabled: true, roles: ['admin', 'editor'] },
     { id: 'missing-documents', menuId: 'documents', parentId: 'documents', level: 2, label: 'Missing / To Retrieve', description: 'Records expected documents that have not yet been located.', moduleId: 'missing-documents', order: 30, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
@@ -65,6 +69,7 @@ function setupNavigation_() {
     { id: 'getting-started', menuId: 'help', parentId: 'help', level: 2, label: 'Getting Started', description: 'Introduces first login, business selection and dashboard basics.', moduleId: 'getting-started', order: 20, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'users-access-guide', menuId: 'help', parentId: 'help', level: 2, label: 'Users & Access', description: 'Explains invitations, roles and permissions.', moduleId: 'users-access-guide', order: 30, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'accounting-guide', menuId: 'help', parentId: 'help', level: 2, label: 'Accounting Guide', description: 'Explains Nilavaram accounting concepts and workflow.', moduleId: 'accounting-guide', order: 40, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'accounting-operating-rules', menuId: 'help', parentId: 'help', level: 2, label: 'Accounting Operating Rules', description: 'Shows the locked transaction, posting, reconciliation, correction, storage and audit rules.', moduleId: 'accounting-operating-rules', order: 45, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'documents-imports-guide', menuId: 'help', parentId: 'help', level: 2, label: 'Documents and Imports', description: 'Explains document storage and transaction imports.', moduleId: 'documents-imports-guide', order: 50, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'security-sessions-guide', menuId: 'help', parentId: 'help', level: 2, label: 'Security & Sessions', description: 'Explains sign-in, access and session security.', moduleId: '', type: 'group', order: 60, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'inactivity-sign-in', menuId: 'help', parentId: 'security-sessions-guide', level: 3, label: 'Inactivity and Sign-in', description: 'Explains the planned inactivity warning and secure sign-in requirement.', moduleId: 'inactivity-sign-in', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
@@ -112,6 +117,18 @@ function setupNavigation_() {
       roles: ['admin']
     }));
   });
+
+  firestoreSetDocument_('menuItems', 'new-transaction', toFirestoreFields_({
+    menuId: 'transactions',
+    parentId: 'transactions',
+    level: 2,
+    label: 'New Transaction (replaced)',
+    description: 'Replaced by the controlled Transaction Workbench.',
+    moduleId: 'new-transaction',
+    order: 999,
+    enabled: false,
+    roles: ['admin', 'editor']
+  }));
 
   menuItems.forEach(function(item) {
     firestoreSetDocument_('menuItems', item.id, toFirestoreFields_({

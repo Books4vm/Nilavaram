@@ -332,7 +332,7 @@
           <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5z"/>
           <path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z"/>
         </svg>
-        <h1>Nilavaram Administration</h1>
+        <h1>Nilavaram</h1>
       </div>
       <div class="appearance-controls" aria-label="Display preferences">
         <label class="appearance-field" for="theme-choice">
@@ -370,11 +370,17 @@
 
   <script>
     const PAGE_VIEW_STARTED_AT = new Date();
+    const CONNECTIONS_BOOTSTRAP = <?!= connectionsBootstrapJson ?>;
+    const OPEN_CONNECTIONS_ON_LOAD = <?!= openConnectionsOnLoadJson ?>;
     let startupTimerId = null;
 
     window.onload = function() {
       initializeDisplayPreferences();
-      showDefaultDashboard();
+      if (OPEN_CONNECTIONS_ON_LOAD) {
+        showConnections();
+      } else {
+        showDefaultDashboard();
+      }
       loadStartup();
     };
 
@@ -768,6 +774,7 @@
         'getting-started',
         'users-access-guide',
         'accounting-guide',
+        'accounting-operating-rules',
         'documents-imports-guide',
         'inactivity-sign-in',
         'project-architecture',
@@ -791,7 +798,17 @@
         return;
       }
       if (moduleId === 'new-transaction') {
-        showSimpleTransaction();
+        showTransactionWorkbench('source-input');
+        return;
+      }
+      if ([
+        'transaction-workbench',
+        'source-input',
+        'reconciliation-validation',
+        'account-rule-review',
+        'manual-journal-entry'
+      ].indexOf(moduleId) !== -1) {
+        showTransactionWorkbench(moduleId);
         return;
       }
       if (moduleId === 'users') {
@@ -808,6 +825,10 @@
           .testFirestore();
         return;
       }
+      if (moduleId === 'connections') {
+        showConnections();
+        return;
+      }
 
       google.script.run
         .withSuccessHandler(function(result) {
@@ -815,6 +836,166 @@
         })
         .withFailureHandler(showError)
         .openModule(moduleId);
+    }
+
+    function showConnections() {
+      window.nilavaramAdminAccessInfo =
+        CONNECTIONS_BOOTSTRAP.accessInfo || {};
+      renderMicrosoftConnection(
+        CONNECTIONS_BOOTSTRAP.microsoftStatus || {}
+      );
+      const output = document.getElementById('output');
+      output.insertAdjacentHTML(
+        'afterbegin',
+        '<p><b>Connection diagnostic build ' +
+        escapeHtml(CONNECTIONS_BOOTSTRAP.build || '') +
+        ' — server-rendered</b></p>'
+      );
+    }
+
+    function renderMicrosoftConnection(status) {
+      const output = document.getElementById('output');
+      const access = window.nilavaramAdminAccessInfo || {};
+      let html = '<h2>Connections</h2>' +
+        '<h3>Storage and Developer Access</h3>' +
+        '<p><b>VS Code project folder:</b><br><code>' +
+        escapeHtml(access.vscodeFolder || '') + '</code></p>' +
+        '<p><b>GitHub:</b> <a target="_blank" rel="noopener noreferrer" href="' +
+        escapeHtml(access.githubRepository || '#') + '">' +
+        escapeHtml(access.githubRepository || '') + '</a>' +
+        '<br><b>Branch:</b> ' + escapeHtml(access.githubBranch || '') + '</p>' +
+        '<p><b>Apps Script web application:</b> ' +
+        '<a target="_blank" rel="noopener noreferrer" href="' +
+        escapeHtml(access.appsScriptWebApp || '#') +
+        '">Open Nilavaram</a></p>' +
+        '<h3>Evidence Storage and Optional Local Backup</h3>' +
+        '<p><b>Primary Cloud Evidence Storage:</b> OneDrive — ' +
+        escapeHtml(access.primaryOneDriveAccount || '') + '</p>' +
+        '<p><b>Optional Local Backup / Intake:</b> ' +
+        escapeHtml(access.externalDriveLabel || '') + ' <code>' +
+        escapeHtml(access.externalDrive || '') + '</code>' +
+        ' — approximately ' +
+        escapeHtml(access.externalDriveFreeGb || '') + ' GB free.</p>' +
+        '<p><b>External code backup:</b><br><code>' +
+        escapeHtml(access.externalCodeBackup || '') + '</code><br>' +
+        'This is a backup copy; continue editing the authoritative VS Code ' +
+        'project on C:.</p>' +
+        '<p><b>External data root:</b><br><code>' +
+        escapeHtml(access.dataRoot || '') + '</code></p>' +
+        '<p><b>OneDrive sync source:</b><br><code>' +
+        escapeHtml(access.oneDriveSyncSource || '') + '</code></p>' +
+        '<p><b>External archive folder:</b><br><code>' +
+        escapeHtml(access.recommendedArchiveFolder || '') + '</code></p>' +
+        '<p><b>Local OneDrive view:</b><br><code>' +
+        escapeHtml(access.localOneDrive || '') + '</code></p>' +
+        '<p>The external HDD is optional. Place files approved for manual ' +
+        'cloud upload in the OneDrive sync source. ' +
+        'Your selected file-sync application may copy that folder to OneDrive. ' +
+        'Keep the external HDD source or archive copy and verify cloud uploads. ' +
+        'Do not require the full cloud archive on the laptop.</p>' +
+        '<p class="error"><b>Credential rule:</b> ' +
+        escapeHtml(access.credentialNotice || '') + '</p>' +
+        '<h3>Microsoft OneDrive</h3>' +
+        '<p><b>Approved repository:</b> ' +
+        escapeHtml(status.expectedAccount || 'vmurugan@hotmail.com') + '</p>';
+
+      if (!status.configured) {
+        html += '<p class="error"><b>Configuration required.</b> ' +
+          'The Microsoft application must be registered before sign-in.</p>' +
+          '<p>Missing secure settings: ' +
+          escapeHtml((status.missingProperties || []).join(', ')) + '</p>';
+      } else if (!status.connected) {
+        html += '<p class="error"><b>Not connected.</b></p>' +
+          '<div class="button-row">' +
+          '<button class="primary-button" type="button" ' +
+          'onclick="connectMicrosoftOneDrive()">Connect OneDrive</button>' +
+          '</div>';
+      } else {
+        html += '<p class="success"><b>Connected.</b></p>' +
+          '<p><b>Account:</b> ' + escapeHtml(status.account) + '</p>' +
+          '<p><b>Drive type:</b> ' + escapeHtml(status.driveType) + '</p>' +
+          '<p><b>Total space:</b> ' + escapeHtml(status.totalGb) + ' GB</p>' +
+          '<p><b>Used:</b> ' + escapeHtml(status.usedGb) + ' GB</p>' +
+          '<p><b>Available:</b> ' +
+          escapeHtml(status.remainingGb) + ' GB</p>' +
+          '<p><b>Storage status:</b> ' +
+          escapeHtml(status.quotaState) + '</p>' +
+          '<div class="button-row">' +
+            '<a class="secondary-button" ' +
+            'href="' + escapeHtml(access.appsScriptWebApp || '#') +
+            '?validateOneDrive=1">Validate live OneDrive quota</a>' +
+          '</div>';
+      }
+      output.innerHTML = html;
+      if (CONNECTIONS_BOOTSTRAP.liveValidationPassed) {
+        output.insertAdjacentHTML(
+          'afterbegin',
+          '<p class="success"><b>Live Microsoft Graph validation passed.</b></p>'
+        );
+      } else if (CONNECTIONS_BOOTSTRAP.liveValidationError) {
+        output.insertAdjacentHTML(
+          'afterbegin',
+          '<p class="error"><b>Live Microsoft Graph validation failed:</b> ' +
+          escapeHtml(CONNECTIONS_BOOTSTRAP.liveValidationError) + '</p>'
+        );
+      }
+    }
+
+    function validateMicrosoftOneDrive() {
+      const output = document.getElementById('output');
+      output.insertAdjacentHTML(
+        'afterbegin',
+        '<p id="microsoft-live-check"><b>Contacting Microsoft Graph...</b></p>'
+      );
+      const timeoutId = window.setTimeout(function() {
+        const message = document.getElementById('microsoft-live-check');
+        if (message) {
+          message.innerHTML =
+            '<span class="error"><b>The live Microsoft check did not ' +
+            'return within 30 seconds.</b></span>';
+        }
+      }, 30000);
+      google.script.run
+        .withSuccessHandler(function(status) {
+          window.clearTimeout(timeoutId);
+          renderMicrosoftConnection(status);
+          document.getElementById('output').insertAdjacentHTML(
+            'afterbegin',
+            '<p class="success"><b>Live Microsoft Graph validation passed.</b></p>'
+          );
+        })
+        .withFailureHandler(function(error) {
+          window.clearTimeout(timeoutId);
+          showError(error);
+        })
+        .validateMicrosoftConnectionForUi();
+    }
+
+    function connectMicrosoftOneDrive() {
+      document.getElementById('output').innerHTML =
+        '<h2>Connections</h2><p>Preparing Microsoft sign-in...</p>';
+      google.script.run
+        .withSuccessHandler(function(result) {
+          const signInWindow = window.open(
+            result.authorizationUrl,
+            '_blank',
+            'noopener'
+          );
+          if (!signInWindow) {
+            showError({
+              message: 'Allow pop-ups for Nilavaram, then select Connect again.'
+            });
+          } else {
+            document.getElementById('output').innerHTML =
+              '<h2>Connections</h2>' +
+              '<p>Complete Microsoft sign-in in the new window as <b>' +
+              escapeHtml(result.expectedAccount) + '</b>.</p>' +
+              '<button class="secondary-button" type="button" ' +
+              'onclick="showConnections()">I completed sign-in — refresh</button>';
+          }
+        })
+        .withFailureHandler(showError)
+        .getMicrosoftAuthorizationUrl();
     }
 
     function showHelpArticle(articleId, label) {
@@ -1441,6 +1622,367 @@
         .saveChartAccount(input);
     }
 
+    function showTransactionWorkbench(view) {
+      document.getElementById('output').textContent =
+        'Preparing the Transaction Workbench...';
+      google.script.run
+        .withSuccessHandler(function(data) {
+          window.nilavaramWorkbench = data;
+          window.nilavaramWorkbenchView = view || 'transaction-workbench';
+          renderTransactionWorkbench(data, window.nilavaramWorkbenchView);
+        })
+        .withFailureHandler(showError)
+        .getTransactionWorkbench();
+    }
+
+    function workbenchBadge(passed, passedText, reviewText) {
+      return passed
+        ? '<span class="success">✓ ' + escapeHtml(passedText) + '</span>'
+        : '<span class="error">● ' + escapeHtml(reviewText) + '</span>';
+    }
+
+    function renderTransactionWorkbench(data, view) {
+      const output = document.getElementById('output');
+      let html =
+        '<h2>Transaction Workbench</h2>' +
+        '<p>External proof is registered first and remains outside the books ' +
+        'until it is matched or approved as a new accounting transaction.</p>' +
+        '<p class="error"><b>Posting safety hold:</b> Actual posting is disabled ' +
+        'until this complete workflow passes end-to-end verification.</p>' +
+        '<div class="button-row">' +
+          '<button type="button" onclick="showTransactionWorkbench(\'source-input\')">1. Source Input</button>' +
+          '<button type="button" onclick="showTransactionWorkbench(\'reconciliation-validation\')">2. Reconciliation</button>' +
+          '<button type="button" onclick="showTransactionWorkbench(\'account-rule-review\')">3. Account Rules</button>' +
+          '<button type="button" onclick="showTransactionWorkbench(\'manual-journal-entry\')">Manual / Correction JE</button>' +
+        '</div>' +
+        '<p><b>Locked policy:</b> ' + escapeHtml(data.policyVersion) +
+        ' &nbsp; <b>Registered:</b> ' + data.counts.total +
+        ' &nbsp; <b>Red review:</b> ' + data.counts.redReview + '</p>' +
+        '<details><summary>View locked workflow rules</summary><ol>' +
+        data.lockedRules.map(function(rule) {
+          return '<li>' + escapeHtml(rule) + '</li>';
+        }).join('') + '</ol></details>';
+      output.innerHTML = html + '<div id="workbench-view"></div>';
+      if (view === 'source-input') renderSourceInput(data);
+      else if (view === 'reconciliation-validation') renderReconciliation(data);
+      else if (view === 'account-rule-review') renderAccountRuleReview(data);
+      else if (view === 'manual-journal-entry') renderManualJournalEntry(data);
+      else renderWorkbenchSummary(data);
+    }
+
+    function renderWorkbenchSummary(data) {
+      let html = '<h3>Current queue</h3>';
+      if (!data.sourceRecords.length) {
+        html += '<p>No source records have been registered.</p>';
+      } else {
+        html += '<table><thead><tr><th>Source</th><th>Date</th><th>Description</th>' +
+          '<th>Evidence</th><th>Reconciliation</th><th>Accounts</th><th>Books</th></tr></thead><tbody>';
+        data.sourceRecords.forEach(function(record) {
+          html += '<tr><td>' + escapeHtml(record.sourceRecordNumber) + '</td>' +
+            '<td>' + escapeHtml(record.transactionDate) + '</td>' +
+            '<td>' + escapeHtml(record.description) + '</td>' +
+            '<td>' + workbenchBadge(record.controls.evidence === 'passed', 'Verified', 'Review') + '</td>' +
+            '<td>' + workbenchBadge(record.controls.reconciliation === 'passed', 'Agreed', 'Pending / difference') + '</td>' +
+            '<td>' + workbenchBadge(record.controls.accountAssignment === 'passed', 'Approved', 'Review') + '</td>' +
+            '<td>' + escapeHtml(record.booksStatus || 'outside-books') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+      }
+      document.getElementById('workbench-view').innerHTML = html;
+    }
+
+    function sourceRecordOptions(data) {
+      return data.sourceRecords.map(function(record) {
+        return '<option value="' + escapeHtml(record.id) + '">' +
+          escapeHtml(record.sourceRecordNumber + ' — ' + record.description) +
+          '</option>';
+      }).join('');
+    }
+
+    function renderSourceInput(data) {
+      document.getElementById('workbench-view').innerHTML =
+        '<h3>Step 1 — Register source input and proof</h3>' +
+        '<p>Select a local CSV, PDF or image only to calculate its SHA-256 identity. ' +
+        'The browser does not upload the file; keep it under <code>E:\\nn\\Nilavaram Data</code> ' +
+        'and sync it to OneDrive separately.</p>' +
+        '<form id="source-input-form"><div class="form-grid">' +
+          '<div><label for="source-type">Input method</label><select id="source-type">' +
+            '<option value="bank-download">Automatic/bank download record</option>' +
+            '<option value="csv">CSV file</option><option value="pdf">PDF statement</option>' +
+            '<option value="image">Receipt/image</option></select></div>' +
+          '<div><label for="source-file">Supporting file</label><input id="source-file" type="file" required></div>' +
+          '<div><label for="source-date">Transaction date</label><input id="source-date" type="date" required></div>' +
+          '<div><label for="source-amount">Amount</label><input id="source-amount" type="number" min="0.01" step="0.01" required></div>' +
+          '<div><label for="source-description">Description/payee</label><input id="source-description" required></div>' +
+          '<div><label for="source-reference">External reference/check number</label><input id="source-reference"></div>' +
+          '<div><label for="source-storage">External HDD / OneDrive reference</label>' +
+            '<input id="source-storage" value="E:\\nn\\Nilavaram Data\\00 Inbox" required></div>' +
+        '</div><p id="source-hash-message" class="help-meta">The file hash will be calculated locally.</p>' +
+        '<button class="primary-button" type="submit">Register outside the books</button> ' +
+        '<span id="source-input-message"></span></form><hr>' +
+        '<div id="source-queue"></div>';
+      document.getElementById('source-input-form').onsubmit = saveSourceInputForm;
+      renderSourceQueue(data);
+    }
+
+    async function sha256File(file) {
+      const buffer = await file.arrayBuffer();
+      const digest = await crypto.subtle.digest('SHA-256', buffer);
+      return Array.from(new Uint8Array(digest))
+        .map(function(value) { return value.toString(16).padStart(2, '0'); })
+        .join('');
+    }
+
+    async function saveSourceInputForm(event) {
+      event.preventDefault();
+      const file = document.getElementById('source-file').files[0];
+      if (!file) return;
+      const message = document.getElementById('source-input-message');
+      message.textContent = ' Calculating file identity...';
+      try {
+        const hash = await sha256File(file);
+        document.getElementById('source-hash-message').textContent =
+          'SHA-256: ' + hash;
+        const input = {
+          sourceType: document.getElementById('source-type').value,
+          date: document.getElementById('source-date').value,
+          amount: document.getElementById('source-amount').value,
+          description: document.getElementById('source-description').value,
+          externalReference: document.getElementById('source-reference').value,
+          storageReference: document.getElementById('source-storage').value,
+          evidenceName: file.name,
+          fileHash: hash
+        };
+        message.textContent = ' Registering...';
+        google.script.run
+          .withSuccessHandler(function(result) {
+            message.innerHTML = ' <span class="success">' +
+              escapeHtml(result.message) + '</span>';
+            showTransactionWorkbench('source-input');
+          })
+          .withFailureHandler(function(error) {
+            message.innerHTML = ' <span class="error">' +
+              escapeHtml(error.message) + '</span>';
+          })
+          .registerSourceRecord(input);
+      } catch (error) {
+        message.innerHTML = ' <span class="error">' +
+          escapeHtml(error.message) + '</span>';
+      }
+    }
+
+    function renderSourceQueue(data) {
+      const container = document.getElementById('source-queue');
+      if (!container) return;
+      if (!data.sourceRecords.length) {
+        container.innerHTML = '<p>No source records yet.</p>';
+        return;
+      }
+      let html = '<h3>Registered source queue</h3><table><thead><tr>' +
+        '<th>ID</th><th>Proof</th><th>Status</th><th>Alert</th></tr></thead><tbody>';
+      data.sourceRecords.forEach(function(record) {
+        html += '<tr><td>' + escapeHtml(record.sourceRecordNumber) + '</td>' +
+          '<td>' + escapeHtml(record.evidenceName) + '</td>' +
+          '<td>Outside books</td><td><span class="error">' +
+          escapeHtml(record.alertMessage || 'Review required') +
+          '</span></td></tr>';
+      });
+      container.innerHTML = html + '</tbody></table>';
+    }
+
+    function renderReconciliation(data) {
+      document.getElementById('workbench-view').innerHTML =
+        '<h3>Step 2 — Reconciliation input validation</h3>' +
+        '<p>The system checks both statement arithmetic and the final formula: <b>' +
+        escapeHtml(data.formulas.reconciliation) + '</b></p>' +
+        '<form id="reconciliation-form"><div class="form-grid">' +
+          '<div><label>Source record</label><select id="recon-source">' + sourceRecordOptions(data) + '</select></div>' +
+          '<div><label>External beginning balance</label><input id="recon-ext-begin" type="number" step="0.01" required></div>' +
+          '<div><label>External activity (signed)</label><input id="recon-ext-activity" type="number" step="0.01" required></div>' +
+          '<div><label>External ending balance</label><input id="recon-ext-end" type="number" step="0.01" required></div>' +
+          '<div><label>Book beginning balance</label><input id="recon-book-begin" type="number" step="0.01" required></div>' +
+          '<div><label>Book activity (signed)</label><input id="recon-book-activity" type="number" step="0.01" required></div>' +
+          '<div><label>Outstanding items (signed)</label><input id="recon-outstanding" type="number" step="0.01" value="0" required></div>' +
+        '</div><button class="primary-button" type="submit">Run reconciliation check</button> ' +
+        '<span id="reconciliation-message"></span></form>' +
+        '<p class="error"><b>Red alert rule:</b> Never force a difference. Review missing, duplicate, cutoff or ' +
+        'classification issues. A material correction should be reviewed by a qualified CPA and entered as a separate correction Journal Entry.</p>';
+      document.getElementById('reconciliation-form').onsubmit = saveReconciliationForm;
+    }
+
+    function saveReconciliationForm(event) {
+      event.preventDefault();
+      const input = {
+        sourceRecordId: document.getElementById('recon-source').value,
+        externalBeginning: document.getElementById('recon-ext-begin').value,
+        externalActivity: document.getElementById('recon-ext-activity').value,
+        externalEnding: document.getElementById('recon-ext-end').value,
+        bookBeginning: document.getElementById('recon-book-begin').value,
+        bookActivity: document.getElementById('recon-book-activity').value,
+        outstanding: document.getElementById('recon-outstanding').value
+      };
+      document.getElementById('reconciliation-message').textContent = ' Checking...';
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('reconciliation-message').innerHTML =
+          result.success
+            ? ' <span class="success">' + escapeHtml(result.message) + '</span>'
+            : ' <span class="error">' + escapeHtml(result.message) + '</span>';
+      }).withFailureHandler(function(error) {
+        document.getElementById('reconciliation-message').innerHTML =
+          ' <span class="error">' + escapeHtml(error.message) + '</span>';
+      }).saveSourceReconciliation(input);
+    }
+
+    function renderAccountRuleReview(data) {
+      const accounts = (window.nilavaramTransactionSetup || {}).accounts || [];
+      let accountOptions = accounts.map(function(account) {
+        return '<option value="' + escapeHtml(account.code) + '">' +
+          escapeHtml(account.code + ' — ' + account.name) + '</option>';
+      }).join('');
+      let ruleOptions = '<option value="">No rule — user selection</option>' +
+        data.rules.map(function(rule) {
+          return '<option value="' + escapeHtml(rule.id) + '">' +
+            escapeHtml(rule.name + ' v' + (rule.version || 1) +
+              ' — confidence ' + (rule.confidence || 0) + '%') + '</option>';
+        }).join('');
+      document.getElementById('workbench-view').innerHTML =
+        '<h3>Step 3 — Account rule review and approval</h3>' +
+        '<p>Every approval records the rule ID/version, match reason, suggestion, confidence, approver and any change reason.</p>' +
+        (accounts.length ? '' : '<p class="error">Loading the active Chart of Accounts...</p>') +
+        '<form id="rule-approval-form"><div class="form-grid">' +
+          '<div><label>Source record</label><select id="rule-source">' + sourceRecordOptions(data) + '</select></div>' +
+          '<div><label>Approved rule</label><select id="rule-id">' + ruleOptions + '</select></div>' +
+          '<div><label>Debit account</label><select id="rule-debit">' + accountOptions + '</select></div>' +
+          '<div><label>Credit account</label><select id="rule-credit">' + accountOptions + '</select></div>' +
+          '<div><label>Reason if suggestion changed</label><input id="rule-change-reason"></div>' +
+        '</div><button class="primary-button" type="submit">Approve account assignment</button> ' +
+        '<span id="rule-message"></span></form><hr><h3>Visible active rules</h3>' +
+        renderRulesTable(data.rules);
+      if (!accounts.length) {
+        google.script.run.withSuccessHandler(function(setup) {
+          window.nilavaramTransactionSetup = setup;
+          renderAccountRuleReview(data);
+        }).withFailureHandler(showError).getSimpleTransactionSetup();
+        return;
+      }
+      document.getElementById('rule-id').onchange = applySelectedRule;
+      document.getElementById('rule-approval-form').onsubmit = saveRuleApproval;
+    }
+
+    function renderRulesTable(rules) {
+      let html = '<table><thead><tr><th>Rule</th><th>Version</th><th>Reason</th>' +
+        '<th>Suggestion</th><th>Confidence</th><th>Status</th></tr></thead><tbody>';
+      rules.forEach(function(rule) {
+        html += '<tr><td>' + escapeHtml(rule.ruleId || rule.id) + '</td>' +
+          '<td>' + escapeHtml(rule.version || 1) + '</td>' +
+          '<td>' + escapeHtml(rule.matchReason || '') + '</td>' +
+          '<td>' + escapeHtml((rule.debitAccountCode || '') + ' / ' +
+            (rule.creditAccountCode || '')) + '</td>' +
+          '<td>' + escapeHtml(rule.confidence || 0) + '%</td>' +
+          '<td><span class="success">✓ Active</span></td></tr>';
+      });
+      return html + '</tbody></table>';
+    }
+
+    function applySelectedRule() {
+      const id = document.getElementById('rule-id').value;
+      const rule = (window.nilavaramWorkbench.rules || []).find(function(item) {
+        return item.id === id;
+      });
+      if (!rule) return;
+      document.getElementById('rule-debit').value = rule.debitAccountCode;
+      document.getElementById('rule-credit').value = rule.creditAccountCode;
+    }
+
+    function saveRuleApproval(event) {
+      event.preventDefault();
+      const input = {
+        sourceRecordId: document.getElementById('rule-source').value,
+        ruleId: document.getElementById('rule-id').value,
+        debitAccountCode: document.getElementById('rule-debit').value,
+        creditAccountCode: document.getElementById('rule-credit').value,
+        changedReason: document.getElementById('rule-change-reason').value
+      };
+      document.getElementById('rule-message').textContent = ' Approving...';
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('rule-message').innerHTML =
+          ' <span class="success">' + escapeHtml(result.message) + '</span>';
+      }).withFailureHandler(function(error) {
+        document.getElementById('rule-message').innerHTML =
+          ' <span class="error">' + escapeHtml(error.message) + '</span>';
+      }).approveSourceAccountAssignment(input);
+    }
+
+    function renderManualJournalEntry(data) {
+      const setup = window.nilavaramTransactionSetup;
+      if (!setup) {
+        google.script.run.withSuccessHandler(function(result) {
+          window.nilavaramTransactionSetup = result;
+          renderManualJournalEntry(data);
+        }).withFailureHandler(showError).getSimpleTransactionSetup();
+        return;
+      }
+      const entities = setup.entities.map(function(entity) {
+        return '<option value="' + escapeHtml(entity.id) + '">' +
+          escapeHtml(entity.name) + '</option>';
+      }).join('');
+      const accounts = setup.accounts.map(function(account) {
+        return '<option value="' + escapeHtml(account.code) + '">' +
+          escapeHtml(account.code + ' — ' + account.name) + '</option>';
+      }).join('');
+      document.getElementById('workbench-view').innerHTML =
+        '<h3>Manual / Correction Journal Entry</h3>' +
+        '<p class="error">Manual entries require evidence and audit notes. Material or uncertain corrections should be reviewed by a qualified CPA.</p>' +
+        '<form id="journal-entry-form"><div class="form-grid">' +
+          '<div><label>Purpose</label><select id="je-purpose"><option value="manual">Manual Journal Entry</option><option value="correction">Correction Journal Entry</option></select></div>' +
+          '<div><label>Entity</label><select id="je-entity">' + entities + '</select></div>' +
+          '<div><label>Date</label><input id="je-date" type="date" required></div>' +
+          '<div><label>Description</label><input id="je-description" required></div>' +
+          '<div><label>Amount</label><input id="je-amount" type="number" min="0.01" step="0.01" required></div>' +
+          '<div><label>Debit account</label><select id="je-debit">' + accounts + '</select></div>' +
+          '<div><label>Credit account</label><select id="je-credit">' + accounts + '</select></div>' +
+          '<div><label>Evidence file</label><input id="je-file" type="file" required></div>' +
+          '<div><label>Storage reference</label><input id="je-storage" value="E:\\nn\\Nilavaram Data\\01 Source Documents" required></div>' +
+          '<div><label>Audit explanation</label><textarea id="je-note" required></textarea></div>' +
+        '</div><button class="primary-button" type="submit">Save JE on verification hold</button> ' +
+        '<span id="je-message"></span></form>';
+      document.getElementById('journal-entry-form').onsubmit = saveJournalEntryForm;
+    }
+
+    async function saveJournalEntryForm(event) {
+      event.preventDefault();
+      const file = document.getElementById('je-file').files[0];
+      if (!file) return;
+      const message = document.getElementById('je-message');
+      message.textContent = ' Calculating file identity...';
+      try {
+        const input = {
+          entryPurpose: document.getElementById('je-purpose').value,
+          entityId: document.getElementById('je-entity').value,
+          date: document.getElementById('je-date').value,
+          description: document.getElementById('je-description').value,
+          amount: document.getElementById('je-amount').value,
+          debitAccountCode: document.getElementById('je-debit').value,
+          creditAccountCode: document.getElementById('je-credit').value,
+          evidenceName: file.name,
+          fileHash: await sha256File(file),
+          storageReference: document.getElementById('je-storage').value,
+          auditNote: document.getElementById('je-note').value
+        };
+        message.textContent = ' Saving controlled draft...';
+        google.script.run.withSuccessHandler(function(result) {
+          message.innerHTML = ' <span class="success">' +
+            escapeHtml(result.message) + '</span>';
+        }).withFailureHandler(function(error) {
+          message.innerHTML = ' <span class="error">' +
+            escapeHtml(error.message) + '</span>';
+        }).saveEvidenceBackedJournalEntry(input);
+      } catch (error) {
+        message.innerHTML = ' <span class="error">' +
+          escapeHtml(error.message) + '</span>';
+      }
+    }
+
     function showSimpleTransaction() {
       document.getElementById('output').textContent =
         'Preparing New Transaction...';
@@ -1500,7 +2042,7 @@
             '</div>' +
           '</details>' +
           '<div class="button-row">' +
-            '<button class="primary-button" type="submit">Save as draft</button>' +
+            '<button class="primary-button" type="submit">Save and post transaction</button>' +
             '<span id="transaction-message"></span>' +
           '</div>' +
         '</form>';
@@ -1555,18 +2097,49 @@
         debitAccountCode: document.getElementById('transaction-debit').value,
         creditAccountCode: document.getElementById('transaction-credit').value
       };
-      document.getElementById('transaction-message').textContent = ' Saving...';
+      document.getElementById('transaction-message').textContent =
+        ' Saving and posting...';
       google.script.run
         .withSuccessHandler(function(result) {
+          if (result.success) {
+            document.getElementById('transaction-message').innerHTML =
+              ' <span class="success">' +
+              escapeHtml(result.message) + '</span>';
+            document.getElementById('transaction-form').reset();
+            return;
+          }
+          window.nilavaramPostingRetryId = result.transactionId;
           document.getElementById('transaction-message').innerHTML =
-            ' <span class="success">' + escapeHtml(result.message) + '</span>';
-          document.getElementById('transaction-form').reset();
+            ' <span class="error">' + escapeHtml(result.message) + '</span>' +
+            ' <button class="secondary-button" type="button" ' +
+            'onclick="retryPosting()">Retry posting saved draft</button>';
         })
         .withFailureHandler(function(error) {
           document.getElementById('transaction-message').innerHTML =
             ' <span class="error">' + escapeHtml(error.message) + '</span>';
         })
-        .saveSimpleTransaction(input);
+        .saveAndPostSimpleTransaction(input);
+    }
+
+    function retryPosting() {
+      const transactionId = window.nilavaramPostingRetryId;
+      if (!transactionId) return;
+      document.getElementById('transaction-message').textContent =
+        ' Retrying posting...';
+      google.script.run
+        .withSuccessHandler(function(result) {
+          document.getElementById('transaction-message').innerHTML =
+            ' <span class="success">' + escapeHtml(result.message) + '</span>';
+          document.getElementById('transaction-form').reset();
+          window.nilavaramPostingRetryId = '';
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('transaction-message').innerHTML =
+            ' <span class="error">' + escapeHtml(error.message) + '</span>' +
+            ' <button class="secondary-button" type="button" ' +
+            'onclick="retryPosting()">Retry posting saved draft</button>';
+        })
+        .postTransaction(transactionId);
     }
 
     function saveUserForm(event) {

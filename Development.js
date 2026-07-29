@@ -227,6 +227,23 @@ function setupProjectIntentTasks_() {
       'Keep document storage separate from the live Firestore account master'
     ]
   });
+
+  createDevelopmentTaskIfMissing_('microsoft-graph-document-integration', {
+    title: 'Configure Microsoft Graph and Document Integration',
+    dueDate: '',
+    requirements: [
+      'Register Nilavaram in Microsoft Entra and configure secure OAuth authentication',
+      'Use Microsoft Graph directly without requiring desktop folder synchronization',
+      'Support the owner OneDrive and explicitly approved shared OneDrive folders',
+      'Use a SharePoint document library as the preferred long-term team repository',
+      'Store drive IDs, item IDs, hashes and document metadata in Firestore',
+      'Keep transaction and report links valid when a document is renamed or moved',
+      'Use unique transaction IDs, file hashes and idempotent retries to prevent duplicates',
+      'Show red Admin alerts for pending reconciliation, missing evidence, failed uploads or lost access',
+      'Warn an Admin when OneDrive, SharePoint or Google Drive needs more storage',
+      'Preserve a complete append-only audit trail for posting, correction and reconciliation'
+    ]
+  });
 }
 
 function getDevelopmentTasks() {

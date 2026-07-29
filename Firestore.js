@@ -162,19 +162,61 @@ function firestoreBatchSetDocuments_(collectionName, records) {
 }
 
 /**
+ * Atomically creates or replaces documents across one or more collections.
+ * Either every write succeeds or Firestore applies none of them.
+ *
+ * @param {Object[]} records collection, id and fields for each document.
+ * @returns {Object}
+ */
+function firestoreCommitDocuments_(records) {
+  if (!records || records.length === 0) return { writeResults: [] };
+  if (records.length > 500) {
+    throw new Error('One atomic Firestore commit cannot exceed 500 records.');
+  }
+  const projectId = getFirestoreProjectId_();
+  const databaseName = 'projects/' + projectId + '/databases/(default)';
+  const writes = records.map(function(record) {
+    if (!record.collection || !record.id || !record.fields) {
+      throw new Error('Every atomic write requires collection, ID and fields.');
+    }
+    return {
+      update: {
+        name: databaseName + '/documents/' +
+          record.collection + '/' + record.id,
+        fields: record.fields
+      }
+    };
+  });
+  return firestoreRequest_(
+    'https://firestore.googleapis.com/v1/' +
+      databaseName + '/documents:commit',
+    'post',
+    { writes: writes }
+  );
+}
+
+/**
  * Reads every document in a Firestore collection.
  *
  * @param {string} collectionName Firestore collection.
  * @returns {Object[]}
  */
 function firestoreGetCollection_(collectionName) {
-  const url =
-    getFirestoreBaseUrl_() +
-    '/' + encodeURIComponent(collectionName) +
-    '?pageSize=300';
-
-  const result = firestoreRequest_(url, 'get');
-  return result.documents || [];
+  const documents = [];
+  let pageToken = '';
+  do {
+    let url =
+      getFirestoreBaseUrl_() +
+      '/' + encodeURIComponent(collectionName) +
+      '?pageSize=300';
+    if (pageToken) {
+      url += '&pageToken=' + encodeURIComponent(pageToken);
+    }
+    const result = firestoreRequest_(url, 'get');
+    Array.prototype.push.apply(documents, result.documents || []);
+    pageToken = String(result.nextPageToken || '');
+  } while (pageToken);
+  return documents;
 }
 
 /**

@@ -56,6 +56,90 @@ function getDashboardInfo() {
 }
 
 /**
+ * Returns non-secret Admin locations and access links for the live UI.
+ */
+function buildStorageAccessInfo_() {
+  return {
+    vscodeFolder: 'C:\\Users\\theso\\Documents\\nn\\Nilavaram',
+    githubRepository: 'https://github.com/Books4vm/Nilavaram',
+    githubBranch: 'main',
+    appsScriptWebApp:
+      'https://script.google.com/macros/s/' +
+      'AKfycbxMMqgLL6xmJp__dI4vDHj0zZ_6ZyZsb_-' +
+      'KsspdNU99WXW1ZJrRzJTaVObTJ8C2s-3Q/exec',
+    localOneDrive: 'C:\\Users\\theso\\OneDrive',
+    primaryOneDriveAccount: 'vmurugan@hotmail.com',
+    externalDrive: 'E:\\',
+    externalDriveLabel: 'My Passport',
+    externalCodeBackup: 'E:\\nn\\Nilavaram',
+    dataRoot: 'E:\\nn\\Nilavaram Data',
+    recommendedArchiveFolder: 'E:\\nn\\Nilavaram Data\\99 Archive',
+    oneDriveSyncSource: 'E:\\nn\\Nilavaram Data\\04 OneDrive Sync',
+    externalDriveFreeGb: 3778.2,
+    credentialNotice:
+      'Credentials are maintained separately. Passwords, tokens and secrets ' +
+      'must not be stored in Nilavaram, Firestore, GitHub or these notes.'
+  };
+}
+
+function getAdminStorageAccessInfo() {
+  requireAdmin_();
+  return buildStorageAccessInfo_();
+}
+
+function buildConnectionsBootstrap_() {
+  const config = getMicrosoftConfig_();
+  const missing = getMissingMicrosoftConfig_(config);
+  const hasRefreshToken = Boolean(
+    PropertiesService.getScriptProperties()
+      .getProperty('MICROSOFT_REFRESH_TOKEN')
+  );
+  return {
+    build: 13,
+    accessInfo: buildStorageAccessInfo_(),
+    hasRefreshToken: hasRefreshToken,
+    microsoftStatus: {
+      configured: missing.length === 0,
+      connected: hasRefreshToken,
+      expectedAccount: NILAVARAM_MICROSOFT_ACCOUNT,
+      missingProperties: missing,
+      account: hasRefreshToken ? NILAVARAM_MICROSOFT_ACCOUNT : '',
+      driveType: hasRefreshToken ? 'Authorization saved' : '',
+      quotaState: hasRefreshToken ? 'Live quota check pending' : ''
+    },
+    liveValidationPassed: false,
+    liveValidationError: ''
+  };
+}
+
+/**
+ * Loads the Connections screen in one server request. Keeping this as one
+ * request avoids leaving the UI on a permanent loading message when either of
+ * two chained browser-to-server calls does not return.
+ */
+function getConnectionsPageData() {
+  const bootstrap = buildConnectionsBootstrap_();
+  const missing = bootstrap.microsoftStatus.missingProperties;
+  const hasRefreshToken = bootstrap.hasRefreshToken;
+  const result = {
+    build: bootstrap.build,
+    accessInfo: bootstrap.accessInfo,
+    microsoftStatus: bootstrap.microsoftStatus,
+    microsoftError: ''
+  };
+  if (missing.length === 0 && hasRefreshToken) {
+    try {
+      result.microsoftStatus = readMicrosoftDriveSummary_();
+      result.microsoftStatus.configured = true;
+      result.microsoftStatus.expectedAccount = NILAVARAM_MICROSOFT_ACCOUNT;
+    } catch (error) {
+      result.microsoftError = String(error && error.message || error);
+    }
+  }
+  return result;
+}
+
+/**
  * Returns the startup identity and navigation in one browser-to-server call.
  * This reduces the time spent waiting between separate startup requests.
  */

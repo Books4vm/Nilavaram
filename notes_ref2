@@ -43,3 +43,6 @@ CURRENT CREDENTIAL STATUS
 - GitHub remote: configured.
 - GitHub authentication: managed outside project files.
 - OneDrive/Microsoft Graph authentication: not yet configured.
+
+Credentials are maintained separately by the owner. Only non-secret locations
+and configuration status may be documented in Nilavaram.

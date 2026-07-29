@@ -6,6 +6,12 @@ built with Google Apps Script.
 The approved tentative menu hierarchy and the purpose of each section are
 documented in `NAVIGATION.md`.
 
+The approved transaction, audit, Firestore, OneDrive, SharePoint and Microsoft
+Graph responsibilities are locked in `INTEGRATION_DECISIONS.md`.
+
+The permanent accounting identity, journal, posting, reconciliation,
+correction and user-safety rules are locked in `ACCOUNTING_OPERATING_RULES.md`.
+
 The agreed Project Start defines Nilavaram as a private, long-term Personal,
 Family and Business Information System. The UI records development intentions
 that may be completed in any practical sequence.
@@ -229,6 +235,49 @@ The current manifest restricts the web app to `MYSELF`. Keep this setting while
 the owner tests the new foundation. Before invited users can enter, the
 deployment access and Google identity behavior must be configured and tested.
 Do not broaden access until that authentication step is complete.
+
+## Microsoft Graph connection
+
+Nilavaram's approved primary OneDrive repository is
+`vmurugan@hotmail.com`. Microsoft account storage showed 0.2 GB used out of
+1 TB on 2026-07-28, leaving approximately 999.8 GB available.
+`thesolarcpa@outlook.com` is excluded from document storage.
+The owner has maintained the Microsoft 365 Family subscription covering all six
+family accounts for approximately three to four years and intends to continue
+it.
+
+Before **System → Connections → Connect OneDrive** can be used, register a
+Microsoft Entra web application that accepts personal Microsoft accounts. Add
+this exact Nilavaram production address as its **Web** redirect URI:
+
+```text
+https://script.google.com/macros/s/AKfycbxMMqgLL6xmJp__dI4vDHj0zZ_6ZyZsb_-KsspdNU99WXW1ZJrRzJTaVObTJ8C2s-3Q/exec
+```
+
+Add these values under **Apps Script → Project Settings → Script Properties**:
+
+```text
+MICROSOFT_CLIENT_ID
+MICROSOFT_CLIENT_SECRET
+MICROSOFT_REDIRECT_URI
+```
+
+Set `MICROSOFT_REDIRECT_URI` to the exact address above. It must exactly match
+the redirect URI entered in Microsoft Entra. Never store the client secret in
+this repository, Firestore, the dashboard or project notes.
+
+The initial delegated Microsoft Graph permissions are:
+
+```text
+User.Read
+Files.ReadWrite
+offline_access
+```
+
+After authorization, Nilavaram verifies that the signed-in Microsoft identity
+is exactly `vmurugan@hotmail.com`, reads its live OneDrive quota, and stores
+only the non-secret drive identity and quota summary in Firestore. Access and
+refresh tokens remain in Apps Script Properties.
 
 ## Main files
 

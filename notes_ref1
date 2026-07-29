@@ -27,3 +27,32 @@ Credential rule:
 Record the credential name, purpose, owner, location and status. Never record
 passwords, OAuth tokens, private keys or service-account secrets in these notes,
 the UI, Firestore or GitHub.
+
+STORAGE AND ACCESS LOCATIONS
+
+VS Code project:
+C:\Users\theso\Documents\nn\Nilavaram
+
+GitHub repository:
+https://github.com/Books4vm/Nilavaram
+Primary branch: main
+
+Apps Script production web app:
+https://script.google.com/macros/s/AKfycbxMMqgLL6xmJp__dI4vDHj0zZ_6ZyZsb_-KsspdNU99WXW1ZJrRzJTaVObTJ8C2s-3Q/exec
+
+External HDD:
+E:\ (My Passport)
+External code backup: E:\nn\Nilavaram
+External data root: E:\nn\Nilavaram Data
+OneDrive sync source: E:\nn\Nilavaram Data\04 OneDrive Sync
+Archive folder: E:\nn\Nilavaram Data\99 Archive
+
+Local OneDrive view:
+C:\Users\theso\OneDrive
+Primary repository account: vmurugan@hotmail.com
+
+Keep a source or backup copy on the external HDD. Upload copies manually
+through OneDrive on the web, or configure the selected file-sync application
+to copy the OneDrive Sync source. Do not require the complete cloud archive to
+remain downloaded on the laptop. The E: code folder is a backup copy; edit and
+commit only from the authoritative C: project.
