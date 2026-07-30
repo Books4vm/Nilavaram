@@ -341,3 +341,323 @@ function validateAkoyaConnectionForUi() {
   status.checkedAt = new Date().toISOString();
   return status;
 }
+
+function akoyaSha256Hex_(value) {
+  return Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    String(value),
+    Utilities.Charset.UTF_8
+  ).map(function(byte) {
+    const unsigned = byte < 0 ? byte + 256 : byte;
+    return ('0' + unsigned.toString(16)).slice(-2);
+  }).join('');
+}
+
+function unwrapAkoyaAccount_(item) {
+  if (!item || typeof item !== 'object') return null;
+  const categories = [
+    'depositAccount',
+    'loanAccount',
+    'locAccount',
+    'investmentAccount',
+    'insuranceAccount',
+    'annuityAccount'
+  ];
+  for (let index = 0; index < categories.length; index += 1) {
+    const category = categories[index];
+    if (item[category]) {
+      const account = item[category];
+      account.akoyaAccountCategory = category;
+      return account;
+    }
+  }
+  return item.accountId ? item : null;
+}
+
+function flattenAkoyaAccounts_(payload) {
+  const result = [];
+  if (!payload || typeof payload !== 'object') return result;
+  (payload.accounts || []).forEach(function(item) {
+    const account = unwrapAkoyaAccount_(item);
+    if (account) result.push(account);
+  });
+  [
+    'depositAccount',
+    'loanAccount',
+    'locAccount',
+    'investmentAccount',
+    'insuranceAccount',
+    'annuityAccount'
+  ].forEach(function(category) {
+    const values = payload[category];
+    if (!values) return;
+    (Array.isArray(values) ? values : [values]).forEach(function(value) {
+      const account = unwrapAkoyaAccount_(
+        value.accountId ? value : (function() {
+          const wrapped = {};
+          wrapped[category] = value;
+          return wrapped;
+        })()
+      );
+      if (account && !result.some(function(existing) {
+        return String(existing.accountId) === String(account.accountId);
+      })) {
+        result.push(account);
+      }
+    });
+  });
+  return result;
+}
+
+function selectAkoyaCheckingAccount_(payload) {
+  const accounts = flattenAkoyaAccounts_(payload);
+  const checking = accounts.filter(function(account) {
+    return String(account.accountType || '').toUpperCase() === 'CHECKING';
+  });
+  if (!checking.length) {
+    throw new Error(
+      'The permissioned Akoya sandbox data does not contain a checking account.'
+    );
+  }
+  return checking[0];
+}
+
+function unwrapAkoyaTransaction_(item) {
+  if (!item || typeof item !== 'object') return null;
+  const keys = Object.keys(item);
+  for (let index = 0; index < keys.length; index += 1) {
+    const key = keys[index];
+    if (/Transaction$/.test(key) && item[key]) return item[key];
+  }
+  return item.transactionId ? item : null;
+}
+
+function flattenAkoyaTransactions_(payload) {
+  return (payload && payload.transactions || [])
+    .map(unwrapAkoyaTransaction_)
+    .filter(function(item) { return Boolean(item); });
+}
+
+function readAllAkoyaCheckingTransactions_(accountId, startTime, endTime) {
+  const limit = 50;
+  const transactions = [];
+  let offset = 0;
+  for (let page = 0; page < 10; page += 1) {
+    const payload = akoyaGet_(
+      '/transactions/v3/' + NILAVARAM_AKOYA_SANDBOX_PROVIDER +
+      '/' + encodeURIComponent(accountId) + '?' +
+      buildAkoyaQueryString_({
+        mode: 'standard',
+        startTime: startTime,
+        endTime: endTime,
+        offset: offset,
+        limit: limit
+      }),
+      'batch'
+    );
+    const pageTransactions = flattenAkoyaTransactions_(payload);
+    Array.prototype.push.apply(transactions, pageTransactions);
+    if (pageTransactions.length < limit) break;
+    offset += pageTransactions.length;
+  }
+  return transactions;
+}
+
+function akoyaTransactionDate_(transaction) {
+  const value = String(
+    transaction.postedTimestamp ||
+    transaction.transactionTimestamp ||
+    transaction.memoTimestamp ||
+    transaction.postedDate ||
+    transaction.date ||
+    ''
+  );
+  const match = value.match(/^\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : '';
+}
+
+function akoyaTransactionDescription_(transaction) {
+  return String(
+    transaction.description ||
+    transaction.memo ||
+    transaction.name ||
+    transaction.category ||
+    'Akoya sandbox transaction'
+  ).trim();
+}
+
+/**
+ * Imports the permissioned Mikomo checking transactions into sourceRecords.
+ * Every record remains outside the books and is safe to re-run because its
+ * document identity is derived from provider, account and transaction IDs.
+ */
+function importAkoyaSandboxCheckingTransactions() {
+  const user = requireAccountingEditor_();
+  const status = validateAkoyaConnectionForUi();
+  if (!status.connected) {
+    throw new Error('Connect Akoya Sandbox before importing transactions.');
+  }
+
+  const accountsPayload = readAkoyaSandboxAccounts_();
+  const account = selectAkoyaCheckingAccount_(accountsPayload);
+  const accountId = String(account.accountId || '');
+  const startTime = '2025-01-01T00:00:00Z';
+  const endTime = new Date().toISOString();
+  const transactions = readAllAkoyaCheckingTransactions_(
+    accountId,
+    startTime,
+    endTime
+  );
+  const existing = firestoreGetCollection_('sourceRecords')
+    .map(fromFirestoreDocument_);
+  const existingKeys = {};
+  existing.forEach(function(record) {
+    if (record.externalSourceKey) {
+      existingKeys[String(record.externalSourceKey)] = true;
+    }
+  });
+
+  const now = new Date();
+  const batchId = 'akoya-' +
+    Utilities.formatDate(now, 'America/Los_Angeles', 'yyyyMMdd-HHmmss');
+  const writes = [];
+  let skipped = 0;
+  let invalid = 0;
+  transactions.forEach(function(transaction) {
+    const transactionId = String(transaction.transactionId || '').trim();
+    const date = akoyaTransactionDate_(transaction);
+    const rawAmount = Number(transaction.amount);
+    if (!transactionId || !date || !isFinite(rawAmount)) {
+      invalid += 1;
+      return;
+    }
+    const externalSourceKey = [
+      'akoya',
+      'sandbox',
+      NILAVARAM_AKOYA_SANDBOX_PROVIDER,
+      accountId,
+      transactionId
+    ].join('|');
+    if (existingKeys[externalSourceKey]) {
+      skipped += 1;
+      return;
+    }
+    existingKeys[externalSourceKey] = true;
+    const identityHash = akoyaSha256Hex_(externalSourceKey);
+    const contentHash = akoyaSha256Hex_(
+      JSON.stringify(transaction)
+    );
+    const amountCents = Math.abs(Math.round(rawAmount * 100));
+    const record = {
+      schemaVersion: NILAVARAM_WORKBENCH_SCHEMA_VERSION,
+      sourceRecordId: 'akoya-' + identityHash.slice(0, 40),
+      sourceRecordNumber: 'AKOYA-' +
+        identityHash.slice(0, 12).toUpperCase(),
+      sourceBatchId: batchId,
+      sourceType: 'bank-download',
+      sourceProvider: 'akoya',
+      sourceEnvironment: 'sandbox',
+      sourceFinancialInstitution: NILAVARAM_AKOYA_SANDBOX_PROVIDER,
+      sourceAccountId: accountId,
+      sourceAccountType: String(account.accountType || 'CHECKING'),
+      sourceAccountDisplay: String(
+        account.accountNumberDisplay ||
+        account.nickname ||
+        account.description ||
+        'Mikomo checking'
+      ),
+      externalSourceKey: externalSourceKey,
+      externalReference: transactionId,
+      transactionDate: date,
+      description: akoyaTransactionDescription_(transaction),
+      amountCents: amountCents,
+      signedSourceAmountCents: Math.round(rawAmount * 100),
+      debitCreditMemo: String(transaction.debitCreditMemo || ''),
+      transactionStatus: String(transaction.status || ''),
+      currency: String(
+        transaction.currency &&
+        transaction.currency.currencyCode ||
+        transaction.currencyCode ||
+        'USD'
+      ),
+      evidenceName: 'Akoya Sandbox API transaction',
+      evidenceType: 'consumer-permissioned-api',
+      fileHashAlgorithm: 'SHA-256',
+      fileHash: contentHash,
+      storageReference:
+        'akoya://sandbox/' + NILAVARAM_AKOYA_SANDBOX_PROVIDER +
+        '/' + accountId + '/' + transactionId,
+      evidenceStatus: 'verified',
+      booksStatus: 'outside-books',
+      matchStatus: 'unmatched',
+      reconciliationStatus: 'pending',
+      accountApprovalStatus: 'pending',
+      postingStatus: 'blocked-until-account-approval',
+      alertLevel: 'red',
+      alertMessage:
+        'Imported from Akoya Sandbox. Reconciliation and account assignment ' +
+        'require review.',
+      createdBy: user.email,
+      createdAt: now,
+      updatedAt: now
+    };
+    writes.push({
+      collection: 'sourceRecords',
+      id: record.sourceRecordId,
+      fields: toFirestoreFields_(record)
+    });
+  });
+
+  if (writes.length) {
+    firestoreCommitDocuments_(writes);
+  }
+  const batch = {
+    sourceBatchId: batchId,
+    sourceProvider: 'akoya',
+    sourceEnvironment: 'sandbox',
+    sourceFinancialInstitution: NILAVARAM_AKOYA_SANDBOX_PROVIDER,
+    sourceAccountId: accountId,
+    sourceAccountDisplay: String(
+      account.accountNumberDisplay ||
+      account.nickname ||
+      account.description ||
+      'Mikomo checking'
+    ),
+    requestedStartTime: startTime,
+    requestedEndTime: endTime,
+    downloadedCount: transactions.length,
+    addedCount: writes.length,
+    duplicateSkippedCount: skipped,
+    invalidSkippedCount: invalid,
+    booksStatus: 'outside-books',
+    postingStatus: 'not-posted',
+    importedBy: user.email,
+    importedAt: now
+  };
+  firestoreSetDocument_(
+    'sourceBatches',
+    batchId,
+    toFirestoreFields_(batch)
+  );
+  writeAudit_('akoya-sandbox-source-imported', user.email, {
+    sourceBatchId: batchId,
+    sourceAccountId: accountId,
+    downloadedCount: transactions.length,
+    addedCount: writes.length,
+    duplicateSkippedCount: skipped,
+    invalidSkippedCount: invalid,
+    booksStatus: 'outside-books'
+  });
+  return {
+    success: true,
+    sourceBatchId: batchId,
+    accountType: String(account.accountType || 'CHECKING'),
+    accountDisplay: batch.sourceAccountDisplay,
+    downloadedCount: transactions.length,
+    addedCount: writes.length,
+    duplicateSkippedCount: skipped,
+    invalidSkippedCount: invalid,
+    booksStatus: 'outside-books',
+    postingStatus: 'not-posted'
+  };
+}

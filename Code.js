@@ -79,6 +79,39 @@ function doGet(e) {
       );
     }
   }
+  if (parameters.importAkoyaSandbox === '1') {
+    try {
+      const importResult = importAkoyaSandboxCheckingTransactions();
+      return HtmlService.createHtmlOutput(
+        '<!doctype html><html><head><base target="_top">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>Akoya Sandbox Import</title></head><body>' +
+        '<h1>Akoya sandbox source import completed</h1>' +
+        '<p><b>Account:</b> ' +
+        escapeHtmlServer_(importResult.accountDisplay) + ' (' +
+        escapeHtmlServer_(importResult.accountType) + ')</p>' +
+        '<p><b>Downloaded:</b> ' +
+        escapeHtmlServer_(importResult.downloadedCount) + '</p>' +
+        '<p><b>Added to source input:</b> ' +
+        escapeHtmlServer_(importResult.addedCount) + '</p>' +
+        '<p><b>Duplicates safely skipped:</b> ' +
+        escapeHtmlServer_(importResult.duplicateSkippedCount) + '</p>' +
+        '<p><b>Invalid records skipped:</b> ' +
+        escapeHtmlServer_(importResult.invalidSkippedCount) + '</p>' +
+        '<p><b>Books status:</b> Outside the books</p>' +
+        '<p><b>Posting status:</b> Not posted</p>' +
+        '<p><a href="' + escapeHtmlServer_(
+          buildStorageAccessInfo_().appsScriptWebApp
+        ) + '" target="_top">Return to Nilavaram</a></p>' +
+        '</body></html>'
+      ).setTitle('Akoya Sandbox Import');
+    } catch (error) {
+      return buildAuthorizationErrorPage_(
+        'Akoya Sandbox Import',
+        error
+      );
+    }
+  }
   if (parameters.code || parameters.error) {
     try {
       const summary = completeMicrosoftAuthorization_(parameters);
@@ -152,7 +185,7 @@ function buildAuthorizationErrorPage_(title, error) {
 }
 
 function escapeHtmlServer_(value) {
-  return String(value || '')
+  return String(value == null ? '' : value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

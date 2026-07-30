@@ -1061,6 +1061,9 @@
           '<a class="secondary-button" ' +
           'href="' + escapeHtml(access.appsScriptWebApp || '#') +
           '?validateAkoya=1">Validate live Akoya Sandbox connection</a>' +
+          '<a class="primary-button" ' +
+          'href="' + escapeHtml(access.appsScriptWebApp || '#') +
+          '?importAkoyaSandbox=1">Download sandbox checking transactions</a>' +
           '</div>';
       }
       output.innerHTML = html;
@@ -1849,8 +1852,19 @@
     }
 
     function renderSourceInput(data) {
+      const akoya = CONNECTIONS_BOOTSTRAP.akoyaStatus || {};
+      const access = CONNECTIONS_BOOTSTRAP.accessInfo || {};
+      const akoyaImport = akoya.connected
+        ? '<div class="notice"><p><b>Akoya Sandbox is connected.</b> ' +
+          'The download remains outside the books and is safe to repeat.</p>' +
+          '<a class="primary-button" href="' +
+          escapeHtml(access.appsScriptWebApp || '#') +
+          '?importAkoyaSandbox=1">Download sandbox checking transactions</a>' +
+          '</div>'
+        : '';
       document.getElementById('workbench-view').innerHTML =
         '<h3>Step 1 — Register source input and proof</h3>' +
+        akoyaImport +
         '<p>Select a local CSV, PDF or image only to calculate its SHA-256 identity. ' +
         'The browser does not upload the file; keep it under <code>E:\\nn\\Nilavaram Data</code> ' +
         'and sync it to OneDrive separately.</p>' +
