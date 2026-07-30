@@ -3,7 +3,9 @@
  * Controlled source-to-books intake, reconciliation and rule approval.
  */
 
-const NILAVARAM_WORKBENCH_SCHEMA_VERSION = 1;
+const NILAVARAM_WORKBENCH_SCHEMA_VERSION = 2;
+const NILAVARAM_BANK_RULE_POLICY_VERSION = '2026-07-30.1';
+const NILAVARAM_REVIEW_BATCH_SIZE = 25;
 
 function normalizeWorkbenchMoney_(value, label, allowZero) {
   const number = Number(value);
@@ -32,6 +34,180 @@ function workbenchStatus_(record) {
   };
 }
 
+function normalizeRuleText_(value) {
+  return String(value || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function bankDirection_(record) {
+  const memo = String(record.debitCreditMemo || '').toUpperCase();
+  if (memo === 'DEBIT') return 'money-out';
+  if (memo === 'CREDIT') return 'money-in';
+  return 'unknown';
+}
+
+function ruleMatchesSource_(rule, record, direction) {
+  const transactionType = String(rule.transactionType || '').toLowerCase();
+  if (transactionType === 'payment' && direction !== 'money-out') return false;
+  if (transactionType === 'receipt' && direction !== 'money-in') return false;
+  if (rule.direction && rule.direction !== 'either' &&
+      rule.direction !== direction) return false;
+  const sourceAccountId = String(rule.sourceAccountId || '');
+  if (sourceAccountId &&
+      sourceAccountId !== String(record.sourceAccountId || '')) return false;
+
+  const sourceText = normalizeRuleText_([
+    record.description,
+    record.externalReference,
+    record.payeeName
+  ].join(' '));
+  const matchText = Array.isArray(rule.matchText)
+    ? rule.matchText
+    : (rule.matchText ? [rule.matchText] : []);
+  if (!matchText.length) return false;
+  const operator = String(rule.matchOperator || 'contains');
+  return matchText.some(function(value) {
+    const expected = normalizeRuleText_(value);
+    if (!expected) return false;
+    if (operator === 'exactly') return sourceText === expected;
+    if (operator === 'does-not-contain') {
+      return sourceText.indexOf(expected) === -1;
+    }
+    return sourceText.indexOf(expected) !== -1;
+  });
+}
+
+function accountRuleSuggestion_(record, rules, accountsByCode, priorPatterns) {
+  const direction = bankDirection_(record);
+  const sourceText = normalizeRuleText_(record.description);
+  const isSandboxChecking =
+    String(record.sourceProvider || '') === 'akoya' &&
+    String(record.sourceEnvironment || '') === 'sandbox' &&
+    String(record.sourceAccountType || '').toUpperCase() === 'CHECKING';
+  const bankAccountCode = String(record.bankAccountCode ||
+    (isSandboxChecking ? '11110' : ''));
+  const warning = isSandboxChecking
+    ? 'Sandbox simulation only: x8282 uses 11110 as the bank side; it is not BOA x0137 data.'
+    : '';
+  if (direction === 'unknown') {
+    return {
+      status: 'red-review',
+      confidence: 0,
+      reason: 'Money-in or money-out direction could not be determined.',
+      warning: warning
+    };
+  }
+  if (!bankAccountCode || !accountsByCode[bankAccountCode]) {
+    return {
+      status: 'red-review',
+      confidence: 0,
+      reason: 'The downloaded account is not mapped to an active Chart of Accounts bank account.',
+      warning: warning
+    };
+  }
+
+  const priorKey = [
+    String(record.sourceAccountId || ''),
+    direction,
+    sourceText
+  ].join('|');
+  const prior = priorPatterns[priorKey];
+  let matchedRule = null;
+  let counterAccountCode = '';
+  let confidence = 0;
+  let reason = '';
+  if (prior && prior.counterAccountCode) {
+    counterAccountCode = prior.counterAccountCode;
+    confidence = 100;
+    reason = 'Exact description and direction match a previously approved assignment.';
+  } else {
+    matchedRule = rules
+      .filter(function(rule) {
+        return ruleMatchesSource_(rule, record, direction);
+      })
+      .sort(function(a, b) {
+        const priorityDifference =
+          Number(b.priority || 0) - Number(a.priority || 0);
+        return priorityDifference ||
+          Number(b.confidence || 0) - Number(a.confidence || 0);
+      })[0] || null;
+    if (matchedRule) {
+      if (direction === 'money-out') {
+        counterAccountCode = String(matchedRule.debitAccountCode || '');
+      } else {
+        counterAccountCode = String(matchedRule.creditAccountCode || '');
+      }
+      confidence = Number(matchedRule.confidence || 0);
+      reason = String(matchedRule.matchReason ||
+        'Description matched an active account rule.');
+    }
+  }
+
+  if (!counterAccountCode || !accountsByCode[counterAccountCode]) {
+    return {
+      status: 'red-review',
+      direction: direction,
+      bankAccountCode: bankAccountCode,
+      confidence: confidence,
+      ruleId: matchedRule ? matchedRule.id : '',
+      reason: counterAccountCode
+        ? 'The suggested counter-account is inactive or unavailable.'
+        : 'No approved prior pattern or active account rule matched.',
+      warning: warning
+    };
+  }
+  const debitCode =
+    direction === 'money-out' ? counterAccountCode : bankAccountCode;
+  const creditCode =
+    direction === 'money-out' ? bankAccountCode : counterAccountCode;
+  const sensitivePattern =
+    /\b(TRANSFER|LOAN|MORTGAGE|EQUITY|CAPITAL|TAX|REFUND|SPLIT)\b/
+      .test(sourceText);
+  const green = confidence >= 90 && !sensitivePattern;
+  return {
+    status: green ? 'green-confirm' : 'red-review',
+    direction: direction,
+    bankAccountCode: bankAccountCode,
+    counterAccountCode: counterAccountCode,
+    debitAccountCode: debitCode,
+    creditAccountCode: creditCode,
+    confidence: confidence,
+    ruleId: matchedRule ? matchedRule.id : '',
+    reason: sensitivePattern
+      ? 'Sensitive transfer, financing, tax, refund, capital or split wording requires review.'
+      : reason,
+    warning: warning
+  };
+}
+
+function getPriorApprovedPatterns_(records) {
+  const patterns = {};
+  records.forEach(function(record) {
+    if (record.accountApprovalStatus !== 'approved') return;
+    const direction = bankDirection_(record);
+    if (direction === 'unknown') return;
+    const bankCode = String(record.bankAccountCode ||
+      (record.sourceProvider === 'akoya' &&
+       record.sourceEnvironment === 'sandbox' ? '11110' : ''));
+    const counterCode = direction === 'money-out'
+      ? String(record.debitAccountCode || '')
+      : String(record.creditAccountCode || '');
+    if (!bankCode || !counterCode || bankCode === counterCode) return;
+    patterns[[
+      String(record.sourceAccountId || ''),
+      direction,
+      normalizeRuleText_(record.description)
+    ].join('|')] = {
+      counterAccountCode: counterCode,
+      approvedAt: record.accountApprovedAt
+    };
+  });
+  return patterns;
+}
+
 function setupTransactionWorkbench_() {
   createIfMissing_('transactionRules', 'ctu-paycheck-m', {
     ruleId: 'ctu-paycheck-m',
@@ -44,6 +220,8 @@ function setupTransactionWorkbench_() {
     creditAccountCode: '7M110',
     matchReason: 'Approved payee/description pattern',
     confidence: 100,
+    priority: 100,
+    matchOperator: 'contains',
     status: 'active',
     approvedBy: 'initial-accounting-design',
     approvedAt: new Date()
@@ -54,22 +232,33 @@ function getTransactionWorkbench() {
   requireCurrentUser_();
   ensureAccountingFoundation_();
   setupTransactionWorkbench_();
-  const sourceRecords = firestoreGetCollection_('sourceRecords')
+  const allSourceRecords = firestoreGetCollection_('sourceRecords')
     .map(fromFirestoreDocument_)
     .sort(function(a, b) {
       return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
-    })
-    .slice(0, 100)
-    .map(function(record) {
-      record.controls = workbenchStatus_(record);
-      return record;
     });
   const rules = firestoreGetCollection_('transactionRules')
     .map(fromFirestoreDocument_)
     .filter(function(rule) { return rule.status === 'active'; })
-    .sort(function(a, b) { return String(a.name).localeCompare(String(b.name)); });
+    .sort(function(a, b) {
+      return Number(b.priority || 0) - Number(a.priority || 0) ||
+        String(a.name).localeCompare(String(b.name));
+    });
+  const accountsByCode = {};
+  getSimpleTransactionSetup().accounts.forEach(function(account) {
+    accountsByCode[account.code] = account;
+  });
+  const priorPatterns = getPriorApprovedPatterns_(allSourceRecords);
+  const sourceRecords = allSourceRecords.map(function(record) {
+    record.controls = workbenchStatus_(record);
+    record.accountSuggestion = accountRuleSuggestion_(
+      record, rules, accountsByCode, priorPatterns
+    );
+    return record;
+  });
   return {
-    policyVersion: '2026-07-28.1',
+    policyVersion: NILAVARAM_BANK_RULE_POLICY_VERSION,
+    reviewBatchSize: NILAVARAM_REVIEW_BATCH_SIZE,
     postingEnabled: false,
     lockedRules: [
       'Downloaded/imported records remain outside the books until matched or approved as new.',
@@ -78,6 +267,11 @@ function getTransactionWorkbench() {
       'A reconciliation is complete only when adjusted external balance minus adjusted book balance equals $0.00.',
       'Non-zero differences and incomplete controls display red review alerts and are never forced.',
       'Account suggestions require user confirmation and preserve the complete rule decision trail.',
+      'The downloaded bank side is fixed by money-in or money-out; rules suggest only the opposite account.',
+      'Exact previously approved patterns have first priority, followed by active rules in priority order.',
+      'A green suggestion requires at least 90% confidence and active accounts; it still requires user confirmation.',
+      'Transfers, loans, equity, capital, tax, refunds, splits, ambiguous matches and inactive accounts remain red.',
+      'A rule suggestion never posts a transaction automatically.',
       'A material or uncertain correction should be reviewed by a qualified CPA and entered as a separate Journal Entry.',
       'A green check means a recorded control passed; red means review is required.'
     ],
@@ -85,6 +279,9 @@ function getTransactionWorkbench() {
     rules: rules,
     counts: {
       total: sourceRecords.length,
+      greenSuggestions: sourceRecords.filter(function(r) {
+        return r.accountSuggestion.status === 'green-confirm';
+      }).length,
       redReview: sourceRecords.filter(function(r) {
         return !r.controls.readyToPost || !r.controls.fullyReconciled;
       }).length,
@@ -327,6 +524,86 @@ function approveSourceAccountAssignment(input) {
   return {
     success: true,
     message: 'Green check: account assignment approved and fully audited. Posting remains disabled until end-to-end verification.'
+  };
+}
+
+function saveTransactionAccountRule(input) {
+  const user = requireAccountingEditor_();
+  const name = String(input && input.name || '').trim();
+  const direction = String(input && input.direction || '').trim();
+  const operator = String(input && input.operator || '').trim();
+  const matchText = String(input && input.matchText || '').trim();
+  const counterAccountCode =
+    String(input && input.counterAccountCode || '').trim();
+  const priority = Math.round(Number(input && input.priority || 50));
+  if (!name || !matchText) {
+    throw new Error('Enter a rule name and bank-description text.');
+  }
+  if (['money-in', 'money-out'].indexOf(direction) === -1) {
+    throw new Error('Select Money in or Money out.');
+  }
+  if (['contains', 'exactly'].indexOf(operator) === -1) {
+    throw new Error('Select Contains or Is exactly.');
+  }
+  if (!isFinite(priority) || priority < 1 || priority > 999) {
+    throw new Error('Priority must be from 1 through 999.');
+  }
+  const accounts = getSimpleTransactionSetup().accounts;
+  if (!accounts.some(function(account) {
+    return account.code === counterAccountCode;
+  })) {
+    throw new Error('Select an active counter-account.');
+  }
+  if (counterAccountCode === '11110') {
+    throw new Error('The counter-account cannot be the bank account itself.');
+  }
+  const ruleId = 'bank-rule-' + Utilities.getUuid();
+  const confidence = operator === 'exactly' ? 95 : 90;
+  const rule = {
+    ruleId: ruleId,
+    name: name,
+    version: 1,
+    priority: priority,
+    direction: direction,
+    transactionType: direction === 'money-in' ? 'receipt' : 'payment',
+    matchField: 'description',
+    matchOperator: operator,
+    matchText: [matchText],
+    debitAccountCode:
+      direction === 'money-out' ? counterAccountCode : '11110',
+    creditAccountCode:
+      direction === 'money-out' ? '11110' : counterAccountCode,
+    counterAccountCode: counterAccountCode,
+    bankAccountCode: '11110',
+    matchReason:
+      (operator === 'exactly' ? 'Exact' : 'Contains') +
+      ' bank-description rule: ' + matchText,
+    confidence: confidence,
+    autoPost: false,
+    status: 'active',
+    approvedBy: user.email,
+    approvedAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+  firestoreSetDocument_(
+    'transactionRules', ruleId, toFirestoreFields_(rule)
+  );
+  writeAudit_('transaction-account-rule-created', user.email, {
+    ruleId: ruleId,
+    version: 1,
+    priority: priority,
+    direction: direction,
+    operator: operator,
+    matchText: matchText,
+    counterAccountCode: counterAccountCode,
+    autoPost: false
+  });
+  return {
+    success: true,
+    ruleId: ruleId,
+    message:
+      'Rule saved. Matching records will receive a suggestion, but nothing is approved or posted automatically.'
   };
 }
 

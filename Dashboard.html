@@ -1781,6 +1781,7 @@
         .withSuccessHandler(function(data) {
           window.nilavaramWorkbench = data;
           window.nilavaramWorkbenchView = view || 'transaction-workbench';
+          if (!window.nilavaramWorkbenchPage) window.nilavaramWorkbenchPage = 1;
           renderTransactionWorkbench(data, window.nilavaramWorkbenchView);
         })
         .withFailureHandler(showError)
@@ -1809,6 +1810,7 @@
         '</div>' +
         '<p><b>Locked policy:</b> ' + escapeHtml(data.policyVersion) +
         ' &nbsp; <b>Registered:</b> ' + data.counts.total +
+        ' &nbsp; <b>Green suggestions:</b> ' + data.counts.greenSuggestions +
         ' &nbsp; <b>Red review:</b> ' + data.counts.redReview + '</p>' +
         '<details><summary>View locked workflow rules</summary><ol>' +
         data.lockedRules.map(function(rule) {
@@ -1822,14 +1824,48 @@
       else renderWorkbenchSummary(data);
     }
 
+    function workbenchPageRecords(data) {
+      const size = Number(data.reviewBatchSize || 25);
+      const totalPages = Math.max(1, Math.ceil(data.sourceRecords.length / size));
+      window.nilavaramWorkbenchPage = Math.min(
+        Math.max(1, Number(window.nilavaramWorkbenchPage || 1)),
+        totalPages
+      );
+      const start = (window.nilavaramWorkbenchPage - 1) * size;
+      return data.sourceRecords.slice(start, start + size);
+    }
+
+    function workbenchBatchNavigation(data) {
+      const size = Number(data.reviewBatchSize || 25);
+      const pages = Math.max(1, Math.ceil(data.sourceRecords.length / size));
+      const page = Number(window.nilavaramWorkbenchPage || 1);
+      return '<div class="button-row"><button type="button" ' +
+        (page <= 1 ? 'disabled ' : '') +
+        'onclick="changeWorkbenchBatch(-1)">Previous 25</button>' +
+        '<span><b>Batch ' + page + ' of ' + pages + '</b> (' +
+        data.sourceRecords.length + ' total records)</span>' +
+        '<button type="button" ' + (page >= pages ? 'disabled ' : '') +
+        'onclick="changeWorkbenchBatch(1)">Next 25</button></div>';
+    }
+
+    function changeWorkbenchBatch(change) {
+      window.nilavaramWorkbenchPage =
+        Math.max(1, Number(window.nilavaramWorkbenchPage || 1) + change);
+      renderTransactionWorkbench(
+        window.nilavaramWorkbench,
+        window.nilavaramWorkbenchView
+      );
+    }
+
     function renderWorkbenchSummary(data) {
       let html = '<h3>Current queue</h3>';
       if (!data.sourceRecords.length) {
         html += '<p>No source records have been registered.</p>';
       } else {
-        html += '<table><thead><tr><th>Source</th><th>Date</th><th>Description</th>' +
+        html += workbenchBatchNavigation(data) +
+          '<table><thead><tr><th>Source</th><th>Date</th><th>Description</th>' +
           '<th>Evidence</th><th>Reconciliation</th><th>Accounts</th><th>Books</th></tr></thead><tbody>';
-        data.sourceRecords.forEach(function(record) {
+        workbenchPageRecords(data).forEach(function(record) {
           html += '<tr><td>' + escapeHtml(record.sourceRecordNumber) + '</td>' +
             '<td>' + escapeHtml(record.transactionDate) + '</td>' +
             '<td>' + escapeHtml(record.description) + '</td>' +
@@ -1941,9 +1977,11 @@
         container.innerHTML = '<p>No source records yet.</p>';
         return;
       }
-      let html = '<h3>Registered source queue</h3><table><thead><tr>' +
+      let html = '<h3>Registered source queue</h3>' +
+        workbenchBatchNavigation(data) +
+        '<table><thead><tr>' +
         '<th>ID</th><th>Proof</th><th>Status</th><th>Alert</th></tr></thead><tbody>';
-      data.sourceRecords.forEach(function(record) {
+      workbenchPageRecords(data).forEach(function(record) {
         html += '<tr><td>' + escapeHtml(record.sourceRecordNumber) + '</td>' +
           '<td>' + escapeHtml(record.evidenceName) + '</td>' +
           '<td>Outside books</td><td><span class="error">' +
@@ -2007,9 +2045,13 @@
           return '<option value="' + escapeHtml(rule.id) + '">' +
             escapeHtml(rule.name + ' v' + (rule.version || 1) +
               ' — confidence ' + (rule.confidence || 0) + '%') + '</option>';
-        }).join('');
+      }).join('');
       document.getElementById('workbench-view').innerHTML =
         '<h3>Step 3 — Account rule review and approval</h3>' +
+        '<p>The bank side comes from money-in or money-out. The rule suggests the opposite account. ' +
+        'Green means safe to confirm; red means review. Neither color posts automatically.</p>' +
+        renderAccountSuggestionQueue(data) +
+        '<h3>Confirm or change one suggestion</h3>' +
         '<p>Every approval records the rule ID/version, match reason, suggestion, confidence, approver and any change reason.</p>' +
         (accounts.length ? '' : '<p class="error">Loading the active Chart of Accounts...</p>') +
         '<form id="rule-approval-form"><div class="form-grid">' +
@@ -2019,7 +2061,24 @@
           '<div><label>Credit account</label><select id="rule-credit">' + accountOptions + '</select></div>' +
           '<div><label>Reason if suggestion changed</label><input id="rule-change-reason"></div>' +
         '</div><button class="primary-button" type="submit">Approve account assignment</button> ' +
-        '<span id="rule-message"></span></form><hr><h3>Visible active rules</h3>' +
+        '<span id="rule-message"></span></form><hr>' +
+        '<h3>Create a description rule</h3>' +
+        '<p>Use a narrow, recognizable bank description. Exact rules receive 95% confidence; Contains rules receive 90%.</p>' +
+        '<form id="new-account-rule-form"><div class="form-grid">' +
+          '<div><label>Rule name</label><input id="new-rule-name" required></div>' +
+          '<div><label>Direction</label><select id="new-rule-direction">' +
+            '<option value="money-out">Money out / payment</option>' +
+            '<option value="money-in">Money in / receipt</option></select></div>' +
+          '<div><label>Bank description test</label><select id="new-rule-operator">' +
+            '<option value="contains">Contains</option>' +
+            '<option value="exactly">Is exactly</option></select></div>' +
+          '<div><label>Description text</label><input id="new-rule-text" required></div>' +
+          '<div><label>Opposite account</label><select id="new-rule-counter">' +
+            accountOptions + '</select></div>' +
+          '<div><label>Priority (higher runs first)</label>' +
+            '<input id="new-rule-priority" type="number" min="1" max="999" value="50" required></div>' +
+        '</div><button class="primary-button" type="submit">Save active suggestion rule</button> ' +
+        '<span id="new-rule-message"></span></form><hr><h3>Visible active rules</h3>' +
         renderRulesTable(data.rules);
       if (!accounts.length) {
         google.script.run.withSuccessHandler(function(setup) {
@@ -2029,7 +2088,66 @@
         return;
       }
       document.getElementById('rule-id').onchange = applySelectedRule;
+      document.getElementById('rule-source').onchange = applySourceSuggestion;
       document.getElementById('rule-approval-form').onsubmit = saveRuleApproval;
+      document.getElementById('new-account-rule-form').onsubmit =
+        saveNewAccountRule;
+      applySourceSuggestion();
+    }
+
+    function renderAccountSuggestionQueue(data) {
+      if (!data.sourceRecords.length) return '<p>No source records yet.</p>';
+      let html = workbenchBatchNavigation(data) +
+        '<table><thead><tr><th>Date / description</th><th>Direction</th>' +
+        '<th>Suggested entry</th><th>Rule decision</th><th>Action</th>' +
+        '</tr></thead><tbody>';
+      workbenchPageRecords(data).forEach(function(record) {
+        const suggestion = record.accountSuggestion || {};
+        const green = suggestion.status === 'green-confirm';
+        html += '<tr><td>' + escapeHtml(record.transactionDate || '') +
+          '<br>' + escapeHtml(record.description || '') + '</td>' +
+          '<td>' + escapeHtml(suggestion.direction || 'unknown') + '</td>' +
+          '<td>Dr ' + escapeHtml(suggestion.debitAccountCode || 'Review') +
+          '<br>Cr ' + escapeHtml(suggestion.creditAccountCode || 'Review') +
+          '</td><td>' + workbenchBadge(
+            green,
+            'Confirm — ' + (suggestion.confidence || 0) + '%',
+            'Review required'
+          ) + '<br>' + escapeHtml(suggestion.reason || '') +
+          (suggestion.warning
+            ? '<br><span class="error">' + escapeHtml(suggestion.warning) + '</span>'
+            : '') +
+          '</td><td><button type="button" onclick="selectRuleRecord(\'' +
+          escapeHtml(record.id) + '\')">Review this line</button></td></tr>';
+      });
+      return html + '</tbody></table>';
+    }
+
+    function selectRuleRecord(id) {
+      document.getElementById('rule-source').value = id;
+      applySourceSuggestion();
+      document.getElementById('rule-approval-form').scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+
+    function applySourceSuggestion() {
+      const sourceElement = document.getElementById('rule-source');
+      if (!sourceElement) return;
+      const record = (window.nilavaramWorkbench.sourceRecords || [])
+        .find(function(item) { return item.id === sourceElement.value; });
+      if (!record || !record.accountSuggestion) return;
+      const suggestion = record.accountSuggestion;
+      document.getElementById('rule-id').value = suggestion.ruleId || '';
+      if (suggestion.debitAccountCode) {
+        document.getElementById('rule-debit').value =
+          suggestion.debitAccountCode;
+      }
+      if (suggestion.creditAccountCode) {
+        document.getElementById('rule-credit').value =
+          suggestion.creditAccountCode;
+      }
     }
 
     function renderRulesTable(rules) {
@@ -2074,6 +2192,27 @@
         document.getElementById('rule-message').innerHTML =
           ' <span class="error">' + escapeHtml(error.message) + '</span>';
       }).approveSourceAccountAssignment(input);
+    }
+
+    function saveNewAccountRule(event) {
+      event.preventDefault();
+      const input = {
+        name: document.getElementById('new-rule-name').value,
+        direction: document.getElementById('new-rule-direction').value,
+        operator: document.getElementById('new-rule-operator').value,
+        matchText: document.getElementById('new-rule-text').value,
+        counterAccountCode: document.getElementById('new-rule-counter').value,
+        priority: document.getElementById('new-rule-priority').value
+      };
+      document.getElementById('new-rule-message').textContent = ' Saving...';
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('new-rule-message').innerHTML =
+          ' <span class="success">' + escapeHtml(result.message) + '</span>';
+        showTransactionWorkbench('account-rule-review');
+      }).withFailureHandler(function(error) {
+        document.getElementById('new-rule-message').innerHTML =
+          ' <span class="error">' + escapeHtml(error.message) + '</span>';
+      }).saveTransactionAccountRule(input);
     }
 
     function renderManualJournalEntry(data) {
