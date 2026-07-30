@@ -829,6 +829,10 @@
         showConnections();
         return;
       }
+      if (String(moduleId || '').indexOf('wizard-') === 0) {
+        showAccountingWizardStatus(moduleId, label);
+        return;
+      }
 
       google.script.run
         .withSuccessHandler(function(result) {
@@ -836,6 +840,104 @@
         })
         .withFailureHandler(showError)
         .openModule(moduleId);
+    }
+
+    function showAccountingWizardStatus(moduleId, label) {
+      const details = {
+        'wizard-accounting-year': {
+          status: 'Visible — controlled setup is pending',
+          text: 'This screen will set the opening date, fiscal year and ' +
+            'reporting-period controls. It must be completed before live ' +
+            'opening balances or transactions are posted.'
+        },
+        'wizard-opening-tb': {
+          status: 'Visible — opening-entry workflow is pending',
+          text: 'The Opening Trial Balance will require balanced debit and ' +
+            'credit lines, active Chart of Accounts codes, supporting ' +
+            'evidence, approval and an append-only audit record. For BOA ' +
+            'x0137, a positive opening balance will debit the bank asset and ' +
+            'credit M’s Equity for the same verified amount.'
+        },
+        'wizard-sheet-index': {
+          status: 'Visible — source index is pending',
+          text: 'This will list each bank statement, CSV, PDF, image or text ' +
+            'batch with its date range, file identity, import status and ' +
+            'duplicate-control result.'
+        },
+        'wizard-create-acode-map': {
+          status: 'Visible — mapping editor is pending',
+          text: 'This will create reusable description-to-account suggestions ' +
+            'from previously approved accounting decisions.'
+        },
+        'wizard-validate-acode-map': {
+          status: 'Visible — validation control is pending',
+          text: 'This will check every suggested code against the active ' +
+            'Chart of Accounts and show green approval or red review status.'
+        },
+        'wizard-ledger': {
+          status: 'Visible — report engine is pending',
+          text: 'The General Ledger will be generated only from posted, ' +
+            'balanced journal lines and will retain links to source evidence.'
+        },
+        'wizard-trial-balance': {
+          status: 'Visible — report engine is pending',
+          text: 'The Trial Balance will show account debit and credit totals ' +
+            'and must balance to zero difference.'
+        },
+        'wizard-profit-loss': {
+          status: 'Visible — report engine is pending',
+          text: 'Profit and Loss will report posted income and expenses for ' +
+            'the selected accounting period.'
+        },
+        'wizard-profit-loss-appropriation': {
+          status: 'Visible — report engine is pending',
+          text: 'Profit and Loss Appropriation will show approved allocations ' +
+            'of the period result without altering the underlying audit trail.'
+        },
+        'wizard-balance-sheet': {
+          status: 'Visible — report engine is pending',
+          text: 'The Balance Sheet will report assets, liabilities and equity ' +
+            'as of a selected date from posted journal lines.'
+        },
+        'wizard-error-check': {
+          status: 'Visible — consolidated control screen is pending',
+          text: 'This will consolidate red alerts for duplicates, imbalance, ' +
+            'missing evidence, invalid account codes and reconciliation ' +
+            'differences.'
+        },
+        'wizard-all-reports': {
+          status: 'Visible — enabled after individual reports are verified',
+          text: 'One click will create the complete report package only after ' +
+            'the Ledger, Trial Balance, Profit and Loss, Appropriation and ' +
+            'Balance Sheet have each passed their controls.'
+        },
+        'wizard-export-csv': {
+          status: 'Visible — export is pending',
+          text: 'This will export approved tabular accounting data with the ' +
+            'selected business, period and generation timestamp.'
+        },
+        'wizard-export-pdf': {
+          status: 'Visible — export is pending',
+          text: 'This will export approved reports as dated PDF evidence.'
+        },
+        'wizard-search': {
+          status: 'Visible — indexed search is pending',
+          text: 'Search will locate transactions, account codes, descriptions, ' +
+            'document references, reconciliation items and audit events.'
+        }
+      };
+      const item = details[moduleId] || {
+        status: 'Visible — implementation is pending',
+        text: 'This Accounting Wizard function is recorded in the navigation ' +
+          'and will be activated through the controlled development sequence.'
+      };
+      document.getElementById('output').innerHTML =
+        '<h2>' + escapeHtml(label) + '</h2>' +
+        '<p><b>Status:</b> ' + escapeHtml(item.status) + '</p>' +
+        '<p>' + escapeHtml(item.text) + '</p>' +
+        '<p class="help-meta">A visible menu item does not mean that live ' +
+        'posting or final reporting has been enabled. Nilavaram will label ' +
+        'each function accurately until verification is complete.</p>';
     }
 
     function showConnections() {
