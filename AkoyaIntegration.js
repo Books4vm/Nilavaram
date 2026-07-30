@@ -21,14 +21,16 @@ function getAkoyaConfig_() {
   return {
     environment: String(
       properties.getProperty('AKOYA_ENVIRONMENT') || 'sandbox'
-    ).toLowerCase(),
-    clientId: String(properties.getProperty('AKOYA_CLIENT_ID') || ''),
+    ).trim().toLowerCase(),
+    clientId: String(
+      properties.getProperty('AKOYA_CLIENT_ID') || ''
+    ).trim(),
     clientSecret: String(
       properties.getProperty('AKOYA_CLIENT_SECRET') || ''
-    ),
+    ).trim(),
     redirectUri: String(
       properties.getProperty('AKOYA_REDIRECT_URI') || ''
-    )
+    ).trim()
   };
 }
 
@@ -117,9 +119,15 @@ function parseAkoyaResponse_(response, operation) {
 function requestAkoyaInitialTokens_(code) {
   const config = getAkoyaConfig_();
   const authorization = Utilities.base64Encode(
-    config.clientId + ':' + config.clientSecret
+    config.clientId + ':' + config.clientSecret,
+    Utilities.Charset.UTF_8
   );
-  const response = UrlFetchApp.fetch(
+  const payload = {
+    grant_type: 'authorization_code',
+    redirect_uri: config.redirectUri,
+    code: String(code)
+  };
+  let response = UrlFetchApp.fetch(
     getAkoyaIdentityBase_(config) + '/token',
     {
       method: 'post',
@@ -128,14 +136,26 @@ function requestAkoyaInitialTokens_(code) {
         Authorization: 'Basic ' + authorization,
         Accept: 'application/json'
       },
-      payload: {
-        grant_type: 'authorization_code',
-        redirect_uri: config.redirectUri,
-        code: String(code)
-      },
+      payload: payload,
       muteHttpExceptions: true
     }
   );
+  if (response.getResponseCode() === 401) {
+    payload.client_id = config.clientId;
+    payload.client_secret = config.clientSecret;
+    response = UrlFetchApp.fetch(
+      getAkoyaIdentityBase_(config) + '/token',
+      {
+        method: 'post',
+        contentType: 'application/x-www-form-urlencoded',
+        headers: {
+          Accept: 'application/json'
+        },
+        payload: payload,
+        muteHttpExceptions: true
+      }
+    );
+  }
   return parseAkoyaResponse_(response, 'Akoya authorization');
 }
 
