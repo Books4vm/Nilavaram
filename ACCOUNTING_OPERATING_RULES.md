@@ -160,6 +160,25 @@ These rules were confirmed on 2026-08-08:
    them.
 5. Complete displayed 25 is a separate deliberate action and requires a valid
    ACODE for every transaction in that displayed set.
+6. Category and owner/entity filters belong to each transaction row. One
+   transaction's filter must not hide or change another row's ACODE choices.
+7. A new description rule is selected by default after the user chooses an
+   ACODE. Duplicate rules with the same year, account, direction, description
+   test and ACODE are not created.
+
+## Locked annual-books boundary
+
+1. Nilavaram maintains a separate accounting boundary for each calendar/tax
+   year, comparable to beginning a fresh manual ledger each January 1.
+2. Source-download batches are separated by source account and accounting
+   year. A reconciliation batch cannot combine transactions from two years.
+3. Every new automatic ACODE rule has an effective tax year and dates from
+   January 1 through December 31 of that year.
+4. A rule may suggest classifications only within its own tax year. An old
+   rule without a year is treated as unscoped and will not auto-apply.
+5. Changing a rule does not silently rewrite a filed prior year or a posted
+   transaction. Such a change requires the controlled correction process and,
+   when material or uncertain, qualified CPA review.
 
 ## Implementation status
 

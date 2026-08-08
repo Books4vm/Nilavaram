@@ -50,6 +50,10 @@ function bankDirection_(record) {
 }
 
 function ruleMatchesSource_(rule, record, direction) {
+  const recordYear = String(record.transactionDate || '').slice(0, 4);
+  const ruleYear = String(rule.taxYear || rule.accountingYear || '');
+  // Unscoped legacy rules must not silently affect a filed or different year.
+  if (!/^\d{4}$/.test(ruleYear) || ruleYear !== recordYear) return false;
   const transactionType = String(rule.transactionType || '').toLowerCase();
   if (transactionType === 'payment' && direction !== 'money-out') return false;
   if (transactionType === 'receipt' && direction !== 'money-in') return false;
@@ -117,6 +121,7 @@ function accountRuleSuggestion_(record, rules, accountsByCode, priorPatterns) {
 
   const priorKey = [
     String(record.sourceAccountId || ''),
+    String(record.transactionDate || '').slice(0, 4),
     direction,
     sourceText
   ].join('|');
@@ -204,6 +209,7 @@ function getPriorApprovedPatterns_(records) {
     if (!bankCode || !counterCode || bankCode === counterCode) return;
     patterns[[
       String(record.sourceAccountId || ''),
+      String(record.transactionDate || '').slice(0, 4),
       direction,
       normalizeRuleText_(record.description)
     ].join('|')] = {
@@ -227,6 +233,9 @@ function setupTransactionWorkbench_() {
     matchReason: 'Approved payee/description pattern',
     confidence: 100,
     priority: 100,
+    taxYear: '2025',
+    effectiveFrom: '2025-01-01',
+    effectiveThrough: '2025-12-31',
     matchOperator: 'contains',
     status: 'active',
     approvedBy: 'initial-accounting-design',
@@ -542,6 +551,7 @@ function saveTransactionAccountRule(input) {
   const counterAccountCode =
     String(input && input.counterAccountCode || '').trim();
   const priority = Math.round(Number(input && input.priority || 50));
+  const taxYear = String(input && input.taxYear || '').trim();
   if (!name || !matchText) {
     throw new Error('Enter a rule name and bank-description text.');
   }
@@ -553,6 +563,9 @@ function saveTransactionAccountRule(input) {
   }
   if (!isFinite(priority) || priority < 1 || priority > 999) {
     throw new Error('Priority must be from 1 through 999.');
+  }
+  if (!/^\d{4}$/.test(taxYear)) {
+    throw new Error('Enter the four-digit calendar/tax year for this rule.');
   }
   const accounts = getSimpleTransactionSetup().accounts;
   if (!accounts.some(function(account) {
@@ -570,6 +583,9 @@ function saveTransactionAccountRule(input) {
     name: name,
     version: 1,
     priority: priority,
+    taxYear: taxYear,
+    effectiveFrom: taxYear + '-01-01',
+    effectiveThrough: taxYear + '-12-31',
     direction: direction,
     transactionType: direction === 'money-in' ? 'receipt' : 'payment',
     matchField: 'description',
@@ -610,6 +626,68 @@ function saveTransactionAccountRule(input) {
     ruleId: ruleId,
     message:
       'Rule saved. Matching records will receive a suggestion, but nothing is approved or posted automatically.'
+  };
+}
+
+function updateTransactionAccountRuleForYear(input) {
+  const user = requireAccountingEditor_();
+  const ruleId = String(input && input.ruleId || '').trim();
+  const previous = ruleId ? getDocumentOrNull_('transactionRules', ruleId) : null;
+  if (!previous) throw new Error('The selected rule was not found.');
+  const taxYear = String(previous.taxYear || '').trim();
+  if (!/^\d{4}$/.test(taxYear)) {
+    throw new Error('This legacy rule has no tax year. Create a new year-specific rule instead.');
+  }
+  const operator = String(input && input.operator || '').trim();
+  const matchText = String(input && input.matchText || '').trim();
+  const counterCode = String(input && input.counterAccountCode || '').trim();
+  const priority = Math.round(Number(input && input.priority || 50));
+  if (['contains', 'exactly'].indexOf(operator) === -1 || !matchText) {
+    throw new Error('Enter a valid description test and matching text.');
+  }
+  if (!isFinite(priority) || priority < 1 || priority > 999) {
+    throw new Error('Priority must be from 1 through 999.');
+  }
+  const accounts = getSimpleTransactionSetup().accounts;
+  if (!accounts.some(function(account) { return account.code === counterCode; })) {
+    throw new Error('Select an active opposite ACODE.');
+  }
+  const direction = String(previous.direction || '');
+  if (['money-in', 'money-out'].indexOf(direction) === -1) {
+    throw new Error('The existing rule direction is invalid.');
+  }
+  const bankCode = String(previous.bankAccountCode || '11110');
+  if (bankCode === counterCode) throw new Error('The opposite ACODE cannot be the bank ACODE.');
+  const updated = copyRecordWithoutId_(previous);
+  updated.version = Number(previous.version || 1) + 1;
+  updated.name = String(input && input.name || previous.name || '').trim();
+  updated.matchOperator = operator;
+  updated.matchText = [matchText];
+  updated.counterAccountCode = counterCode;
+  updated.debitAccountCode = direction === 'money-out' ? counterCode : bankCode;
+  updated.creditAccountCode = direction === 'money-out' ? bankCode : counterCode;
+  updated.priority = priority;
+  updated.matchReason = (operator === 'exactly' ? 'Exact' : 'Contains') +
+    ' bank-description rule: ' + matchText;
+  updated.confidence = operator === 'exactly' ? 95 : 90;
+  updated.updatedAt = new Date();
+  updated.updatedBy = user.email;
+  firestoreSetDocument_('transactionRuleHistory', Utilities.getUuid(),
+    toFirestoreFields_({ruleId: ruleId, taxYear: taxYear,
+      previousRecord: previous, changedBy: user.email, changedAt: new Date()}));
+  firestoreSetDocument_('transactionRules', ruleId, toFirestoreFields_(updated));
+  writeAudit_('transaction-account-rule-updated', user.email, {
+    ruleId: ruleId, version: updated.version, taxYear: taxYear,
+    applyToUnapprovedYear: !!input.applyToUnapprovedYear,
+    protectedApprovedAndPostedRecords: true
+  });
+  return {
+    success: true,
+    message: 'Rule updated for ' + taxYear + '. ' +
+      (input.applyToUnapprovedYear
+        ? 'The revised suggestion will be used for unapproved ' + taxYear + ' transactions when refreshed. '
+        : 'Existing unapproved suggestions will remain visible until the next normal refresh. ') +
+      'Approved, posted and other-year transactions were not changed.'
   };
 }
 

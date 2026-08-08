@@ -3,7 +3,7 @@
  * End-user input, batch reconciliation and ACODE assignment workspace.
  */
 
-const NILAVARAM_INPUT_WORKFLOW_VERSION = '2026-08-08.2';
+const NILAVARAM_INPUT_WORKFLOW_VERSION = '2026-08-08.3';
 
 function shortInstitutionName_(record) {
   const value = String(record.sourceFinancialInstitution || '').toLowerCase();
@@ -34,10 +34,12 @@ function getInputWorkspace() {
   const data = getTransactionWorkbench();
   const groupsByKey = {};
   data.sourceRecords.forEach(function(record) {
+    const accountingYear = String(record.transactionDate || '').slice(0, 4);
     const key = [
       record.sourceProvider || record.sourceType || 'manual',
       record.sourceEnvironment || 'live',
-      record.sourceAccountId || record.sourceBatchId || 'unassigned'
+      record.sourceAccountId || record.sourceBatchId || 'unassigned',
+      accountingYear || 'undated'
     ].join('|');
     if (!groupsByKey[key]) {
       groupsByKey[key] = {
@@ -47,6 +49,7 @@ function getInputWorkspace() {
         sourceAccountId: record.sourceAccountId || '',
         sourceAccountDisplay: record.sourceAccountDisplay || 'Unassigned source',
         proofLabel: sourceProofLabel_(record),
+        accountingYear: accountingYear,
         recordCount: 0,
         receiptCents: 0,
         paymentCents: 0,
@@ -59,6 +62,7 @@ function getInputWorkspace() {
     const direction = bankDirection_(record);
     const view = copyRecordWithoutId_(record);
     view.id = record.id;
+    view.accountingYear = accountingYear;
     view.direction = direction;
     view.proofLabel = sourceProofLabel_(record);
     view.receiptCents = direction === 'money-in' ? Number(record.amountCents || 0) : 0;
@@ -128,14 +132,16 @@ function saveSourceBatchReconciliation(input) {
   }) && !!input.zeroBasedSandboxReview;
   const openingCents = sandboxZeroBased ? 0 :
     centsFromSignedInput_(input.openingBalance, 'Opening balance');
+  const groupYear = String(records[0].transactionDate || '').slice(0, 4);
   const groupKey = [records[0].sourceProvider, records[0].sourceEnvironment,
-    records[0].sourceAccountId].join('|');
+    records[0].sourceAccountId, groupYear].join('|');
   const duplicateKeys = {};
   let receipts = 0;
   let payments = 0;
   records.forEach(function(record) {
     const key = [record.sourceProvider, record.sourceEnvironment,
-      record.sourceAccountId].join('|');
+      record.sourceAccountId,
+      String(record.transactionDate || '').slice(0, 4)].join('|');
     if (key !== groupKey) throw new Error('One reconciliation may contain only one source account.');
     if (duplicateKeys[record.externalSourceKey]) {
       throw new Error('A duplicate source transaction is present in the batch.');
@@ -197,7 +203,8 @@ function saveSourceBatchReconciliation(input) {
     differenceCents: 0,
     reconciliationBasis: sandboxZeroBased
       ? 'sandbox-zero-based-arithmetic-review'
-      : 'external-balance-comparison'
+      : 'external-balance-comparison',
+    accountingYear: groupYear
   });
   return {
     success: true,
@@ -233,6 +240,17 @@ function saveSourceBatchAcodeAssignments(input) {
   const now = new Date();
   const writes = [];
   let createdRules = 0;
+  const existingRuleKeys = {};
+  activeRules.forEach(function(rule) {
+    const existingMatchText = Array.isArray(rule.matchText)
+      ? rule.matchText[0] : rule.matchText;
+    existingRuleKeys[[
+      String(rule.taxYear || ''), String(rule.sourceAccountId || ''),
+      String(rule.direction || ''), String(rule.matchOperator || 'contains'),
+      normalizeRuleText_(existingMatchText),
+      String(rule.counterAccountCode || '')
+    ].join('|')] = true;
+  });
   assignments.forEach(function(assignment) {
     const id = String(assignment.sourceRecordId || '');
     const record = byId[id];
@@ -272,6 +290,7 @@ function saveSourceBatchAcodeAssignments(input) {
     updated.accountApprovalStatus = 'approved';
     updated.accountApprovedBy = user.email;
     updated.accountApprovedAt = now;
+    updated.accountingYear = String(record.transactionDate || '').slice(0, 4);
     updated.postingStatus = 'ready-not-posted';
     updated.alertLevel = updated.reconciliationStatus === 'reconciled' ? 'none' : 'red';
     updated.alertMessage = updated.reconciliationStatus === 'reconciled'
@@ -283,16 +302,25 @@ function saveSourceBatchAcodeAssignments(input) {
     if (assignment.createRule) {
       const matchText = String(assignment.ruleText || record.description || '').trim();
       if (!matchText) throw new Error('Rule text is required.');
+      const taxYear = String(record.transactionDate || '').slice(0, 4);
+      const operator = String(assignment.operator || 'contains');
+      const ruleKey = [taxYear, String(record.sourceAccountId || ''), direction,
+        operator, normalizeRuleText_(matchText), counterCode].join('|');
+      if (existingRuleKeys[ruleKey]) return;
+      existingRuleKeys[ruleKey] = true;
       const ruleId = 'bank-rule-' + Utilities.getUuid();
       const rule = {
         ruleId: ruleId,
         name: String(assignment.ruleName || ('Rule - ' + matchText)).trim(),
         version: 1,
         priority: Number(assignment.priority || 50),
+        taxYear: taxYear,
+        effectiveFrom: taxYear + '-01-01',
+        effectiveThrough: taxYear + '-12-31',
         direction: direction,
         transactionType: direction === 'money-in' ? 'receipt' : 'payment',
         matchField: 'description',
-        matchOperator: String(assignment.operator || 'contains'),
+        matchOperator: operator,
         matchText: [matchText],
         debitAccountCode: updated.debitAccountCode,
         creditAccountCode: updated.creditAccountCode,

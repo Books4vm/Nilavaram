@@ -83,6 +83,9 @@ function setupTransactionFoundation_() {
     memberEntityId: 'member-m',
     debitAccountCode: '11110',
     creditAccountCode: '7M110',
+    taxYear: '2025',
+    effectiveFrom: '2025-01-01',
+    effectiveThrough: '2025-12-31',
     status: 'active',
     confidence: 'approved-example'
   });

@@ -2409,8 +2409,11 @@
       const baseUrl = String((CONNECTIONS_BOOTSTRAP.accessInfo || {}).appsScriptWebApp || '');
       const reviewUrl = baseUrl + '?reviewWindow=acode&groupKey=' +
         encodeURIComponent(group.key);
+      const popupWidth = Math.max(1200, Number(screen.availWidth || 1600) - 20);
+      const popupHeight = Math.max(760, Number(screen.availHeight || 950) - 60);
       const popup = window.open(reviewUrl, 'NilavaramAcodeReview',
-        'popup=yes,width=1500,height=900,resizable=yes,scrollbars=yes');
+        'popup=yes,left=0,top=0,width=' + popupWidth + ',height=' + popupHeight +
+        ',resizable=yes,scrollbars=yes');
       if (!popup) {
         alert('Allow pop-ups for the Nilavaram Apps Script address and try again.');
         return;
@@ -2844,7 +2847,7 @@
         '<span id="rule-message"></span></form><hr>' +
         '<h3>Create a description rule</h3>' +
         '<p>Use a narrow, recognizable bank description. Exact rules receive 95% confidence; Contains rules receive 90%.</p>' +
-        '<form id="new-account-rule-form"><div class="form-grid">' +
+        '<form id="new-account-rule-form"><input id="edit-rule-id" type="hidden"><div class="form-grid">' +
           '<div><label>Rule name</label><input id="new-rule-name" required></div>' +
           '<div><label>Direction</label><select id="new-rule-direction">' +
             '<option value="money-out">Money out / payment</option>' +
@@ -2853,11 +2856,16 @@
             '<option value="contains">Contains</option>' +
             '<option value="exactly">Is exactly</option></select></div>' +
           '<div><label>Description text</label><input id="new-rule-text" required></div>' +
+          '<div><label>Calendar / tax year</label>' +
+            '<input id="new-rule-tax-year" type="number" min="2000" max="2100" value="' +
+            escapeHtml(String(new Date().getFullYear())) + '" required></div>' +
           '<div><label>Opposite account</label><select id="new-rule-counter">' +
             accountOptions + '</select></div>' +
           '<div><label>Priority (higher runs first)</label>' +
             '<input id="new-rule-priority" type="number" min="1" max="999" value="50" required></div>' +
-        '</div><button class="primary-button" type="submit">Save active suggestion rule</button> ' +
+          '<div><label><input id="apply-rule-year" type="checkbox" checked> Apply the revised suggestion to all still-unapproved transactions in this tax year</label></div>' +
+        '</div><button id="save-rule-button" class="primary-button" type="submit">Save active suggestion rule</button> ' +
+        '<button id="cancel-rule-edit" type="button">Clear / cancel edit</button> ' +
         '<span id="new-rule-message"></span></form><hr><h3>Visible active rules</h3>' +
         renderRulesTable(data.rules);
       if (!accounts.length) {
@@ -2872,6 +2880,13 @@
       document.getElementById('rule-approval-form').onsubmit = saveRuleApproval;
       document.getElementById('new-account-rule-form').onsubmit =
         saveNewAccountRule;
+      document.getElementById('cancel-rule-edit').onclick = function() {
+        document.getElementById('new-account-rule-form').reset();
+        document.getElementById('edit-rule-id').value = '';
+        document.getElementById('new-rule-tax-year').readOnly = false;
+        document.getElementById('new-rule-direction').disabled = false;
+        document.getElementById('save-rule-button').textContent = 'Save active suggestion rule';
+      };
       applySourceSuggestion();
     }
 
@@ -2931,18 +2946,45 @@
     }
 
     function renderRulesTable(rules) {
-      let html = '<table><thead><tr><th>Rule</th><th>Version</th><th>Reason</th>' +
-        '<th>Suggestion</th><th>Confidence</th><th>Status</th></tr></thead><tbody>';
+      let html = '<table><thead><tr><th>Rule</th><th>Tax year</th><th>Version</th><th>Reason</th>' +
+        '<th>Suggestion</th><th>Confidence</th><th>Status</th><th></th></tr></thead><tbody>';
       rules.forEach(function(rule) {
         html += '<tr><td>' + escapeHtml(rule.ruleId || rule.id) + '</td>' +
+          '<td>' + escapeHtml(rule.taxYear || 'Unscoped — will not auto-apply') + '</td>' +
           '<td>' + escapeHtml(rule.version || 1) + '</td>' +
           '<td>' + escapeHtml(rule.matchReason || '') + '</td>' +
           '<td>' + escapeHtml((rule.debitAccountCode || '') + ' / ' +
             (rule.creditAccountCode || '')) + '</td>' +
           '<td>' + escapeHtml(rule.confidence || 0) + '%</td>' +
-          '<td><span class="success">✓ Active</span></td></tr>';
+          '<td><span class="success">✓ Active</span></td>' +
+          '<td><button type="button" onclick="editTransactionRule(\'' +
+            escapeHtml(rule.id) + '\')">Review / change</button></td></tr>';
       });
       return html + '</tbody></table>';
+    }
+
+    function editTransactionRule(id) {
+      const rule = (window.nilavaramWorkbench.rules || []).find(function(item) {
+        return item.id === id;
+      });
+      if (!rule) return;
+      if (!rule.taxYear) {
+        alert('This is an older unscoped rule. Create a new tax-year rule instead; it will not auto-apply.');
+        return;
+      }
+      document.getElementById('edit-rule-id').value = rule.id;
+      document.getElementById('new-rule-name').value = rule.name || '';
+      document.getElementById('new-rule-direction').value = rule.direction || 'money-out';
+      document.getElementById('new-rule-operator').value = rule.matchOperator || 'contains';
+      document.getElementById('new-rule-text').value = Array.isArray(rule.matchText)
+        ? (rule.matchText[0] || '') : (rule.matchText || '');
+      document.getElementById('new-rule-tax-year').value = rule.taxYear;
+      document.getElementById('new-rule-tax-year').readOnly = true;
+      document.getElementById('new-rule-direction').disabled = true;
+      document.getElementById('new-rule-counter').value = rule.counterAccountCode || '';
+      document.getElementById('new-rule-priority').value = rule.priority || 50;
+      document.getElementById('save-rule-button').textContent = 'Update this tax-year rule';
+      document.getElementById('new-account-rule-form').scrollIntoView({behavior:'smooth'});
     }
 
     function applySelectedRule() {
@@ -2977,22 +3019,27 @@
     function saveNewAccountRule(event) {
       event.preventDefault();
       const input = {
+        ruleId: document.getElementById('edit-rule-id').value,
         name: document.getElementById('new-rule-name').value,
         direction: document.getElementById('new-rule-direction').value,
         operator: document.getElementById('new-rule-operator').value,
         matchText: document.getElementById('new-rule-text').value,
+        taxYear: document.getElementById('new-rule-tax-year').value,
         counterAccountCode: document.getElementById('new-rule-counter').value,
-        priority: document.getElementById('new-rule-priority').value
+        priority: document.getElementById('new-rule-priority').value,
+        applyToUnapprovedYear: document.getElementById('apply-rule-year').checked
       };
       document.getElementById('new-rule-message').textContent = ' Saving...';
-      google.script.run.withSuccessHandler(function(result) {
+      const runner = google.script.run.withSuccessHandler(function(result) {
         document.getElementById('new-rule-message').innerHTML =
           ' <span class="success">' + escapeHtml(result.message) + '</span>';
         showTransactionWorkbench('account-rule-review');
       }).withFailureHandler(function(error) {
         document.getElementById('new-rule-message').innerHTML =
           ' <span class="error">' + escapeHtml(error.message) + '</span>';
-      }).saveTransactionAccountRule(input);
+      });
+      if (input.ruleId) runner.updateTransactionAccountRuleForYear(input);
+      else runner.saveTransactionAccountRule(input);
     }
 
     function renderManualJournalEntry(data) {

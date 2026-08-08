@@ -3,7 +3,7 @@
  * Firestore-backed entities and editable five-character Chart of Accounts.
  */
 
-const NILAVARAM_ACCOUNTING_FOUNDATION_VERSION = 7;
+const NILAVARAM_ACCOUNTING_FOUNDATION_VERSION = 8;
 
 function numericMemberCodeToVisible_(code) {
   const value = String(code || '').toUpperCase();
@@ -234,6 +234,7 @@ function setupApprovedMemberUseAccounts_() {
   const existingCodes = {};
   existingAccounts.forEach(function(account) {
     existingCodes[account.code] = true;
+    existingCodes[visibleMemberCodeToNumeric_(account.code)] = true;
   });
 
   const pending = [];
@@ -310,6 +311,17 @@ function setupApprovedMemberUseAccounts_() {
   ];
 
   members.forEach(function(member) {
+    addAccount(
+      String(member.base + 100),
+      member.letter + ' — Employment and Other Deposits',
+      'group', String(member.base), member.entityId, 'member-receipt', '100'
+    );
+    addAccount(
+      String(member.base + 190),
+      member.letter + ' — Other member income/deposits',
+      'net-worth', String(member.base + 100), member.entityId,
+      'member-receipt', '190'
+    );
     directCategories.forEach(function(category) {
       const code = String(member.base + Number(category[0])).padStart(5, '0');
       addAccount(

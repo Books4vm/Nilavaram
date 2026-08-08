@@ -10,8 +10,10 @@
     header { border-bottom: 1px solid #7eb8d4; top: 0; }
     footer { border-top: 1px solid #7eb8d4; bottom: 0; }
     main { padding: 16px 18px; }
-    .row { background: #fff; border: 1px solid #7eb8d4; border-left: 7px solid #b42318; border-radius: 8px; display: grid; gap: 8px 12px; grid-template-columns: 150px 190px minmax(280px,2fr) 150px minmax(220px,1fr) minmax(300px,1.5fr); margin-bottom: 10px; padding: 10px; }
+    .row { background: #fff; border: 1px solid #7eb8d4; border-left: 7px solid #b42318; border-radius: 8px; margin-bottom: 10px; padding: 10px; }
     .row.green { border-left-color: #16823a; }
+    .summary { display: grid; gap: 8px 12px; grid-template-columns: 150px 190px minmax(280px,2fr) 150px minmax(220px,1fr); }
+    .classification { align-items: end; border-top: 1px solid #b9d8e8; display: grid; gap: 8px 12px; grid-template-columns: minmax(240px,1fr) minmax(190px,.7fr) minmax(300px,1.4fr) minmax(340px,1.4fr); margin-top: 10px; padding-top: 10px; }
     small { color: #344054; display: block; font-weight: 700; }
     input, select, button { font: inherit; min-height: 40px; padding: 7px; }
     input, select { border: 1px solid #7eb8d4; border-radius: 6px; width: 100%; }
@@ -22,18 +24,15 @@
     .success { color: #075f2c; font-weight: 700; }
     .error { color: #a40000; font-weight: 700; }
     .notice { background: #fff2b8; border-radius: 999px; color: #6b4e00; display: inline-block; font-weight: 800; padding: 5px 11px; }
-    .filters { align-items: end; background: #fff; border: 1px solid #7eb8d4; border-radius: 8px; display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; padding: 10px; }
-    .filters label { min-width: 230px; }
     .copy-buttons { display: flex; gap: 6px; margin: 6px 0; }
     .copy-buttons button { min-height: 34px; padding: 4px 9px; }
-    @media(max-width:1100px) { .row { grid-template-columns: repeat(2,minmax(180px,1fr)); } }
+    @media(max-width:1100px) { .summary,.classification { grid-template-columns: repeat(2,minmax(180px,1fr)); } }
   </style>
 </head>
 <body>
   <header>
     <h1 id="title">ACODE Assignment</h1>
     <p>Classification only. Reconciliation balances are intentionally not shown here.</p>
-    <div id="filters" class="filters"></div>
     <div id="page-nav"></div>
   </header>
   <main id="rows"><p class="notice">Loading 25 transactions from Firestore...</p></main>
@@ -55,8 +54,6 @@
     const pageSize = 25;
     const drafts = {};
     const dirty = {};
-    let categoryFilter = 'all';
-    let ownerFilter = 'all';
     let copiedAcode = '';
 
     function esc(value) {
@@ -73,6 +70,7 @@
       const code = String(account.code || '').toUpperCase();
       const name = String(account.name || '').toLowerCase();
       if (account.categoryFamily === 'member-use') return 'member-payment';
+      if (account.categoryFamily === 'member-receipt') return 'member-receipt';
       if (/^7[MASR]/.test(code) &&
           /(employment|paycheck|deposit|income|receipt)/.test(name)) return 'member-receipt';
       if (account.accountType === 'asset') return 'asset';
@@ -81,49 +79,43 @@
       if (account.accountType === 'net-worth') return 'net-worth';
       return 'other';
     }
-    function filteredAccounts(selected) {
+    function filteredAccounts(selected, category, owner) {
       return workspace.accounts.filter(function(account) {
         if (account.code === selected) return true;
-        const categoryPassed = categoryFilter === 'all' ||
-          accountCategory(account) === categoryFilter;
-        const ownerPassed = ownerFilter === 'all' ||
-          String(account.entityId || '') === ownerFilter;
+        const categoryPassed = category === 'all' ||
+          accountCategory(account) === category;
+        const ownerPassed = owner === 'all' || String(account.entityId || '') === owner;
         return categoryPassed && ownerPassed;
       });
     }
-    function accountOptions(selected) {
-      return '<option value="">Choose ACODE</option>' + filteredAccounts(selected).map(function(account) {
+    function accountOptions(selected, category, owner) {
+      return '<option value="">Choose ACODE</option>' +
+        filteredAccounts(selected, category, owner).map(function(account) {
         return '<option value="' + esc(account.code) + '" ' +
           (account.code === selected ? 'selected' : '') + '>' +
           esc(account.code + ' — ' + account.name) + '</option>';
       }).join('');
     }
-    function renderFilters() {
-      const ownerOptions = (workspace.entities || []).map(function(entity) {
+    function ownerOptions(selected) {
+      return '<option value="all">All owners/entities</option>' +
+        (workspace.entities || []).map(function(entity) {
         return '<option value="' + esc(entity.id) + '" ' +
-          (ownerFilter === entity.id ? 'selected' : '') + '>' + esc(entity.name) + '</option>';
+          (selected === entity.id ? 'selected' : '') + '>' + esc(entity.name) + '</option>';
       }).join('');
-      document.getElementById('filters').innerHTML =
-        '<label>1. Narrow by account category<select id="category-filter">' +
-          '<option value="all">All categories</option>' +
-          '<option value="member-receipt">Receipt — member income/deposits</option>' +
-          '<option value="member-payment">Payment — member use/payments</option>' +
-          '<option value="asset">Assets</option>' +
-          '<option value="liability">External liabilities</option>' +
-          '<option value="net-worth">Other member/trust net worth</option>' +
-          '<option value="clearing">Transfers and clearing</option>' +
-          '<option value="other">Other</option></select></label>' +
-        '<label>2. Narrow by owner/entity<select id="owner-filter">' +
-          '<option value="all">All owners/entities</option>' + ownerOptions + '</select></label>' +
-        '<span id="copy-status">' + (copiedAcode
-          ? '<b>Copied ACODE:</b> ' + esc(copiedAcode) : 'No ACODE copied yet.') + '</span>';
-      document.getElementById('category-filter').value = categoryFilter;
-      document.getElementById('category-filter').onchange = function() {
-        captureDrafts(); categoryFilter = this.value; render();
-      };
-      document.getElementById('owner-filter').onchange = function() {
-        captureDrafts(); ownerFilter = this.value; render();
-      };
+    }
+    function categoryOptions(selected) {
+      const values = [
+        ['all','All categories'],
+        ['member-receipt','Receipt — member income/deposits'],
+        ['member-payment','Payment — member use/payments'],
+        ['asset','Assets'], ['liability','External liabilities'],
+        ['net-worth','Other member/trust net worth'],
+        ['clearing','Transfers and clearing'], ['other','Other']
+      ];
+      return values.map(function(item) {
+        return '<option value="' + item[0] + '" ' +
+          (selected === item[0] ? 'selected' : '') + '>' + item[1] + '</option>';
+      }).join('');
     }
     function pageRecords() {
       if (!group || !Array.isArray(group.records)) return [];
@@ -138,15 +130,16 @@
         const rule = document.querySelector('.rule[data-id="' + id + '"]');
         const operator = document.querySelector('.operator[data-id="' + id + '"]');
         const text = document.querySelector('.rule-text[data-id="' + id + '"]');
+        const category = document.querySelector('.row-category[data-id="' + id + '"]');
+        const owner = document.querySelector('.row-owner[data-id="' + id + '"]');
         if (!select) return;
         drafts[id] = {counterAccountCode: select.value,
           createRule: rule.checked, operator: operator.value,
-          ruleText: text.value};
+          ruleText: text.value, category: category.value, owner: owner.value};
       });
     }
     function render() {
       if (!group) return;
-      renderFilters();
       document.getElementById('title').textContent =
         'ACODE Assignment — ' + group.proofLabel;
       const pages = Math.max(1, Math.ceil(group.records.length / pageSize));
@@ -161,25 +154,38 @@
         const suggestion = record.accountSuggestion || {};
         const draft = drafts[record.id] || {};
         const selected = draft.counterAccountCode || suggestion.counterAccountCode || '';
+        const category = draft.category ||
+          (record.direction === 'money-in' ? 'member-receipt' : 'member-payment');
+        const owner = draft.owner || 'all';
         const ruleText = draft.ruleText || record.description || '';
         return '<section class="row ' + (suggestion.status === 'green-confirm' ? 'green' : '') + '">' +
+          '<div class="summary">' +
           '<div><small>Transaction ID</small>' + esc(record.sourceRecordNumber) + '</div>' +
           '<div><small>Proof</small>' + esc(record.proofLabel) + '</div>' +
           '<div><small>Transaction to classify</small>' + esc(record.transactionDate) + '<br>' +
             esc(record.description) + '<br><small>External ref: ' + esc(record.externalReference || '—') + '</small></div>' +
           '<div><small>Direction</small>' + esc(record.direction || 'Review') +
             '<br><small>Amount</small>' + money(record.amountCents) + '</div>' +
-          '<div><small>Suggested rule</small>' + esc(suggestion.reason || 'No matching rule') + '</div>' +
-          '<div><small>ACODE / rule</small><select class="acode" data-id="' + esc(record.id) + '">' +
-            accountOptions(selected) + '</select>' +
+          '<div><small>Suggested rule</small>' + esc(suggestion.reason || 'No matching rule') + '</div></div>' +
+          '<div class="classification">' +
+          '<div><small>1. Account category</small><select class="row-category" data-id="' + esc(record.id) + '">' +
+            categoryOptions(category) + '</select></div>' +
+          '<div><small>2. Owner/entity</small><select class="row-owner" data-id="' + esc(record.id) + '">' +
+            ownerOptions(owner) + '</select></div>' +
+          '<div><small>3. Choose ACODE</small><select class="acode" data-id="' + esc(record.id) + '">' +
+            accountOptions(selected, category, owner) + '</select>' +
             '<div class="copy-buttons"><button class="copy-acode secondary" type="button" data-id="' + esc(record.id) + '">Copy ACODE</button>' +
-            '<button class="paste-acode secondary" type="button" data-id="' + esc(record.id) + '">Paste ACODE</button></div>' +
+            '<button class="paste-acode secondary" type="button" data-id="' + esc(record.id) + '">Paste ACODE</button></div></div>' +
+          '<div><small>4. Automatic rule for this tax year</small>' +
             '<label><input class="rule" data-id="' + esc(record.id) + '" type="checkbox" style="width:auto" ' +
-              (draft.createRule ? 'checked' : '') + '> Save as rule</label>' +
+              (draft.createRule === false ? '' : 'checked') + '> Save as rule for ' + esc(String(record.transactionDate || '').slice(0,4)) + '</label>' +
             '<select class="operator" data-id="' + esc(record.id) + '"><option value="contains">Contains</option><option value="exactly" ' +
               (draft.operator === 'exactly' ? 'selected' : '') + '>Is exactly</option></select>' +
-            '<input class="rule-text" data-id="' + esc(record.id) + '" value="' + esc(ruleText) + '"></div></section>';
+            '<input class="rule-text" data-id="' + esc(record.id) + '" value="' + esc(ruleText) + '"></div></div></section>';
       }).join('');
+      document.querySelectorAll('.row-category,.row-owner').forEach(function(select) {
+        select.onchange = function() { updateRowChoices(this.dataset.id); };
+      });
       document.querySelectorAll('.acode').forEach(function(select) {
         select.onchange = function() { dirty[this.dataset.id] = true; };
       });
@@ -196,6 +202,15 @@
         button.onclick = function() { pasteAcode(this.dataset.id); };
       });
     }
+    function updateRowChoices(id) {
+      const category = document.querySelector('.row-category[data-id="' + id + '"]');
+      const owner = document.querySelector('.row-owner[data-id="' + id + '"]');
+      const acode = document.querySelector('.acode[data-id="' + id + '"]');
+      if (!category || !owner || !acode) return;
+      acode.innerHTML = accountOptions('', category.value, owner.value);
+      dirty[id] = true;
+      captureDrafts();
+    }
     function copyAcode(id) {
       const select = document.querySelector('.acode[data-id="' + id + '"]');
       if (!select || !select.value) {
@@ -203,7 +218,6 @@
         return;
       }
       copiedAcode = select.value;
-      document.getElementById('copy-status').innerHTML = '<b>Copied ACODE:</b> ' + esc(copiedAcode);
       document.getElementById('message').innerHTML = '<span class="success">' + esc(copiedAcode) + ' copied. Use Paste ACODE on another row.</span>';
     }
     function pasteAcode(id) {
