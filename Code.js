@@ -28,6 +28,37 @@ function include(filename) {
  */
 function doGet(e) {
   const parameters = e && e.parameter || {};
+  if (parameters.migrateOneDriveSource === '1') {
+    try {
+      const result = migrateFirestoreSourceRecordsToOneDrive();
+      return HtmlService.createHtmlOutput(
+        '<!doctype html><html><head><base target="_top">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>OneDrive Recovery Completed</title></head><body>' +
+        '<h1>OneDrive recovery completed</h1>' +
+        '<p><b>' + escapeHtmlServer_(result.message) + '</b></p>' +
+        '<p>Recovery mode is now disabled. Firestore records were retained.</p>' +
+        '<p><a href="' + escapeHtmlServer_(
+          buildStorageAccessInfo_().appsScriptWebApp
+        ) + '" target="_top">Return to Nilavaram</a></p>' +
+        '</body></html>'
+      ).setTitle('OneDrive Recovery Completed');
+    } catch (error) {
+      return HtmlService.createHtmlOutput(
+        '<!doctype html><html><head><base target="_top">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>OneDrive Recovery Status</title></head><body>' +
+        '<h1>OneDrive recovery did not complete</h1>' +
+        '<p><b>' + escapeHtmlServer_(error && error.message || error) + '</b></p>' +
+        '<p>No Firestore records were deleted. If the message says quota exceeded, ' +
+        'wait for the Firestore daily quota to reset and use this link again.</p>' +
+        '<p><a href="' + escapeHtmlServer_(
+          buildStorageAccessInfo_().appsScriptWebApp
+        ) + '" target="_top">Return to Nilavaram</a></p>' +
+        '</body></html>'
+      ).setTitle('OneDrive Recovery Status');
+    }
+  }
   if (parameters.reviewWindow === 'acode') {
     const reviewTemplate = HtmlService.createTemplateFromFile('ReviewWindow');
     reviewTemplate.groupKeyJson = JSON.stringify(

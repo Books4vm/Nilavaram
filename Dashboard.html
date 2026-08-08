@@ -1069,9 +1069,12 @@
           '<span class="error">Not available</span>') + '</p>' +
         '<p class="help-meta">Startup error: ' + escapeHtml(originalMessage) + '</p>';
       if (status.connected) {
+        const recoveryUrl = String(
+          (CONNECTIONS_BOOTSTRAP.accessInfo || {}).appsScriptWebApp || ''
+        ) + '?migrateOneDriveSource=1';
         html += '<div class="button-row">' +
-          '<button id="migrate-onedrive-source" class="primary-button" type="button" ' +
-          'onclick="migrateSourceDataToOneDrive()">Copy and verify source data in OneDrive</button>' +
+          '<a class="primary-button" href="' + escapeHtml(recoveryUrl) +
+          '" target="_top">Copy and verify source data in OneDrive</a>' +
           '<button class="secondary-button" type="button" ' +
           'onclick="showOneDriveSourceStorageStatus()">Check recovery status</button>' +
           '</div>' +
