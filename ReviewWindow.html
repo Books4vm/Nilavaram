@@ -175,7 +175,8 @@
           '<div><small>3. Choose ACODE</small><select class="acode" data-id="' + esc(record.id) + '">' +
             accountOptions(selected, category, owner) + '</select>' +
             '<div class="copy-buttons"><button class="copy-acode secondary" type="button" data-id="' + esc(record.id) + '">Copy ACODE</button>' +
-            '<button class="paste-acode secondary" type="button" data-id="' + esc(record.id) + '">Paste ACODE</button></div></div>' +
+            '<button class="paste-acode secondary" type="button" data-id="' + esc(record.id) + '">Paste ACODE</button>' +
+            '<button class="confirm-suggestion secondary" type="button" data-id="' + esc(record.id) + '">Confirm for partial save</button></div></div>' +
           '<div><small>4. Automatic rule for this tax year</small>' +
             '<label><input class="rule" data-id="' + esc(record.id) + '" type="checkbox" style="width:auto" ' +
               (draft.createRule === false ? '' : 'checked') + '> Save as rule for ' + esc(String(record.transactionDate || '').slice(0,4)) + '</label>' +
@@ -187,7 +188,11 @@
         select.onchange = function() { updateRowChoices(this.dataset.id); };
       });
       document.querySelectorAll('.acode').forEach(function(select) {
-        select.onchange = function() { dirty[this.dataset.id] = true; };
+        select.onchange = function() {
+          dirty[this.dataset.id] = true;
+          captureDrafts();
+          applyRuleImmediately(this.dataset.id);
+        };
       });
       document.querySelectorAll('.rule,.operator,.rule-text').forEach(function(control) {
         control.onchange = function() { dirty[this.dataset.id] = true; };
@@ -200,6 +205,18 @@
       });
       document.querySelectorAll('.paste-acode').forEach(function(button) {
         button.onclick = function() { pasteAcode(this.dataset.id); };
+      });
+      document.querySelectorAll('.confirm-suggestion').forEach(function(button) {
+        button.onclick = function() {
+          const select = document.querySelector('.acode[data-id="' + this.dataset.id + '"]');
+          if (!select || !select.value) {
+            document.getElementById('message').innerHTML = '<span class="error">No suggested ACODE is available to confirm.</span>';
+            return;
+          }
+          dirty[this.dataset.id] = true;
+          captureDrafts();
+          document.getElementById('message').innerHTML = '<span class="success">This row is marked for partial saving.</span>';
+        };
       });
     }
     function updateRowChoices(id) {
@@ -237,6 +254,22 @@
       dirty[id] = true;
       captureDrafts();
       document.getElementById('message').innerHTML = '<span class="success">' + esc(copiedAcode) + ' pasted into the selected row.</span>';
+      applyRuleImmediately(id);
+    }
+    function applyRuleImmediately(id) {
+      const draft = drafts[id] || {};
+      if (!draft.createRule || !draft.counterAccountCode) return;
+      document.getElementById('message').textContent = ' Applying year-specific rule to pending transactions...';
+      google.script.run.withSuccessHandler(function(result) {
+        loadData(result.message);
+      }).withFailureHandler(function(error) {
+        document.getElementById('message').innerHTML = '<span class="error">Rule was not applied: ' + esc(error.message) + '</span>';
+      }).applyPendingAcodeRule({
+        sourceRecordId: id,
+        counterAccountCode: draft.counterAccountCode,
+        operator: draft.operator || 'contains',
+        ruleText: draft.ruleText || ''
+      });
     }
     function changePage(change) {
       captureDrafts();

@@ -165,6 +165,12 @@ These rules were confirmed on 2026-08-08:
 7. A new description rule is selected by default after the user chooses an
    ACODE. Duplicate rules with the same year, account, direction, description
    test and ACODE are not created.
+8. When the user selects an ACODE while its rule is enabled, the rule is saved
+   or reused immediately. Every matching, still-pending transaction in the
+   same source account and tax year receives the ACODE as a review suggestion.
+9. Immediate rule application never approves or posts the other matching
+   transactions. Each suggested row must still be confirmed individually or
+   completed through the displayed-set review control.
 
 ## Locked annual-books boundary
 

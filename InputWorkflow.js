@@ -3,7 +3,7 @@
  * End-user input, batch reconciliation and ACODE assignment workspace.
  */
 
-const NILAVARAM_INPUT_WORKFLOW_VERSION = '2026-08-08.3';
+const NILAVARAM_INPUT_WORKFLOW_VERSION = '2026-08-08.4';
 
 function shortInstitutionName_(record) {
   const value = String(record.sourceFinancialInstitution || '').toLowerCase();
@@ -358,6 +358,111 @@ function saveSourceBatchAcodeAssignments(input) {
     createdRuleCount: createdRules,
     message: assignments.length + ' ACODE assignments saved; ' +
       createdRules + ' rules created. Nothing was posted.'
+  };
+}
+
+function applyPendingAcodeRule(input) {
+  const user = requireAccountingEditor_();
+  const sourceRecordId = String(input && input.sourceRecordId || '').trim();
+  const counterCode = String(input && input.counterAccountCode || '').trim();
+  const operator = String(input && input.operator || 'contains').trim();
+  const matchText = String(input && input.ruleText || '').trim();
+  const records = firestoreGetCollection_('sourceRecords').map(fromFirestoreDocument_);
+  const source = records.find(function(record) { return record.id === sourceRecordId; });
+  if (!source) throw new Error('The source transaction was not found.');
+  if (source.reconciliationStatus !== 'reconciled') {
+    throw new Error('Complete reconciliation before creating an ACODE rule.');
+  }
+  const accounts = getSimpleTransactionSetup().accounts;
+  const accountsByCode = {};
+  accounts.forEach(function(account) { accountsByCode[account.code] = account; });
+  if (!accountsByCode[counterCode]) throw new Error('Select an active ACODE first.');
+  if (['contains', 'exactly'].indexOf(operator) === -1 || !matchText) {
+    throw new Error('Enter a valid rule test and description text.');
+  }
+  const direction = bankDirection_(source);
+  if (direction === 'unknown') throw new Error('The receipt/payment direction requires review.');
+  const taxYear = String(source.transactionDate || '').slice(0, 4);
+  if (!/^\d{4}$/.test(taxYear)) throw new Error('The transaction has no valid tax year.');
+  const currentRules = firestoreGetCollection_('transactionRules')
+    .map(fromFirestoreDocument_).filter(function(rule) { return rule.status === 'active'; });
+  const priorPatterns = getPriorApprovedPatterns_(records);
+  const currentSuggestion = accountRuleSuggestion_(
+    source, currentRules, accountsByCode, priorPatterns
+  );
+  const bankCode = String(currentSuggestion.bankAccountCode || '');
+  if (!bankCode || !accountsByCode[bankCode] || bankCode === counterCode) {
+    throw new Error('The bank-side ACODE is missing or conflicts with the selected ACODE.');
+  }
+  const normalizedText = normalizeRuleText_(matchText);
+  let rule = currentRules.find(function(item) {
+    const itemText = Array.isArray(item.matchText) ? item.matchText[0] : item.matchText;
+    return String(item.taxYear || '') === taxYear &&
+      String(item.sourceAccountId || '') === String(source.sourceAccountId || '') &&
+      String(item.direction || '') === direction &&
+      String(item.matchOperator || 'contains') === operator &&
+      normalizeRuleText_(itemText) === normalizedText &&
+      String(item.counterAccountCode || '') === counterCode;
+  }) || null;
+  let created = false;
+  if (!rule) {
+    const ruleId = 'bank-rule-' + Utilities.getUuid();
+    rule = {
+      id: ruleId,
+      ruleId: ruleId,
+      name: 'Rule — ' + matchText,
+      version: 1,
+      priority: 50,
+      taxYear: taxYear,
+      effectiveFrom: taxYear + '-01-01',
+      effectiveThrough: taxYear + '-12-31',
+      direction: direction,
+      transactionType: direction === 'money-in' ? 'receipt' : 'payment',
+      matchField: 'description',
+      matchOperator: operator,
+      matchText: [matchText],
+      debitAccountCode: direction === 'money-out' ? counterCode : bankCode,
+      creditAccountCode: direction === 'money-out' ? bankCode : counterCode,
+      counterAccountCode: counterCode,
+      bankAccountCode: bankCode,
+      sourceProvider: String(source.sourceProvider || ''),
+      sourceEnvironment: String(source.sourceEnvironment || ''),
+      sourceAccountId: String(source.sourceAccountId || ''),
+      sandboxOnly: source.sourceEnvironment === 'sandbox',
+      matchReason: 'Immediate user-created ACODE rule: ' + matchText,
+      confidence: operator === 'exactly' ? 95 : 90,
+      autoPost: false,
+      status: 'active',
+      approvedBy: user.email,
+      approvedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    firestoreSetDocument_('transactionRules', ruleId, toFirestoreFields_(rule));
+    created = true;
+  }
+  const matched = records.filter(function(record) {
+    return record.accountApprovalStatus !== 'approved' &&
+      String(record.transactionDate || '').slice(0, 4) === taxYear &&
+      ruleMatchesSource_(rule, record, bankDirection_(record));
+  });
+  writeAudit_('pending-acode-rule-applied-for-review', user.email, {
+    ruleId: rule.ruleId || rule.id,
+    taxYear: taxYear,
+    created: created,
+    matchedPendingCount: matched.length,
+    approvedOrPostedRecordsChanged: false
+  });
+  return {
+    success: true,
+    ruleId: rule.ruleId || rule.id,
+    taxYear: taxYear,
+    matchedPendingCount: matched.length,
+    matchedSourceRecordIds: matched.map(function(record) { return record.id; }),
+    message: (created ? 'Rule created. ' : 'Existing rule reused. ') +
+      matched.length + ' pending ' + taxYear +
+      ' transaction(s) now show this ACODE as a suggestion for review. ' +
+      'Nothing else was approved or posted.'
   };
 }
 
