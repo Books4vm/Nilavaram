@@ -237,6 +237,12 @@ function saveSourceBatchAcodeAssignments(input) {
     const id = String(assignment.sourceRecordId || '');
     const record = byId[id];
     if (!record) throw new Error('A selected source record was not found.');
+    if (record.reconciliationStatus !== 'reconciled') {
+      throw new Error(
+        record.sourceRecordNumber +
+        ' must complete reconciliation before ACODE assignment.'
+      );
+    }
     const counterCode = String(assignment.counterAccountCode || '');
     if (!accountsByCode[counterCode]) {
       throw new Error('Select an active ACODE for ' + record.sourceRecordNumber + '.');

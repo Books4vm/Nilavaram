@@ -352,6 +352,9 @@
     .download-row.green { border-left-color: #16823a; }
     .download-row.yellow { border-left-color: #d3a000; }
     .download-row.red { border-left-color: #b42318; }
+    .download-row.acode-review-row {
+      grid-template-columns: 150px 190px minmax(280px, 2fr) 150px minmax(220px, 1fr) minmax(280px, 1.5fr);
+    }
     .download-cell small { color: var(--muted-text); display: block; font-weight: 700; }
     .journal-row {
       align-items: end;
@@ -1889,7 +1892,9 @@
       if (!data.groups.length) {
         html += '<p>No source batches are available.</p>';
       } else {
-        html += '<div class="input-card-grid">' + data.groups.map(function(group) {
+        html += '<h3>Stage 1 — Reconciliation only</h3>' +
+          '<p>Review source completeness, cumulative balances and differences. No ACODE selection appears in this stage.</p>' +
+          '<div class="input-card-grid">' + data.groups.map(function(group) {
           const encoded = encodeURIComponent(group.key);
           return '<section class="input-card"><h3>' + escapeHtml(group.proofLabel) + '</h3>' +
             '<p><b>Environment:</b> ' + escapeHtml(group.environment) +
@@ -1897,18 +1902,30 @@
             '<br><b>Receipts:</b> ' + formatCentsInput_(group.receiptCents) +
             '<br><b>Payments:</b> ' + formatCentsInput_(group.paymentCents) + '</p>' +
             '<p><span class="' + (group.reconciliationStatus === 'reconciled' ? 'status-green' : 'status-yellow') + '">' +
-              (group.reconciliationStatus === 'reconciled' ? 'Reconciled' : 'Reconciliation pending') + '</span> ' +
-              '<span class="' + (group.acodeStatus === 'complete' ? 'status-green' : 'status-red') + '">' +
-              (group.acodeStatus === 'complete' ? 'ACODE complete' : 'ACODE pending') + '</span></p>' +
+              (group.reconciliationStatus === 'reconciled' ? 'Reconciled' : 'Reconciliation pending') + '</span></p>' +
             '<div class="button-row"><button class="primary-button" type="button" onclick="openReconciliationPopup(\'' +
               encoded + '\')">Review & reconcile</button>' +
-            '<button class="secondary-button" type="button" onclick="openAcodePopup(\'' +
-              encoded + '\')">Assign ACODE</button>' +
             (group.provider === 'akoya' && group.environment === 'sandbox'
               ? '<a class="secondary-button" href="' + escapeHtml((CONNECTIONS_BOOTSTRAP.accessInfo || {}).appsScriptWebApp || '#') +
                 '?importAkoyaSandbox=1">Refresh download</a>' : '') +
             '</div></section>';
-        }).join('') + '</div>';
+        }).join('') + '</div>' +
+          '<h3>Stage 2 — ACODE assignment only</h3>' +
+          '<p>This stage contains classification and rule controls only. It becomes available after reconciliation.</p>' +
+          '<div class="input-card-grid">' + data.groups.map(function(group) {
+            const encoded = encodeURIComponent(group.key);
+            const ready = group.reconciliationStatus === 'reconciled';
+            return '<section class="input-card"><h3>' + escapeHtml(group.proofLabel) + '</h3>' +
+              '<p><b>Transactions:</b> ' + group.recordCount +
+              '<br><b>ACODE approved:</b> ' + group.acodeApprovedCount +
+              '<br><b>ACODE pending:</b> ' + (group.recordCount - group.acodeApprovedCount) + '</p>' +
+              '<p><span class="' + (group.acodeStatus === 'complete' ? 'status-green' : 'status-red') + '">' +
+                (group.acodeStatus === 'complete' ? 'ACODE complete' : 'ACODE pending') + '</span></p>' +
+              '<button class="primary-button" type="button" ' + (ready ? '' : 'disabled ') +
+                'onclick="openAcodePopup(\'' + encoded + '\')">Assign ACODE</button>' +
+              (ready ? '' : '<p class="status-yellow">Complete reconciliation first.</p>') +
+              '</section>';
+          }).join('') + '</div>';
       }
       html += '<p class="error"><b>Posting remains disabled.</b> Reconciliation and ACODE approval do not post sandbox records.</p>';
       output.innerHTML = html;
@@ -2125,6 +2142,7 @@
         '.download-row{background:#fff;border:1px solid #7eb8d4;border-left-width:7px;border-radius:8px;display:grid;gap:8px 12px;' +
         'grid-template-columns:150px 190px minmax(260px,2fr) repeat(5,minmax(105px,1fr));margin-bottom:10px;padding:10px}' +
         '.download-row.green{border-left-color:#16823a}.download-row.yellow{border-left-color:#d3a000}.download-row.red{border-left-color:#b42318}' +
+        '.download-row.acode-review-row{grid-template-columns:150px 190px minmax(280px,2fr) 150px minmax(220px,1fr) minmax(280px,1.5fr)}' +
         '.download-cell small{color:#344054;display:block;font-weight:700}.status-green,.status-yellow,.status-red{border-radius:999px;display:inline-block;font-weight:800;padding:4px 10px}' +
         '.status-green{background:#d8f5df;color:#075f2c}.status-yellow{background:#fff2b8;color:#6b4e00}.status-red{background:#ffd9d9;color:#8a0000}' +
         '.success{color:#075f2c}.error{color:#a40000}@media(max-width:1100px){.download-row{grid-template-columns:repeat(2,minmax(180px,1fr))}}' +
@@ -2147,6 +2165,28 @@
     }
 
     function renderDownloadedRow_(record, runningCents, mode, index) {
+      const suggestion = record.accountSuggestion || {};
+      if (mode === 'acode') {
+        const acodeStatus = suggestion.status === 'green-confirm' ? 'green' : 'red';
+        const acodeAction = '<select class="batch-acode" data-id="' + escapeHtml(record.id) + '">' +
+          inputAccountOptions_(window.nilavaramInputWorkspace.accounts,
+            suggestion.counterAccountCode || '') + '</select>' +
+          '<label><input class="batch-rule" type="checkbox" data-id="' + escapeHtml(record.id) + '"> Save as rule</label>' +
+          '<select class="batch-rule-operator" data-id="' + escapeHtml(record.id) + '">' +
+            '<option value="contains">Contains</option><option value="exactly">Is exactly</option></select>' +
+          '<input class="batch-rule-text" data-id="' + escapeHtml(record.id) + '" value="' +
+            escapeHtml(record.description || '') + '" aria-label="Rule text">';
+        return '<div class="download-row acode-review-row ' + acodeStatus + '" data-index="' + index + '">' +
+          '<div class="download-cell"><small>Transaction ID</small>' + escapeHtml(record.sourceRecordNumber) + '</div>' +
+          '<div class="download-cell"><small>Proof</small>' + escapeHtml(record.proofLabel) + '</div>' +
+          '<div class="download-cell"><small>Transaction to classify</small>' + escapeHtml(record.transactionDate) +
+            '<br>' + escapeHtml(record.description) + '<br><small>External ref: ' + escapeHtml(record.externalReference || '—') + '</small></div>' +
+          '<div class="download-cell"><small>Direction</small>' + escapeHtml(record.direction || 'Review') +
+            '<br><small>Amount</small>' + formatCentsInput_(record.amountCents || 0) + '</div>' +
+          '<div class="download-cell"><small>Suggested rule</small>' +
+            escapeHtml(suggestion.reason || 'No matching rule') + '</div>' +
+          '<div class="download-cell"><small>ACODE / rule</small>' + acodeAction + '</div></div>';
+      }
       const sandboxReconciliation = mode === 'reconciliation' &&
         window.nilavaramActiveInputGroup &&
         window.nilavaramActiveInputGroup.environment === 'sandbox' &&
@@ -2156,30 +2196,16 @@
       const rowDifferenceCents = runningCents == null ||
         calculatedExternalCents == null
         ? null : calculatedExternalCents - runningCents;
-      const statusClass = mode === 'acode'
-        ? ((record.accountSuggestion || {}).status === 'green-confirm' ? 'green' : 'red')
-        : (rowDifferenceCents === 0 ? 'green' :
-          calculatedExternalCents == null ? 'yellow' : 'red');
-      const suggestion = record.accountSuggestion || {};
+      const statusClass = rowDifferenceCents === 0 ? 'green' :
+        calculatedExternalCents == null ? 'yellow' : 'red';
       let action = '<span class="status-' + statusClass + '">' +
         (statusClass === 'green' ? 'Match' : statusClass === 'yellow' ? 'Review' : 'Fix') + '</span>';
-      if (mode === 'acode') {
-        action = '<select class="batch-acode" data-id="' + escapeHtml(record.id) + '">' +
-          inputAccountOptions_(window.nilavaramInputWorkspace.accounts,
-            suggestion.counterAccountCode || '') + '</select>' +
-          '<label><input class="batch-rule" type="checkbox" data-id="' + escapeHtml(record.id) + '"> Save as rule</label>' +
-          '<select class="batch-rule-operator" data-id="' + escapeHtml(record.id) + '">' +
-            '<option value="contains">Contains</option><option value="exactly">Is exactly</option></select>' +
-          '<input class="batch-rule-text" data-id="' + escapeHtml(record.id) + '" value="' +
-            escapeHtml(record.description || '') + '" aria-label="Rule text">';
-      } else {
-        action = (rowDifferenceCents === null
-          ? '—'
-          : formatCentsInput_(rowDifferenceCents)) + '<br>' +
-          '<span class="status-' + statusClass + '">' +
-          (statusClass === 'green' ? 'Matching' :
-            statusClass === 'yellow' ? 'Review' : 'Fix') + '</span>';
-      }
+      action = (rowDifferenceCents === null
+        ? '—'
+        : formatCentsInput_(rowDifferenceCents)) + '<br>' +
+        '<span class="status-' + statusClass + '">' +
+        (statusClass === 'green' ? 'Matching' :
+          statusClass === 'yellow' ? 'Review' : 'Fix') + '</span>';
       return '<div class="download-row ' + statusClass + '" data-index="' + index + '">' +
         '<div class="download-cell"><small>Transaction ID</small>' + escapeHtml(record.sourceRecordNumber) + '</div>' +
         '<div class="download-cell"><small>Proof</small>' + escapeHtml(record.proofLabel) + '</div>' +
@@ -2189,7 +2215,7 @@
         '<div class="download-cell"><small>Payment</small>' + formatCentsInput_(record.paymentCents || 0) + '</div>' +
         '<div class="download-cell"><small>Sys running bal.</small>' + (runningCents == null ? 'Enter opening balance' : formatCentsInput_(runningCents)) + '</div>' +
         '<div class="download-cell"><small>External running bal.</small>' + formatCentsInput_(calculatedExternalCents) + '</div>' +
-        '<div class="download-cell"><small>' + (mode === 'acode' ? 'ACODE / rule' : 'Difference / status') + '</small>' + action + '</div>' +
+        '<div class="download-cell"><small>Difference / status</small>' + action + '</div>' +
         '</div>';
     }
 
@@ -2288,6 +2314,10 @@
     function openAcodePopup(encoded) {
       const group = inputGroupByEncodedKey_(encoded);
       if (!group) return;
+      if (group.reconciliationStatus !== 'reconciled') {
+        alert('Complete reconciliation for this account batch before assigning ACODEs.');
+        return;
+      }
       window.nilavaramActiveInputGroup = group;
       window.nilavaramAcodePage = 1;
       window.nilavaramAcodeDrafts = {};
