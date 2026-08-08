@@ -1715,9 +1715,10 @@
               '<div><label for="account-near-code">Place near ACODE, if desired</label>' +
                 '<input id="account-near-code" maxlength="5" placeholder="Example: 7R020"></div>' +
             '</div>' +
-            '<button class="secondary-button" id="account-suggest" type="button">' +
+            '<button class="secondary-button" id="account-suggest" type="button" ' +
+              'onclick="suggestAccountDetails(); return false;">' +
               'Suggest accounting details</button>' +
-            '<p id="account-suggestion" class="help-meta"></p>' +
+            '<p id="account-suggestion" class="help-meta" role="status" aria-live="polite"></p>' +
             '<details id="account-advanced"><summary>Review accounting details</summary>' +
             '<div class="form-grid">' +
               '<div><label for="account-code">Five-character code</label>' +
@@ -1756,7 +1757,6 @@
       if (data.canEdit) {
         document.getElementById('account-form').onsubmit = saveAccountForm;
         document.getElementById('account-cancel').onclick = clearAccountForm;
-        document.getElementById('account-suggest').onclick = suggestAccountDetails;
       }
     }
 
@@ -1811,17 +1811,23 @@
     }
 
     function suggestAccountDetails() {
-      const input = {
-        entityId: document.getElementById('account-entity').value,
-        purpose: document.getElementById('account-purpose').value,
-        name: document.getElementById('account-name').value,
-        lastFour: document.getElementById('account-last-four').value,
-        nearCode: document.getElementById('account-near-code').value
-      };
-      document.getElementById('account-suggestion').textContent =
-        'Preparing a suggestion...';
-      google.script.run
+      const status = document.getElementById('account-suggestion');
+      const button = document.getElementById('account-suggest');
+      status.innerHTML = '<b>Preparing a suggestion…</b>';
+      button.disabled = true;
+      // Yield once so the status is painted before the server request begins.
+      window.setTimeout(function() {
+        try {
+          const input = {
+            entityId: document.getElementById('account-entity').value,
+            purpose: document.getElementById('account-purpose').value,
+            name: document.getElementById('account-name').value,
+            lastFour: document.getElementById('account-last-four').value,
+            nearCode: document.getElementById('account-near-code').value
+          };
+          google.script.run
         .withSuccessHandler(function(suggestion) {
+          button.disabled = false;
           window.nilavaramAccountSuggestions = suggestion.choices || [suggestion];
           applyAccountSuggestion(0);
           let choiceHtml = '<b>Suggested:</b> ' + escapeHtml(suggestion.explanation);
@@ -1840,10 +1846,20 @@
           document.getElementById('account-advanced').open = true;
         })
         .withFailureHandler(function(error) {
+          button.disabled = false;
           document.getElementById('account-suggestion').innerHTML =
-            '<span class="error">' + escapeHtml(error.message) + '</span>';
+            '<span class="error">Suggestion failed: ' +
+            escapeHtml(error && error.message ? error.message : String(error)) +
+            '</span>';
         })
         .suggestChartAccount(input);
+        } catch (error) {
+          button.disabled = false;
+          status.innerHTML = '<span class="error">Suggestion could not start: ' +
+            escapeHtml(error && error.message ? error.message : String(error)) +
+            '</span>';
+        }
+      }, 0);
     }
 
     function applyAccountSuggestion(index) {
