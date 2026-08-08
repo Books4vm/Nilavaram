@@ -3,7 +3,7 @@
  * End-user input, batch reconciliation and ACODE assignment workspace.
  */
 
-const NILAVARAM_INPUT_WORKFLOW_VERSION = '2026-08-08.1';
+const NILAVARAM_INPUT_WORKFLOW_VERSION = '2026-08-08.2';
 
 function shortInstitutionName_(record) {
   const value = String(record.sourceFinancialInstitution || '').toLowerCase();

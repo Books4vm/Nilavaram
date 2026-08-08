@@ -22,6 +22,10 @@
     .success { color: #075f2c; font-weight: 700; }
     .error { color: #a40000; font-weight: 700; }
     .notice { background: #fff2b8; border-radius: 999px; color: #6b4e00; display: inline-block; font-weight: 800; padding: 5px 11px; }
+    .filters { align-items: end; background: #fff; border: 1px solid #7eb8d4; border-radius: 8px; display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; padding: 10px; }
+    .filters label { min-width: 230px; }
+    .copy-buttons { display: flex; gap: 6px; margin: 6px 0; }
+    .copy-buttons button { min-height: 34px; padding: 4px 9px; }
     @media(max-width:1100px) { .row { grid-template-columns: repeat(2,minmax(180px,1fr)); } }
   </style>
 </head>
@@ -29,14 +33,15 @@
   <header>
     <h1 id="title">ACODE Assignment</h1>
     <p>Classification only. Reconciliation balances are intentionally not shown here.</p>
+    <div id="filters" class="filters"></div>
     <div id="page-nav"></div>
   </header>
   <main id="rows"><p class="notice">Loading 25 transactions from Firestore...</p></main>
   <footer>
-    <label><input id="confirm" type="checkbox" style="width:auto"> I reviewed every ACODE assignment displayed in this set of 25.</label>
+    <p><b>Partial saving:</b> saves only rows whose ACODE you selected or changed. No certification checkbox is required.</p>
     <div class="buttons">
       <button id="save-progress" class="secondary" type="button">Save partial progress</button>
-      <button id="complete" class="primary" type="button" disabled>Complete displayed 25</button>
+      <button id="complete" class="primary" type="button">Complete displayed 25</button>
       <button id="refresh" class="secondary" type="button">Refresh ACODE list</button>
       <button class="secondary" type="button" onclick="window.close()">Close</button>
       <span id="message"></span>
@@ -49,6 +54,10 @@
     let page = 1;
     const pageSize = 25;
     const drafts = {};
+    const dirty = {};
+    let categoryFilter = 'all';
+    let ownerFilter = 'all';
+    let copiedAcode = '';
 
     function esc(value) {
       return String(value == null ? '' : value)
@@ -60,12 +69,61 @@
       return '$' + (Number(cents || 0) / 100).toLocaleString(undefined,
         {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
+    function accountCategory(account) {
+      const code = String(account.code || '').toUpperCase();
+      const name = String(account.name || '').toLowerCase();
+      if (account.categoryFamily === 'member-use') return 'member-payment';
+      if (/^7[MASR]/.test(code) &&
+          /(employment|paycheck|deposit|income|receipt)/.test(name)) return 'member-receipt';
+      if (account.accountType === 'asset') return 'asset';
+      if (account.accountType === 'liability') return 'liability';
+      if (account.accountType === 'clearing') return 'clearing';
+      if (account.accountType === 'net-worth') return 'net-worth';
+      return 'other';
+    }
+    function filteredAccounts(selected) {
+      return workspace.accounts.filter(function(account) {
+        if (account.code === selected) return true;
+        const categoryPassed = categoryFilter === 'all' ||
+          accountCategory(account) === categoryFilter;
+        const ownerPassed = ownerFilter === 'all' ||
+          String(account.entityId || '') === ownerFilter;
+        return categoryPassed && ownerPassed;
+      });
+    }
     function accountOptions(selected) {
-      return '<option value="">Choose ACODE</option>' + workspace.accounts.map(function(account) {
+      return '<option value="">Choose ACODE</option>' + filteredAccounts(selected).map(function(account) {
         return '<option value="' + esc(account.code) + '" ' +
           (account.code === selected ? 'selected' : '') + '>' +
           esc(account.code + ' — ' + account.name) + '</option>';
       }).join('');
+    }
+    function renderFilters() {
+      const ownerOptions = (workspace.entities || []).map(function(entity) {
+        return '<option value="' + esc(entity.id) + '" ' +
+          (ownerFilter === entity.id ? 'selected' : '') + '>' + esc(entity.name) + '</option>';
+      }).join('');
+      document.getElementById('filters').innerHTML =
+        '<label>1. Narrow by account category<select id="category-filter">' +
+          '<option value="all">All categories</option>' +
+          '<option value="member-receipt">Receipt — member income/deposits</option>' +
+          '<option value="member-payment">Payment — member use/payments</option>' +
+          '<option value="asset">Assets</option>' +
+          '<option value="liability">External liabilities</option>' +
+          '<option value="net-worth">Other member/trust net worth</option>' +
+          '<option value="clearing">Transfers and clearing</option>' +
+          '<option value="other">Other</option></select></label>' +
+        '<label>2. Narrow by owner/entity<select id="owner-filter">' +
+          '<option value="all">All owners/entities</option>' + ownerOptions + '</select></label>' +
+        '<span id="copy-status">' + (copiedAcode
+          ? '<b>Copied ACODE:</b> ' + esc(copiedAcode) : 'No ACODE copied yet.') + '</span>';
+      document.getElementById('category-filter').value = categoryFilter;
+      document.getElementById('category-filter').onchange = function() {
+        captureDrafts(); categoryFilter = this.value; render();
+      };
+      document.getElementById('owner-filter').onchange = function() {
+        captureDrafts(); ownerFilter = this.value; render();
+      };
     }
     function pageRecords() {
       if (!group || !Array.isArray(group.records)) return [];
@@ -88,6 +146,7 @@
     }
     function render() {
       if (!group) return;
+      renderFilters();
       document.getElementById('title').textContent =
         'ACODE Assignment — ' + group.proofLabel;
       const pages = Math.max(1, Math.ceil(group.records.length / pageSize));
@@ -113,14 +172,57 @@
           '<div><small>Suggested rule</small>' + esc(suggestion.reason || 'No matching rule') + '</div>' +
           '<div><small>ACODE / rule</small><select class="acode" data-id="' + esc(record.id) + '">' +
             accountOptions(selected) + '</select>' +
+            '<div class="copy-buttons"><button class="copy-acode secondary" type="button" data-id="' + esc(record.id) + '">Copy ACODE</button>' +
+            '<button class="paste-acode secondary" type="button" data-id="' + esc(record.id) + '">Paste ACODE</button></div>' +
             '<label><input class="rule" data-id="' + esc(record.id) + '" type="checkbox" style="width:auto" ' +
               (draft.createRule ? 'checked' : '') + '> Save as rule</label>' +
             '<select class="operator" data-id="' + esc(record.id) + '"><option value="contains">Contains</option><option value="exactly" ' +
               (draft.operator === 'exactly' ? 'selected' : '') + '>Is exactly</option></select>' +
             '<input class="rule-text" data-id="' + esc(record.id) + '" value="' + esc(ruleText) + '"></div></section>';
       }).join('');
-      document.getElementById('confirm').checked = false;
-      document.getElementById('complete').disabled = true;
+      document.querySelectorAll('.acode').forEach(function(select) {
+        select.onchange = function() { dirty[this.dataset.id] = true; };
+      });
+      document.querySelectorAll('.rule,.operator,.rule-text').forEach(function(control) {
+        control.onchange = function() { dirty[this.dataset.id] = true; };
+        if (control.classList.contains('rule-text')) {
+          control.oninput = function() { dirty[this.dataset.id] = true; };
+        }
+      });
+      document.querySelectorAll('.copy-acode').forEach(function(button) {
+        button.onclick = function() { copyAcode(this.dataset.id); };
+      });
+      document.querySelectorAll('.paste-acode').forEach(function(button) {
+        button.onclick = function() { pasteAcode(this.dataset.id); };
+      });
+    }
+    function copyAcode(id) {
+      const select = document.querySelector('.acode[data-id="' + id + '"]');
+      if (!select || !select.value) {
+        document.getElementById('message').innerHTML = '<span class="error">Choose an ACODE in that row before copying.</span>';
+        return;
+      }
+      copiedAcode = select.value;
+      document.getElementById('copy-status').innerHTML = '<b>Copied ACODE:</b> ' + esc(copiedAcode);
+      document.getElementById('message').innerHTML = '<span class="success">' + esc(copiedAcode) + ' copied. Use Paste ACODE on another row.</span>';
+    }
+    function pasteAcode(id) {
+      if (!copiedAcode) {
+        document.getElementById('message').innerHTML = '<span class="error">Copy an ACODE from another row first.</span>';
+        return;
+      }
+      const select = document.querySelector('.acode[data-id="' + id + '"]');
+      if (!select) return;
+      if (!Array.prototype.some.call(select.options, function(option) {
+        return option.value === copiedAcode;
+      })) {
+        const account = workspace.accounts.find(function(item) { return item.code === copiedAcode; });
+        if (account) select.add(new Option(account.code + ' — ' + account.name, account.code));
+      }
+      select.value = copiedAcode;
+      dirty[id] = true;
+      captureDrafts();
+      document.getElementById('message').innerHTML = '<span class="success">' + esc(copiedAcode) + ' pasted into the selected row.</span>';
     }
     function changePage(change) {
       captureDrafts();
@@ -150,7 +252,10 @@
     }
     function save(completeSet) {
       captureDrafts();
-      let assignments = pageRecords().map(function(record) {
+      const recordsToSave = completeSet ? pageRecords() : group.records.filter(function(record) {
+        return !!dirty[record.id];
+      });
+      let assignments = recordsToSave.map(function(record) {
         const draft = drafts[record.id] || {};
         return {sourceRecordId: record.id,
           counterAccountCode: draft.counterAccountCode || '',
@@ -163,26 +268,35 @@
         document.getElementById('message').innerHTML = '<span class="error">Choose an ACODE for every displayed transaction.</span>';
         return;
       }
-      if (!completeSet) assignments = assignments.filter(function(item) { return !!item.counterAccountCode; });
+      if (!completeSet) assignments = assignments.filter(function(item) {
+        return !!item.counterAccountCode && !!dirty[item.sourceRecordId];
+      });
       if (!assignments.length) {
         document.getElementById('message').innerHTML = '<span class="error">Choose at least one ACODE before saving.</span>';
         return;
       }
       document.getElementById('message').textContent = ' Saving...';
+      document.getElementById('save-progress').disabled = true;
+      document.getElementById('complete').disabled = true;
       google.script.run.withSuccessHandler(function(result) {
+        assignments.forEach(function(item) {
+          delete dirty[item.sourceRecordId];
+          delete drafts[item.sourceRecordId];
+        });
+        document.getElementById('save-progress').disabled = false;
+        document.getElementById('complete').disabled = false;
         loadData(result.message);
         if (window.opener && !window.opener.closed) {
           try { window.opener.showInputWorkspace('input-main'); } catch (ignore) {}
         }
       }).withFailureHandler(function(error) {
+        document.getElementById('save-progress').disabled = false;
+        document.getElementById('complete').disabled = false;
         document.getElementById('message').innerHTML = '<span class="error">' + esc(error.message) + '</span>';
       }).saveSourceBatchAcodeAssignments({assignments: assignments,
-        confirmAll: completeSet && document.getElementById('confirm').checked,
+        confirmAll: completeSet,
         savePartial: !completeSet});
     }
-    document.getElementById('confirm').onchange = function() {
-      document.getElementById('complete').disabled = !this.checked;
-    };
     document.getElementById('save-progress').onclick = function() { save(false); };
     document.getElementById('complete').onclick = function() { save(true); };
     document.getElementById('refresh').onclick = function() { loadData('ACODE list refreshed.'); };

@@ -148,6 +148,19 @@ These rules were confirmed on 2026-08-08:
 6. The application must reject an active entry account placed under a heading
    marked `NOT USED — NILAVARAM`.
 
+## Locked ACODE batch-review controls
+
+1. ACODE assignment remains separate from reconciliation.
+2. The ACODE list may be narrowed by accounting category and by owner/entity;
+   filtering does not change or approve any transaction.
+3. A selected ACODE may be copied from one displayed row and pasted into
+   another. Each pasted row remains an individual, auditable selection.
+4. Save partial progress saves only rows the user selected or changed. It does
+   not require certification of the other displayed rows and does not approve
+   them.
+5. Complete displayed 25 is a separate deliberate action and requires a valid
+   ACODE for every transaction in that displayed set.
+
 ## Implementation status
 
 - Step 1 — permanent transaction header and journal-line structure: completed.
