@@ -2157,6 +2157,28 @@
       return popup && !popup.closed ? popup.document : null;
     }
 
+    function whenReviewWindowReady_(requiredIds, callback, attempt) {
+      const review = reviewDocument_();
+      const ready = review && requiredIds.every(function(id) {
+        return !!review.getElementById(id);
+      });
+      if (ready) {
+        callback(review);
+        return;
+      }
+      const nextAttempt = Number(attempt || 0) + 1;
+      if (nextAttempt > 40) {
+        if (review && review.body) {
+          review.body.insertAdjacentHTML('afterbegin',
+            '<p class="error">The review window could not finish loading. Close it and try again.</p>');
+        }
+        return;
+      }
+      setTimeout(function() {
+        whenReviewWindowReady_(requiredIds, callback, nextAttempt);
+      }, 50);
+    }
+
     function inputGroupByEncodedKey_(encoded) {
       const key = decodeURIComponent(encoded);
       return (window.nilavaramInputWorkspace.groups || []).find(function(group) {
@@ -2243,12 +2265,16 @@
         '<div class="button-row"><button id="recon-save" class="primary-button" type="button" disabled>One-click reconcile batch</button>' +
         '<button class="secondary-button" type="button" onclick="window.opener.closeTransactionPopup()">Close</button> <span id="recon-message"></span></div></div></div>';
       if (!openDetachedReviewWindow_('Nilavaram Reconciliation', content)) return;
-      const review = reviewDocument_();
-      review.getElementById('batch-opening').oninput = updateReconciliationPopup;
-      review.getElementById('batch-ending').oninput = updateReconciliationPopup;
-      review.getElementById('recon-confirm-all').onchange = updateReconciliationPopup;
-      review.getElementById('recon-save').onclick = saveReconciliationPopup;
-      updateReconciliationPopup();
+      whenReviewWindowReady_([
+        'batch-opening', 'batch-ending', 'recon-confirm-all',
+        'recon-save', 'recon-rows'
+      ], function(review) {
+        review.getElementById('batch-opening').oninput = updateReconciliationPopup;
+        review.getElementById('batch-ending').oninput = updateReconciliationPopup;
+        review.getElementById('recon-confirm-all').onchange = updateReconciliationPopup;
+        review.getElementById('recon-save').onclick = saveReconciliationPopup;
+        updateReconciliationPopup();
+      });
     }
 
     function updateReconciliationPopup() {
@@ -2324,20 +2350,28 @@
       const content = '<div class="modal-shell"><div class="modal-header"><h2>ACODE Assignment — ' +
         escapeHtml(group.proofLabel) + '</h2><p>Rules suggest the opposite ACODE. Review 25 lines at a time; nothing posts automatically.</p>' +
         '<div id="acode-page-nav"></div></div>' +
-        '<div class="modal-body" id="acode-rows"></div>' +
+        '<div class="modal-body" id="acode-rows"><p class="status-yellow">Loading 25 transactions...</p></div>' +
         '<div class="modal-footer"><label><input id="acode-confirm-all" type="checkbox"> I reviewed every ACODE assignment displayed in this set of 25.</label>' +
         '<div class="button-row"><button id="acode-save-progress" class="secondary-button" type="button">Save partial progress</button>' +
         '<button id="acode-complete" class="primary-button" type="button" disabled>Complete displayed 25</button>' +
         '<button class="secondary-button" type="button" onclick="window.opener.refreshAcodePopupData()">Refresh ACODE list</button>' +
         '<button class="secondary-button" type="button" onclick="window.opener.closeTransactionPopup()">Close</button> <span id="acode-message"></span></div></div></div>';
       if (!openDetachedReviewWindow_('Nilavaram ACODE Assignment', content)) return;
-      const review = reviewDocument_();
-      review.getElementById('acode-confirm-all').onchange = function() {
-        review.getElementById('acode-complete').disabled = !this.checked;
-      };
-      review.getElementById('acode-save-progress').onclick = function() { saveAcodePopup(false); };
-      review.getElementById('acode-complete').onclick = function() { saveAcodePopup(true); };
-      renderAcodePopupPage();
+      whenReviewWindowReady_([
+        'acode-confirm-all', 'acode-complete', 'acode-save-progress',
+        'acode-page-nav', 'acode-rows', 'acode-message'
+      ], function(review) {
+        review.getElementById('acode-confirm-all').onchange = function() {
+          review.getElementById('acode-complete').disabled = !this.checked;
+        };
+        review.getElementById('acode-save-progress').onclick = function() {
+          saveAcodePopup(false);
+        };
+        review.getElementById('acode-complete').onclick = function() {
+          saveAcodePopup(true);
+        };
+        renderAcodePopupPage();
+      });
     }
 
     function currentAcodeRecords_() {
