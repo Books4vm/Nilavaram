@@ -1712,6 +1712,8 @@
                 '<input id="account-name" required></div>' +
               '<div><label for="account-last-four">Last four digits, if applicable</label>' +
                 '<input id="account-last-four" inputmode="numeric" maxlength="4"></div>' +
+              '<div><label for="account-near-code">Place near ACODE, if desired</label>' +
+                '<input id="account-near-code" maxlength="5" placeholder="Example: 7R020"></div>' +
             '</div>' +
             '<button class="secondary-button" id="account-suggest" type="button">' +
               'Suggest accounting details</button>' +
@@ -1805,6 +1807,7 @@
       document.getElementById('account-id').value = '';
       document.getElementById('account-message').textContent = '';
       document.getElementById('account-suggestion').textContent = '';
+      window.nilavaramAccountSuggestions = [];
     }
 
     function suggestAccountDetails() {
@@ -1812,25 +1815,44 @@
         entityId: document.getElementById('account-entity').value,
         purpose: document.getElementById('account-purpose').value,
         name: document.getElementById('account-name').value,
-        lastFour: document.getElementById('account-last-four').value
+        lastFour: document.getElementById('account-last-four').value,
+        nearCode: document.getElementById('account-near-code').value
       };
       document.getElementById('account-suggestion').textContent =
         'Preparing a suggestion...';
       google.script.run
         .withSuccessHandler(function(suggestion) {
-          document.getElementById('account-code').value = suggestion.code;
-          document.getElementById('account-name').value = suggestion.name;
-          document.getElementById('account-type').value = suggestion.accountType;
-          document.getElementById('account-parent').value = suggestion.parentCode;
-          document.getElementById('account-suggestion').textContent =
-            suggestion.code + ' — ' + suggestion.name + '. ' +
-            suggestion.explanation;
+          window.nilavaramAccountSuggestions = suggestion.choices || [suggestion];
+          applyAccountSuggestion(0);
+          let choiceHtml = '<b>Suggested:</b> ' + escapeHtml(suggestion.explanation);
+          if (window.nilavaramAccountSuggestions.length > 1) {
+            choiceHtml += '<br><label for="account-suggestion-choice">Choose a suggestion: </label>' +
+              '<select id="account-suggestion-choice" onchange="applyAccountSuggestion(this.selectedIndex)">';
+            window.nilavaramAccountSuggestions.forEach(function(choice) {
+              choiceHtml += '<option>' + escapeHtml(choice.label ||
+                (choice.code + ' — ' + choice.name)) + '</option>';
+            });
+            choiceHtml += '</select>';
+          }
+          choiceHtml += '<br><b>You remain in control:</b> open “Review accounting details” ' +
+            'and replace the suggested code, type or parent before saving.';
+          document.getElementById('account-suggestion').innerHTML = choiceHtml;
+          document.getElementById('account-advanced').open = true;
         })
         .withFailureHandler(function(error) {
           document.getElementById('account-suggestion').innerHTML =
             '<span class="error">' + escapeHtml(error.message) + '</span>';
         })
         .suggestChartAccount(input);
+    }
+
+    function applyAccountSuggestion(index) {
+      const suggestion = (window.nilavaramAccountSuggestions || [])[index];
+      if (!suggestion) return;
+      document.getElementById('account-code').value = suggestion.code;
+      document.getElementById('account-name').value = suggestion.name;
+      document.getElementById('account-type').value = suggestion.accountType;
+      document.getElementById('account-parent').value = suggestion.parentCode;
     }
 
     function saveAccountForm(event) {

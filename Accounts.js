@@ -536,6 +536,7 @@ function suggestChartAccount(input) {
   const entityId = String(input && input.entityId || '').trim();
   const name = String(input && input.name || '').trim();
   const lastFour = String(input && input.lastFour || '').replace(/\D/g, '');
+  const nearCode = String(input && input.nearCode || '').trim().toUpperCase();
   const accounts = firestoreGetCollection_('accounts')
     .map(fromFirestoreDocument_);
 
@@ -563,6 +564,76 @@ function suggestChartAccount(input) {
     'member-s': 73000,
     'member-r': 74000
   };
+  const memberLetters = {
+    'member-m': 'M',
+    'member-a': 'A',
+    'member-s': 'S',
+    'member-r': 'R'
+  };
+
+  // Nilavaram does not use the generic 50000 expense section. A payment for a
+  // member reduces that member's net-worth position and therefore belongs in
+  // the shared 7M/7A/7S/7R member-use structure.
+  if (purpose === 'expense') {
+    if (!memberBases[entityId]) {
+      throw new Error(
+        'The 50000 expense group is NOT USED in this Nilavaram profile. ' +
+        'Select the member concerned so Nilavaram can suggest a member-use ACODE.'
+      );
+    }
+
+    const memberLetter = memberLetters[entityId];
+    const usedSuffixes = {};
+    accounts.forEach(function(account) {
+      const visible = numericMemberCodeToVisible_(
+        account.code || account.exportCode || ''
+      );
+      const match = visible.match(/^7[MASR](\d{3})$/);
+      if (match) usedSuffixes[match[1]] = true;
+    });
+
+    let startSuffix = 1;
+    const nearMatch = nearCode.match(/^7([MASR])(\d{3})$/);
+    if (nearMatch) startSuffix = Number(nearMatch[2]) + 1;
+
+    const suffixChoices = [];
+    for (let pass = 0; pass < 2 && suffixChoices.length < 3; pass += 1) {
+      const first = pass === 0 ? startSuffix : 1;
+      const last = pass === 0 ? 999 : startSuffix - 1;
+      for (let suffix = first; suffix <= last && suffixChoices.length < 3;
+          suffix += 1) {
+        const value = String(suffix).padStart(3, '0');
+        if (!usedSuffixes[value]) suffixChoices.push(value);
+      }
+    }
+    if (!suffixChoices.length) {
+      throw new Error('No unused member-use suffix remains in the Chart of Accounts.');
+    }
+
+    const memberName = memberLetter + ' — ' + name;
+    const choices = suffixChoices.map(function(suffix) {
+      const visibleCode = '7' + memberLetter + suffix;
+      return {
+        code: visibleCode,
+        exportCode: String(memberBases[entityId] + Number(suffix)),
+        name: memberName,
+        accountType: 'net-worth',
+        parentCode: '7' + memberLetter + '000',
+        label: visibleCode + ' — next unused shared member-use suffix'
+      };
+    });
+    return {
+      code: choices[0].code,
+      exportCode: choices[0].exportCode,
+      name: choices[0].name,
+      accountType: choices[0].accountType,
+      parentCode: choices[0].parentCode,
+      choices: choices,
+      explanation: nearMatch
+        ? 'Suggested after ' + nearCode + '. The suffix is unused for every member, so its meaning remains consistent across 7M, 7A, 7S and 7R. You may choose another suggestion or enter your own valid ACODE.'
+        : 'The generic 50000 expense group is not used. Choose a member-use suggestion or enter your own valid member ACODE.'
+    };
+  }
   if (memberBases[entityId] &&
       (purpose === 'paycheck' || purpose === 'equity')) {
     definition.parent = String(memberBases[entityId]);
@@ -679,6 +750,15 @@ function saveChartAccount(input) {
   }
   if (['active', 'inactive'].indexOf(status) === -1) {
     throw new Error('Select a valid status.');
+  }
+
+  if (status === 'active' &&
+      (parentCode === '50000' || parentCode === '40000')) {
+    throw new Error(
+      parentCode + ' is marked NOT USED in the current Nilavaram profile. ' +
+      'Use a member-specific 7M/7A/7S/7R account, or configure a separate ' +
+      'accounting profile before using this group.'
+    );
   }
 
   const accounts = firestoreGetCollection_('accounts')

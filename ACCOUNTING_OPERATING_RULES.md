@@ -130,6 +130,24 @@ These additional rules were approved on 2026-07-28:
     input controls pass. A pending reconciliation must remain clearly
     disclosed and must never be described as complete.
 
+## Locked Chart of Accounts suggestion rules
+
+These rules were confirmed on 2026-08-08:
+
+1. The current Nilavaram profile does not use the generic `40000 — INCOME` or
+   `50000 — EXPENSES` sections for member transactions.
+2. A member-related payment reduces that member's recorded net-worth position
+   and uses the member-specific `7M`, `7A`, `7S` or `7R` structure.
+3. The same final three digits must keep the same meaning for every member.
+   A new suffix may be suggested only when it is unused across all four member
+   prefixes.
+4. The user may provide a nearby ACODE, review multiple valid suggestions, or
+   enter a different valid ACODE before saving.
+5. A suggestion is never a final accounting or tax decision. The user retains
+   control, and purpose plus supporting evidence must be reviewed separately.
+6. The application must reject an active entry account placed under a heading
+   marked `NOT USED — NILAVARAM`.
+
 ## Implementation status
 
 - Step 1 — permanent transaction header and journal-line structure: completed.
