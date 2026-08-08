@@ -2344,34 +2344,16 @@
         alert('Complete reconciliation for this account batch before assigning ACODEs.');
         return;
       }
-      window.nilavaramActiveInputGroup = group;
-      window.nilavaramAcodePage = 1;
-      window.nilavaramAcodeDrafts = {};
-      const content = '<div class="modal-shell"><div class="modal-header"><h2>ACODE Assignment — ' +
-        escapeHtml(group.proofLabel) + '</h2><p>Rules suggest the opposite ACODE. Review 25 lines at a time; nothing posts automatically.</p>' +
-        '<div id="acode-page-nav"></div></div>' +
-        '<div class="modal-body" id="acode-rows"><p class="status-yellow">Loading 25 transactions...</p></div>' +
-        '<div class="modal-footer"><label><input id="acode-confirm-all" type="checkbox"> I reviewed every ACODE assignment displayed in this set of 25.</label>' +
-        '<div class="button-row"><button id="acode-save-progress" class="secondary-button" type="button">Save partial progress</button>' +
-        '<button id="acode-complete" class="primary-button" type="button" disabled>Complete displayed 25</button>' +
-        '<button class="secondary-button" type="button" onclick="window.opener.refreshAcodePopupData()">Refresh ACODE list</button>' +
-        '<button class="secondary-button" type="button" onclick="window.opener.closeTransactionPopup()">Close</button> <span id="acode-message"></span></div></div></div>';
-      if (!openDetachedReviewWindow_('Nilavaram ACODE Assignment', content)) return;
-      whenReviewWindowReady_([
-        'acode-confirm-all', 'acode-complete', 'acode-save-progress',
-        'acode-page-nav', 'acode-rows', 'acode-message'
-      ], function(review) {
-        review.getElementById('acode-confirm-all').onchange = function() {
-          review.getElementById('acode-complete').disabled = !this.checked;
-        };
-        review.getElementById('acode-save-progress').onclick = function() {
-          saveAcodePopup(false);
-        };
-        review.getElementById('acode-complete').onclick = function() {
-          saveAcodePopup(true);
-        };
-        renderAcodePopupPage();
-      });
+      const baseUrl = String((CONNECTIONS_BOOTSTRAP.accessInfo || {}).appsScriptWebApp || '');
+      const reviewUrl = baseUrl + '?reviewWindow=acode&groupKey=' +
+        encodeURIComponent(group.key);
+      const popup = window.open(reviewUrl, 'NilavaramAcodeReview',
+        'popup=yes,width=1500,height=900,resizable=yes,scrollbars=yes');
+      if (!popup) {
+        alert('Allow pop-ups for the Nilavaram Apps Script address and try again.');
+        return;
+      }
+      popup.focus();
     }
 
     function currentAcodeRecords_() {

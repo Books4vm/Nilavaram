@@ -28,6 +28,13 @@ function include(filename) {
  */
 function doGet(e) {
   const parameters = e && e.parameter || {};
+  if (parameters.reviewWindow === 'acode') {
+    const reviewTemplate = HtmlService.createTemplateFromFile('ReviewWindow');
+    reviewTemplate.groupKeyJson = JSON.stringify(
+      String(parameters.groupKey || '')
+    ).replace(/</g, '\\u003c');
+    return reviewTemplate.evaluate().setTitle('Nilavaram ACODE Assignment');
+  }
   if (parameters.startAkoya === '1') {
     try {
       const authorizationUrl = getAkoyaAuthorizationUrl_();

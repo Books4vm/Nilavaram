@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    * { box-sizing: border-box; }
+    body { background: #eaf7ff; color: #050505; font-family: system-ui, "Segoe UI", Arial, sans-serif; font-size: 16px; margin: 0; }
+    header, footer { background: #fff; padding: 14px 18px; position: sticky; z-index: 5; }
+    header { border-bottom: 1px solid #7eb8d4; top: 0; }
+    footer { border-top: 1px solid #7eb8d4; bottom: 0; }
+    main { padding: 16px 18px; }
+    .row { background: #fff; border: 1px solid #7eb8d4; border-left: 7px solid #b42318; border-radius: 8px; display: grid; gap: 8px 12px; grid-template-columns: 150px 190px minmax(280px,2fr) 150px minmax(220px,1fr) minmax(300px,1.5fr); margin-bottom: 10px; padding: 10px; }
+    .row.green { border-left-color: #16823a; }
+    small { color: #344054; display: block; font-weight: 700; }
+    input, select, button { font: inherit; min-height: 40px; padding: 7px; }
+    input, select { border: 1px solid #7eb8d4; border-radius: 6px; width: 100%; }
+    button { border: 1px solid #075985; border-radius: 7px; cursor: pointer; }
+    .primary { background: #075985; color: #fff; }
+    .secondary { background: #fff; color: #050505; }
+    .buttons { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+    .success { color: #075f2c; font-weight: 700; }
+    .error { color: #a40000; font-weight: 700; }
+    .notice { background: #fff2b8; border-radius: 999px; color: #6b4e00; display: inline-block; font-weight: 800; padding: 5px 11px; }
+    @media(max-width:1100px) { .row { grid-template-columns: repeat(2,minmax(180px,1fr)); } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="title">ACODE Assignment</h1>
+    <p>Classification only. Reconciliation balances are intentionally not shown here.</p>
+    <div id="page-nav"></div>
+  </header>
+  <main id="rows"><p class="notice">Loading 25 transactions from Firestore...</p></main>
+  <footer>
+    <label><input id="confirm" type="checkbox" style="width:auto"> I reviewed every ACODE assignment displayed in this set of 25.</label>
+    <div class="buttons">
+      <button id="save-progress" class="secondary" type="button">Save partial progress</button>
+      <button id="complete" class="primary" type="button" disabled>Complete displayed 25</button>
+      <button id="refresh" class="secondary" type="button">Refresh ACODE list</button>
+      <button class="secondary" type="button" onclick="window.close()">Close</button>
+      <span id="message"></span>
+    </div>
+  </footer>
+  <script>
+    const GROUP_KEY = <?!= groupKeyJson ?>;
+    let workspace = null;
+    let group = null;
+    let page = 1;
+    const pageSize = 25;
+    const drafts = {};
+
+    function esc(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+    function money(cents) {
+      return '$' + (Number(cents || 0) / 100).toLocaleString(undefined,
+        {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+    function accountOptions(selected) {
+      return '<option value="">Choose ACODE</option>' + workspace.accounts.map(function(account) {
+        return '<option value="' + esc(account.code) + '" ' +
+          (account.code === selected ? 'selected' : '') + '>' +
+          esc(account.code + ' — ' + account.name) + '</option>';
+      }).join('');
+    }
+    function pageRecords() {
+      const start = (page - 1) * pageSize;
+      return group.records.slice(start, start + pageSize);
+    }
+    function captureDrafts() {
+      pageRecords().forEach(function(record) {
+        const id = record.id;
+        const select = document.querySelector('.acode[data-id="' + id + '"]');
+        const rule = document.querySelector('.rule[data-id="' + id + '"]');
+        const operator = document.querySelector('.operator[data-id="' + id + '"]');
+        const text = document.querySelector('.rule-text[data-id="' + id + '"]');
+        if (!select) return;
+        drafts[id] = {counterAccountCode: select.value,
+          createRule: rule.checked, operator: operator.value,
+          ruleText: text.value};
+      });
+    }
+    function render() {
+      if (!group) return;
+      document.getElementById('title').textContent =
+        'ACODE Assignment — ' + group.proofLabel;
+      const pages = Math.max(1, Math.ceil(group.records.length / pageSize));
+      page = Math.min(Math.max(1, page), pages);
+      document.getElementById('page-nav').innerHTML =
+        '<div class="buttons"><button class="secondary" type="button" ' +
+        (page === 1 ? 'disabled' : '') + ' onclick="changePage(-1)">Previous 25</button>' +
+        '<b>Set ' + page + ' of ' + pages + '</b>' +
+        '<button class="secondary" type="button" ' +
+        (page === pages ? 'disabled' : '') + ' onclick="changePage(1)">Next 25</button></div>';
+      document.getElementById('rows').innerHTML = pageRecords().map(function(record) {
+        const suggestion = record.accountSuggestion || {};
+        const draft = drafts[record.id] || {};
+        const selected = draft.counterAccountCode || suggestion.counterAccountCode || '';
+        const ruleText = draft.ruleText || record.description || '';
+        return '<section class="row ' + (suggestion.status === 'green-confirm' ? 'green' : '') + '">' +
+          '<div><small>Transaction ID</small>' + esc(record.sourceRecordNumber) + '</div>' +
+          '<div><small>Proof</small>' + esc(record.proofLabel) + '</div>' +
+          '<div><small>Transaction to classify</small>' + esc(record.transactionDate) + '<br>' +
+            esc(record.description) + '<br><small>External ref: ' + esc(record.externalReference || '—') + '</small></div>' +
+          '<div><small>Direction</small>' + esc(record.direction || 'Review') +
+            '<br><small>Amount</small>' + money(record.amountCents) + '</div>' +
+          '<div><small>Suggested rule</small>' + esc(suggestion.reason || 'No matching rule') + '</div>' +
+          '<div><small>ACODE / rule</small><select class="acode" data-id="' + esc(record.id) + '">' +
+            accountOptions(selected) + '</select>' +
+            '<label><input class="rule" data-id="' + esc(record.id) + '" type="checkbox" style="width:auto" ' +
+              (draft.createRule ? 'checked' : '') + '> Save as rule</label>' +
+            '<select class="operator" data-id="' + esc(record.id) + '"><option value="contains">Contains</option><option value="exactly" ' +
+              (draft.operator === 'exactly' ? 'selected' : '') + '>Is exactly</option></select>' +
+            '<input class="rule-text" data-id="' + esc(record.id) + '" value="' + esc(ruleText) + '"></div></section>';
+      }).join('');
+      document.getElementById('confirm').checked = false;
+      document.getElementById('complete').disabled = true;
+    }
+    function changePage(change) {
+      captureDrafts();
+      page += change;
+      render();
+    }
+    function loadData(savedMessage) {
+      captureDrafts();
+      document.getElementById('message').textContent = ' Loading...';
+      google.script.run.withSuccessHandler(function(data) {
+        workspace = data;
+        group = data.groups.find(function(item) { return item.key === GROUP_KEY; });
+        if (!group) {
+          document.getElementById('rows').innerHTML = '<p class="error">The source account batch was not found.</p>';
+          return;
+        }
+        if (group.reconciliationStatus !== 'reconciled') {
+          document.getElementById('rows').innerHTML = '<p class="error">Complete reconciliation before assigning ACODEs.</p>';
+          return;
+        }
+        render();
+        document.getElementById('message').innerHTML = savedMessage
+          ? '<span class="success">' + esc(savedMessage) + '</span>' : '';
+      }).withFailureHandler(function(error) {
+        document.getElementById('rows').innerHTML = '<p class="error">' + esc(error.message) + '</p>';
+      }).getInputWorkspace();
+    }
+    function save(completeSet) {
+      captureDrafts();
+      let assignments = pageRecords().map(function(record) {
+        const draft = drafts[record.id] || {};
+        return {sourceRecordId: record.id,
+          counterAccountCode: draft.counterAccountCode || '',
+          createRule: !!draft.createRule,
+          ruleText: draft.ruleText || record.description,
+          ruleName: 'Rule — ' + (draft.ruleText || record.description),
+          operator: draft.operator || 'contains', priority: 50};
+      });
+      if (completeSet && assignments.some(function(item) { return !item.counterAccountCode; })) {
+        document.getElementById('message').innerHTML = '<span class="error">Choose an ACODE for every displayed transaction.</span>';
+        return;
+      }
+      if (!completeSet) assignments = assignments.filter(function(item) { return !!item.counterAccountCode; });
+      if (!assignments.length) {
+        document.getElementById('message').innerHTML = '<span class="error">Choose at least one ACODE before saving.</span>';
+        return;
+      }
+      document.getElementById('message').textContent = ' Saving...';
+      google.script.run.withSuccessHandler(function(result) {
+        loadData(result.message);
+        if (window.opener && !window.opener.closed) {
+          try { window.opener.showInputWorkspace('input-main'); } catch (ignore) {}
+        }
+      }).withFailureHandler(function(error) {
+        document.getElementById('message').innerHTML = '<span class="error">' + esc(error.message) + '</span>';
+      }).saveSourceBatchAcodeAssignments({assignments: assignments,
+        confirmAll: completeSet && document.getElementById('confirm').checked,
+        savePartial: !completeSet});
+    }
+    document.getElementById('confirm').onchange = function() {
+      document.getElementById('complete').disabled = !this.checked;
+    };
+    document.getElementById('save-progress').onclick = function() { save(false); };
+    document.getElementById('complete').onclick = function() { save(true); };
+    document.getElementById('refresh').onclick = function() { loadData('ACODE list refreshed.'); };
+    loadData('');
+  </script>
+</body>
+</html>
