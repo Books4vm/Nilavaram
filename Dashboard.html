@@ -1753,10 +1753,24 @@
       }
 
       output.innerHTML += '<div id="accounts-list"></div>';
-      renderAccountsTable(data);
       if (data.canEdit) {
         document.getElementById('account-form').onsubmit = saveAccountForm;
         document.getElementById('account-cancel').onclick = clearAccountForm;
+        // Bind the essential form controls before rendering the long account
+        // table. A problem in one table row must never disable this form.
+        document.getElementById('account-suggest').onclick = function(event) {
+          event.preventDefault();
+          suggestAccountDetails();
+        };
+      }
+      try {
+        renderAccountsTable(data);
+      } catch (error) {
+        document.getElementById('accounts-list').innerHTML =
+          '<p class="error">The account list could not be displayed, but the ' +
+          'account form above remains available. ' +
+          escapeHtml(error && error.message ? error.message : String(error)) +
+          '</p>';
       }
     }
 
@@ -1842,8 +1856,18 @@
           }
           choiceHtml += '<br><b>You remain in control:</b> open “Review accounting details” ' +
             'and replace the suggested code, type or parent before saving.';
+          choiceHtml += '<br><button type="button" class="primary-button" ' +
+            'id="account-save-suggestion">Use this suggestion and save account</button>';
           document.getElementById('account-suggestion').innerHTML = choiceHtml;
           document.getElementById('account-advanced').open = true;
+          document.getElementById('account-save-suggestion').onclick = function() {
+            const form = document.getElementById('account-form');
+            if (typeof form.requestSubmit === 'function') {
+              form.requestSubmit();
+            } else {
+              saveAccountForm({ preventDefault: function() {} });
+            }
+          };
         })
         .withFailureHandler(function(error) {
           button.disabled = false;
