@@ -217,7 +217,9 @@ function saveSourceBatchAcodeAssignments(input) {
   const assignments = Array.isArray(input && input.assignments)
     ? input.assignments : [];
   if (!assignments.length) throw new Error('No ACODE assignments were supplied.');
-  if (!input.confirmAll) throw new Error('Confirm the complete ACODE review before saving.');
+  if (!input.confirmAll && !input.savePartial) {
+    throw new Error('Confirm the complete ACODE review or choose Save progress.');
+  }
   const records = firestoreGetCollection_('sourceRecords').map(fromFirestoreDocument_);
   const byId = {};
   records.forEach(function(record) { byId[record.id] = record; });

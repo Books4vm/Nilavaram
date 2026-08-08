@@ -2103,15 +2103,40 @@
         '<div class="button-row"><button class="secondary-button" type="button" onclick="showInputWorkspace(\'input-main\')">Back</button></div>';
     }
 
-    function ensureTransactionModal_() {
-      let dialog = document.getElementById('transaction-review-modal');
-      if (!dialog) {
-        dialog = document.createElement('dialog');
-        dialog.id = 'transaction-review-modal';
-        dialog.className = 'transaction-modal';
-        document.body.appendChild(dialog);
+    function openDetachedReviewWindow_(title, content) {
+      const popup = window.open('', 'NilavaramTransactionReview',
+        'popup=yes,width=1500,height=900,resizable=yes,scrollbars=yes');
+      if (!popup) {
+        alert('The review window was blocked. Allow pop-ups for the Nilavaram Apps Script address and try again.');
+        return null;
       }
-      return dialog;
+      window.nilavaramReviewWindow = popup;
+      popup.document.open();
+      popup.document.write('<!DOCTYPE html><html><head><title>' + escapeHtml(title) +
+        '</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>' +
+        'body{font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:16px;margin:0;background:#eaf7ff;color:#050505}' +
+        '.modal-shell{min-height:100vh}.modal-header,.modal-footer{background:#fff;padding:14px 18px;position:sticky;z-index:5}' +
+        '.modal-header{top:0;border-bottom:1px solid #7eb8d4}.modal-footer{bottom:0;border-top:1px solid #7eb8d4}' +
+        '.modal-body{padding:16px 18px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:12px}' +
+        'label{display:block;font-weight:700;margin:4px 0}input,select,button{font:inherit;min-height:40px;padding:7px}' +
+        'input,select{border:1px solid #7eb8d4;border-radius:6px;width:100%;box-sizing:border-box}' +
+        'button{border:1px solid #075985;border-radius:7px;cursor:pointer}.primary-button{background:#075985;color:#fff}' +
+        '.secondary-button{background:#fff;color:#050505}.button-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px}' +
+        '.download-row{background:#fff;border:1px solid #7eb8d4;border-left-width:7px;border-radius:8px;display:grid;gap:8px 12px;' +
+        'grid-template-columns:150px 190px minmax(260px,2fr) repeat(5,minmax(105px,1fr));margin-bottom:10px;padding:10px}' +
+        '.download-row.green{border-left-color:#16823a}.download-row.yellow{border-left-color:#d3a000}.download-row.red{border-left-color:#b42318}' +
+        '.download-cell small{color:#344054;display:block;font-weight:700}.status-green,.status-yellow,.status-red{border-radius:999px;display:inline-block;font-weight:800;padding:4px 10px}' +
+        '.status-green{background:#d8f5df;color:#075f2c}.status-yellow{background:#fff2b8;color:#6b4e00}.status-red{background:#ffd9d9;color:#8a0000}' +
+        '.success{color:#075f2c}.error{color:#a40000}@media(max-width:1100px){.download-row{grid-template-columns:repeat(2,minmax(180px,1fr))}}' +
+        '</style></head><body>' + content + '</body></html>');
+      popup.document.close();
+      popup.focus();
+      return popup;
+    }
+
+    function reviewDocument_() {
+      const popup = window.nilavaramReviewWindow;
+      return popup && !popup.closed ? popup.document : null;
     }
 
     function inputGroupByEncodedKey_(encoded) {
@@ -2156,8 +2181,7 @@
       if (!group) return;
       window.nilavaramActiveInputGroup = group;
       const sandbox = group.environment === 'sandbox';
-      const dialog = ensureTransactionModal_();
-      dialog.innerHTML = '<div class="modal-shell"><div class="modal-header"><h2>Reconciliation — ' +
+      const content = '<div class="modal-shell"><div class="modal-header"><h2>Reconciliation — ' +
         escapeHtml(group.proofLabel) + '</h2><p>' + group.recordCount +
         ' transactions. ' + (sandbox
           ? 'Sandbox review starts from $0.00 and displays the calculated ending balance.'
@@ -2174,49 +2198,56 @@
         }).join('') + '</div></div>' +
         '<div class="modal-footer"><label><input id="recon-confirm-all" type="checkbox"> I reviewed every transaction in this account batch.</label>' +
         '<div class="button-row"><button id="recon-save" class="primary-button" type="button" disabled>One-click reconcile batch</button>' +
-        '<button class="secondary-button" type="button" onclick="closeTransactionPopup()">Close</button> <span id="recon-message"></span></div></div></div>';
-      dialog.showModal();
-      document.getElementById('batch-opening').oninput = updateReconciliationPopup;
-      document.getElementById('batch-ending').oninput = updateReconciliationPopup;
-      document.getElementById('recon-confirm-all').onchange = updateReconciliationPopup;
-      document.getElementById('recon-save').onclick = saveReconciliationPopup;
+        '<button class="secondary-button" type="button" onclick="window.opener.closeTransactionPopup()">Close</button> <span id="recon-message"></span></div></div></div>';
+      if (!openDetachedReviewWindow_('Nilavaram Reconciliation', content)) return;
+      const review = reviewDocument_();
+      review.getElementById('batch-opening').oninput = updateReconciliationPopup;
+      review.getElementById('batch-ending').oninput = updateReconciliationPopup;
+      review.getElementById('recon-confirm-all').onchange = updateReconciliationPopup;
+      review.getElementById('recon-save').onclick = saveReconciliationPopup;
       updateReconciliationPopup();
     }
 
     function updateReconciliationPopup() {
       const group = window.nilavaramActiveInputGroup;
-      const openingText = document.getElementById('batch-opening').value;
-      const endingText = document.getElementById('batch-ending').value;
+      const review = reviewDocument_();
+      if (!review) return;
+      const openingText = review.getElementById('batch-opening').value;
+      const endingText = review.getElementById('batch-ending').value;
       const opening = openingText === '' ? null : Math.round(Number(openingText) * 100);
       const ending = endingText === '' ? null : Math.round(Number(endingText) * 100);
       let running = opening;
       if (opening !== null && isFinite(opening)) {
-        document.getElementById('recon-rows').innerHTML = group.records.map(function(record, index) {
+        review.getElementById('recon-rows').innerHTML = group.records.map(function(record, index) {
           running += Number(record.receiptCents || 0) - Number(record.paymentCents || 0);
           return renderDownloadedRow_(record, running, 'reconciliation', index);
         }).join('');
       }
       const sandbox = group.environment === 'sandbox';
       if (sandbox && running !== null && isFinite(running)) {
-        document.getElementById('batch-ending').value = (running / 100).toFixed(2);
+        review.getElementById('batch-ending').value = (running / 100).toFixed(2);
       }
       const effectiveEnding = sandbox ? running : ending;
       const difference = opening === null || effectiveEnding === null ? null : effectiveEnding - running;
-      const summary = document.getElementById('recon-batch-summary');
+      const summary = review.getElementById('recon-batch-summary');
       summary.className = difference === 0 ? 'status-green' : 'status-red';
       summary.textContent = difference === null
         ? 'Enter both balances to calculate the system balance and difference.'
         : 'System ending ' + formatCentsInput_(running) + ' | External ending ' +
           formatCentsInput_(effectiveEnding) + ' | Difference ' + formatCentsInput_(difference);
-      document.getElementById('recon-save').disabled = !(difference === 0 &&
-        document.getElementById('recon-confirm-all').checked);
+      review.getElementById('recon-save').disabled = !(difference === 0 &&
+        review.getElementById('recon-confirm-all').checked);
     }
 
     function saveReconciliationPopup() {
       const group = window.nilavaramActiveInputGroup;
-      document.getElementById('recon-message').textContent = ' Saving...';
+      const review = reviewDocument_();
+      if (!review) return;
+      review.getElementById('recon-message').textContent = ' Saving...';
       google.script.run.withSuccessHandler(function(result) {
-        document.getElementById('recon-message').innerHTML = result.success
+        const activeReview = reviewDocument_();
+        if (!activeReview) return;
+        activeReview.getElementById('recon-message').innerHTML = result.success
           ? '<span class="success">' + escapeHtml(result.message) + '</span>'
           : '<span class="error">' + escapeHtml(result.message) + '</span>';
         if (result.success) setTimeout(function() {
@@ -2224,14 +2255,16 @@
           showInputWorkspace('input-main');
         }, 800);
       }).withFailureHandler(function(error) {
-        document.getElementById('recon-message').innerHTML = '<span class="error">' +
+        const activeReview = reviewDocument_();
+        if (!activeReview) return;
+        activeReview.getElementById('recon-message').innerHTML = '<span class="error">' +
           escapeHtml(error.message) + '</span>';
       }).saveSourceBatchReconciliation({
         sourceRecordIds: group.records.map(function(record) { return record.id; }),
-        openingBalance: document.getElementById('batch-opening').value,
-        externalEndingBalance: document.getElementById('batch-ending').value,
+        openingBalance: review.getElementById('batch-opening').value,
+        externalEndingBalance: review.getElementById('batch-ending').value,
         zeroBasedSandboxReview: group.environment === 'sandbox',
-        confirmAll: document.getElementById('recon-confirm-all').checked
+        confirmAll: review.getElementById('recon-confirm-all').checked
       });
     }
 
@@ -2240,24 +2273,30 @@
       if (!group) return;
       window.nilavaramActiveInputGroup = group;
       window.nilavaramAcodePage = 1;
-      const dialog = ensureTransactionModal_();
-      dialog.innerHTML = '<div class="modal-shell"><div class="modal-header"><h2>ACODE Assignment — ' +
+      window.nilavaramAcodeDrafts = {};
+      const content = '<div class="modal-shell"><div class="modal-header"><h2>ACODE Assignment — ' +
         escapeHtml(group.proofLabel) + '</h2><p>Rules suggest the opposite ACODE. Review 25 lines at a time; nothing posts automatically.</p>' +
         '<div id="acode-page-nav"></div></div>' +
         '<div class="modal-body" id="acode-rows"></div>' +
         '<div class="modal-footer"><label><input id="acode-confirm-all" type="checkbox"> I reviewed every ACODE assignment displayed in this set of 25.</label>' +
-        '<div class="button-row"><button id="acode-save" class="primary-button" type="button" disabled>Save these ACODE assignments once</button>' +
-        '<button class="secondary-button" type="button" onclick="closeTransactionPopup()">Close</button> <span id="acode-message"></span></div></div></div>';
-      dialog.showModal();
-      document.getElementById('acode-confirm-all').onchange = function() {
-        document.getElementById('acode-save').disabled = !this.checked;
+        '<div class="button-row"><button id="acode-save-progress" class="secondary-button" type="button">Save partial progress</button>' +
+        '<button id="acode-complete" class="primary-button" type="button" disabled>Complete displayed 25</button>' +
+        '<button class="secondary-button" type="button" onclick="window.opener.refreshAcodePopupData()">Refresh ACODE list</button>' +
+        '<button class="secondary-button" type="button" onclick="window.opener.closeTransactionPopup()">Close</button> <span id="acode-message"></span></div></div></div>';
+      if (!openDetachedReviewWindow_('Nilavaram ACODE Assignment', content)) return;
+      const review = reviewDocument_();
+      review.getElementById('acode-confirm-all').onchange = function() {
+        review.getElementById('acode-complete').disabled = !this.checked;
       };
-      document.getElementById('acode-save').onclick = saveAcodePopup;
+      review.getElementById('acode-save-progress').onclick = function() { saveAcodePopup(false); };
+      review.getElementById('acode-complete').onclick = function() { saveAcodePopup(true); };
       renderAcodePopupPage();
     }
 
     function currentAcodeRecords_() {
       const group = window.nilavaramActiveInputGroup;
+      const review = reviewDocument_();
+      if (!review) return;
       const start = (Number(window.nilavaramAcodePage || 1) - 1) * 25;
       return group.records.slice(start, start + 25);
     }
@@ -2267,58 +2306,127 @@
       const pages = Math.max(1, Math.ceil(group.records.length / 25));
       const page = Math.min(Math.max(1, Number(window.nilavaramAcodePage || 1)), pages);
       window.nilavaramAcodePage = page;
-      document.getElementById('acode-page-nav').innerHTML =
+      review.getElementById('acode-page-nav').innerHTML =
         '<div class="button-row"><button class="secondary-button" type="button" ' +
-        (page === 1 ? 'disabled ' : '') + 'onclick="changeAcodePage(-1)">Previous 25</button>' +
+        (page === 1 ? 'disabled ' : '') + 'onclick="window.opener.changeAcodePage(-1)">Previous 25</button>' +
         '<b>Set ' + page + ' of ' + pages + '</b>' +
         '<button class="secondary-button" type="button" ' +
-        (page === pages ? 'disabled ' : '') + 'onclick="changeAcodePage(1)">Next 25</button></div>';
-      document.getElementById('acode-rows').innerHTML = currentAcodeRecords_()
+        (page === pages ? 'disabled ' : '') + 'onclick="window.opener.changeAcodePage(1)">Next 25</button></div>';
+      review.getElementById('acode-rows').innerHTML = currentAcodeRecords_()
         .map(function(record, index) {
           return renderDownloadedRow_(record, null, 'acode', index);
         }).join('');
-      document.getElementById('acode-confirm-all').checked = false;
-      document.getElementById('acode-save').disabled = true;
-      document.getElementById('acode-message').textContent = '';
+      applyAcodeDrafts_();
+      review.getElementById('acode-confirm-all').checked = false;
+      review.getElementById('acode-complete').disabled = true;
+      review.getElementById('acode-message').textContent = '';
     }
 
     function changeAcodePage(change) {
+      captureAcodeDrafts_();
       window.nilavaramAcodePage = Number(window.nilavaramAcodePage || 1) + change;
       renderAcodePopupPage();
     }
 
-    function saveAcodePopup() {
-      const assignments = currentAcodeRecords_().map(function(record) {
-        const select = document.querySelector('.batch-acode[data-id="' + record.id + '"]');
-        const rule = document.querySelector('.batch-rule[data-id="' + record.id + '"]');
-        const operator = document.querySelector('.batch-rule-operator[data-id="' + record.id + '"]');
-        const ruleText = document.querySelector('.batch-rule-text[data-id="' + record.id + '"]');
-        return {sourceRecordId: record.id,
+    function captureAcodeDrafts_() {
+      const review = reviewDocument_();
+      if (!review) return;
+      currentAcodeRecords_().forEach(function(record) {
+        const select = review.querySelector('.batch-acode[data-id="' + record.id + '"]');
+        const rule = review.querySelector('.batch-rule[data-id="' + record.id + '"]');
+        const operator = review.querySelector('.batch-rule-operator[data-id="' + record.id + '"]');
+        const ruleText = review.querySelector('.batch-rule-text[data-id="' + record.id + '"]');
+        window.nilavaramAcodeDrafts[record.id] = {
           counterAccountCode: select ? select.value : '',
           createRule: !!(rule && rule.checked),
-          ruleText: ruleText ? ruleText.value : record.description,
-          ruleName: 'Rule — ' + (ruleText ? ruleText.value : record.description),
           operator: operator ? operator.value : 'contains',
-          priority: 50};
+          ruleText: ruleText ? ruleText.value : record.description
+        };
       });
-      document.getElementById('acode-message').textContent = ' Saving...';
-      google.script.run.withSuccessHandler(function(result) {
-        document.getElementById('acode-message').innerHTML = '<span class="success">' +
-          escapeHtml(result.message) + '</span>';
-        setTimeout(function() {
-          closeTransactionPopup();
-          showInputWorkspace('input-main');
-        }, 800);
+    }
+
+    function applyAcodeDrafts_() {
+      const review = reviewDocument_();
+      if (!review) return;
+      currentAcodeRecords_().forEach(function(record) {
+        const draft = window.nilavaramAcodeDrafts[record.id];
+        if (!draft) return;
+        const select = review.querySelector('.batch-acode[data-id="' + record.id + '"]');
+        const rule = review.querySelector('.batch-rule[data-id="' + record.id + '"]');
+        const operator = review.querySelector('.batch-rule-operator[data-id="' + record.id + '"]');
+        const ruleText = review.querySelector('.batch-rule-text[data-id="' + record.id + '"]');
+        if (select) select.value = draft.counterAccountCode;
+        if (rule) rule.checked = draft.createRule;
+        if (operator) operator.value = draft.operator;
+        if (ruleText) ruleText.value = draft.ruleText;
+      });
+    }
+
+    function refreshAcodePopupData(savedMessage) {
+      captureAcodeDrafts_();
+      const key = window.nilavaramActiveInputGroup.key;
+      const review = reviewDocument_();
+      if (review) review.getElementById('acode-message').textContent = ' Refreshing ACODEs...';
+      google.script.run.withSuccessHandler(function(data) {
+        window.nilavaramInputWorkspace = data;
+        window.nilavaramActiveInputGroup = data.groups.find(function(group) {
+          return group.key === key;
+        });
+        renderAcodePopupPage();
+        const activeReview = reviewDocument_();
+        if (activeReview && savedMessage) {
+          activeReview.getElementById('acode-message').innerHTML =
+            '<span class="success">' + escapeHtml(savedMessage) + '</span>';
+        }
       }).withFailureHandler(function(error) {
-        document.getElementById('acode-message').innerHTML = '<span class="error">' +
+        const activeReview = reviewDocument_();
+        if (activeReview) activeReview.getElementById('acode-message').innerHTML =
+          '<span class="error">' + escapeHtml(error.message) + '</span>';
+      }).getInputWorkspace();
+    }
+
+    function saveAcodePopup(completeSet) {
+      captureAcodeDrafts_();
+      const review = reviewDocument_();
+      if (!review) return;
+      const assignments = currentAcodeRecords_().map(function(record) {
+        const draft = window.nilavaramAcodeDrafts[record.id] || {};
+        return {sourceRecordId: record.id,
+          counterAccountCode: draft.counterAccountCode || '',
+          createRule: !!draft.createRule,
+          ruleText: draft.ruleText || record.description,
+          ruleName: 'Rule — ' + (draft.ruleText || record.description),
+          operator: draft.operator || 'contains',
+          priority: 50};
+      }).filter(function(assignment) {
+        return completeSet || !!assignment.counterAccountCode;
+      });
+      if (completeSet && assignments.some(function(item) { return !item.counterAccountCode; })) {
+        review.getElementById('acode-message').innerHTML = '<span class="error">Choose an ACODE for every displayed transaction before completing the set.</span>';
+        return;
+      }
+      if (!assignments.length) {
+        review.getElementById('acode-message').innerHTML = '<span class="error">Choose at least one ACODE before saving progress.</span>';
+        return;
+      }
+      review.getElementById('acode-message').textContent = ' Saving...';
+      google.script.run.withSuccessHandler(function(result) {
+        refreshAcodePopupData(result.message);
+        showInputWorkspace('input-main');
+      }).withFailureHandler(function(error) {
+        const activeReview = reviewDocument_();
+        if (!activeReview) return;
+        activeReview.getElementById('acode-message').innerHTML = '<span class="error">' +
           escapeHtml(error.message) + '</span>';
       }).saveSourceBatchAcodeAssignments({assignments: assignments,
-        confirmAll: document.getElementById('acode-confirm-all').checked});
+        confirmAll: completeSet && review.getElementById('acode-confirm-all').checked,
+        savePartial: !completeSet});
     }
 
     function closeTransactionPopup() {
-      const dialog = document.getElementById('transaction-review-modal');
-      if (dialog && dialog.open) dialog.close();
+      const popup = window.nilavaramReviewWindow;
+      if (popup && !popup.closed) popup.close();
+      window.nilavaramReviewWindow = null;
     }
 
     function showTransactionWorkbench(view) {
