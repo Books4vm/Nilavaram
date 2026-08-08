@@ -58,6 +58,12 @@ function ruleMatchesSource_(rule, record, direction) {
   const sourceAccountId = String(rule.sourceAccountId || '');
   if (sourceAccountId &&
       sourceAccountId !== String(record.sourceAccountId || '')) return false;
+  const sourceProvider = String(rule.sourceProvider || '');
+  if (sourceProvider &&
+      sourceProvider !== String(record.sourceProvider || '')) return false;
+  const sourceEnvironment = String(rule.sourceEnvironment || '');
+  if (sourceEnvironment &&
+      sourceEnvironment !== String(record.sourceEnvironment || '')) return false;
 
   const sourceText = normalizeRuleText_([
     record.description,
