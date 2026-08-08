@@ -95,7 +95,7 @@ function buildConnectionsBootstrap_() {
       .getProperty('MICROSOFT_REFRESH_TOKEN')
   );
   return {
-    build: 19,
+    build: 20,
     accessInfo: buildStorageAccessInfo_(),
     hasRefreshToken: hasRefreshToken,
     microsoftStatus: {

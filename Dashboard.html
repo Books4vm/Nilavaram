@@ -297,6 +297,73 @@
       padding: 11px;
       text-align: left;
     }
+    .input-card-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      margin: 18px 0;
+    }
+    .input-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .input-card h3 { margin-top: 0; }
+    .status-green, .status-yellow, .status-red {
+      border-radius: 999px;
+      display: inline-block;
+      font-size: .82em;
+      font-weight: 800;
+      padding: 4px 10px;
+    }
+    .status-green { background: #d8f5df; color: #075f2c; }
+    .status-yellow { background: #fff2b8; color: #6b4e00; }
+    .status-red { background: #ffd9d9; color: #8a0000; }
+    .transaction-modal {
+      background: var(--surface-strong);
+      border: 2px solid var(--primary);
+      border-radius: 12px;
+      color: var(--text);
+      height: 92vh;
+      max-width: 1500px;
+      padding: 0;
+      width: 96vw;
+    }
+    .transaction-modal::backdrop { background: rgba(0, 0, 0, .58); }
+    .modal-shell { display: flex; flex-direction: column; height: 100%; }
+    .modal-header, .modal-footer {
+      background: var(--surface-strong);
+      padding: 14px 18px;
+    }
+    .modal-header { border-bottom: 1px solid var(--border); }
+    .modal-footer { border-top: 1px solid var(--border); }
+    .modal-body { overflow: auto; padding: 16px 18px; }
+    .download-row {
+      border: 1px solid var(--border);
+      border-left-width: 7px;
+      border-radius: 8px;
+      display: grid;
+      gap: 8px 12px;
+      grid-template-columns: 150px 190px minmax(260px, 2fr) repeat(5, minmax(105px, 1fr));
+      margin-bottom: 10px;
+      padding: 10px;
+    }
+    .download-row.green { border-left-color: #16823a; }
+    .download-row.yellow { border-left-color: #d3a000; }
+    .download-row.red { border-left-color: #b42318; }
+    .download-cell small { color: var(--muted-text); display: block; font-weight: 700; }
+    .journal-row {
+      align-items: end;
+      display: grid;
+      gap: 8px;
+      grid-template-columns: minmax(220px, 2fr) 1fr 1fr minmax(160px, 1fr) auto;
+      margin-bottom: 8px;
+    }
+    @media (max-width: 1100px) {
+      .download-row { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+      .journal-row { grid-template-columns: 1fr 1fr; }
+    }
     button:focus-visible,
     input:focus-visible,
     select:focus-visible {
@@ -795,6 +862,21 @@
       }
       if (moduleId === 'chart-of-accounts') {
         showChartOfAccounts();
+        return;
+      }
+      if ([
+        'input-main',
+        'input-receipt',
+        'input-payment',
+        'input-journal',
+        'input-upload-csv',
+        'input-upload-pdf',
+        'input-upload-image',
+        'input-upload-txt',
+        'input-workbench',
+        'input-acode-map'
+      ].indexOf(moduleId) !== -1) {
+        showInputWorkspace(moduleId);
         return;
       }
       if (moduleId === 'new-transaction') {
@@ -1772,6 +1854,458 @@
             ' <span class="error">' + escapeHtml(error.message) + '</span>';
         })
         .saveChartAccount(input);
+    }
+
+    function showInputWorkspace(moduleId) {
+      document.getElementById('output').textContent = 'Preparing Input...';
+      google.script.run.withSuccessHandler(function(data) {
+        window.nilavaramInputWorkspace = data;
+        renderInputWorkspace(data, moduleId || 'input-main');
+      }).withFailureHandler(showError).getInputWorkspace();
+    }
+
+    function renderInputWorkspace(data, moduleId) {
+      if (moduleId === 'input-receipt' || moduleId === 'input-payment') {
+        renderReceiptPaymentForm(data, moduleId === 'input-receipt' ? 'receipt' : 'payment');
+        return;
+      }
+      if (moduleId === 'input-journal') {
+        renderMultiLineJournal(data);
+        return;
+      }
+      if (String(moduleId).indexOf('input-upload-') === 0) {
+        renderFileBatchRegistration(data, moduleId.replace('input-upload-', ''));
+        return;
+      }
+      const output = document.getElementById('output');
+      let html = '<h2>Input — Main Menu</h2>' +
+        '<p>Manual entries, source files and downloaded transactions remain controlled separately from posting.</p>' +
+        '<div class="input-card-grid">' +
+          inputMenuCard_('Receipt', 'Manual money received with proof.', 'input-receipt') +
+          inputMenuCard_('Payment', 'Manual money paid with proof.', 'input-payment') +
+          inputMenuCard_('Journal', 'Balanced multi-row journal with attachments.', 'input-journal') +
+          inputMenuCard_('File Upload', 'CSV, PDF, image or text template for a selected account.', 'input-upload-csv') +
+        '</div><h3>Downloaded / uploaded account batches</h3>';
+      if (!data.groups.length) {
+        html += '<p>No source batches are available.</p>';
+      } else {
+        html += '<div class="input-card-grid">' + data.groups.map(function(group) {
+          const encoded = encodeURIComponent(group.key);
+          return '<section class="input-card"><h3>' + escapeHtml(group.proofLabel) + '</h3>' +
+            '<p><b>Environment:</b> ' + escapeHtml(group.environment) +
+            '<br><b>Transactions:</b> ' + group.recordCount +
+            '<br><b>Receipts:</b> ' + formatCentsInput_(group.receiptCents) +
+            '<br><b>Payments:</b> ' + formatCentsInput_(group.paymentCents) + '</p>' +
+            '<p><span class="' + (group.reconciliationStatus === 'reconciled' ? 'status-green' : 'status-yellow') + '">' +
+              (group.reconciliationStatus === 'reconciled' ? 'Reconciled' : 'Reconciliation pending') + '</span> ' +
+              '<span class="' + (group.acodeStatus === 'complete' ? 'status-green' : 'status-red') + '">' +
+              (group.acodeStatus === 'complete' ? 'ACODE complete' : 'ACODE pending') + '</span></p>' +
+            '<div class="button-row"><button class="primary-button" type="button" onclick="openReconciliationPopup(\'' +
+              encoded + '\')">Review & reconcile</button>' +
+            '<button class="secondary-button" type="button" onclick="openAcodePopup(\'' +
+              encoded + '\')">Assign ACODE</button>' +
+            (group.provider === 'akoya' && group.environment === 'sandbox'
+              ? '<a class="secondary-button" href="' + escapeHtml((CONNECTIONS_BOOTSTRAP.accessInfo || {}).appsScriptWebApp || '#') +
+                '?importAkoyaSandbox=1">Refresh download</a>' : '') +
+            '</div></section>';
+        }).join('') + '</div>';
+      }
+      html += '<p class="error"><b>Posting remains disabled.</b> Reconciliation and ACODE approval do not post sandbox records.</p>';
+      output.innerHTML = html;
+      if (moduleId === 'input-acode-map' && data.groups.length) {
+        openAcodePopup(encodeURIComponent(data.groups[0].key));
+      }
+    }
+
+    function inputMenuCard_(title, description, moduleId) {
+      return '<section class="input-card"><h3>' + escapeHtml(title) + '</h3><p>' +
+        escapeHtml(description) + '</p><button class="primary-button" type="button" onclick="showInputWorkspace(\'' +
+        escapeHtml(moduleId) + '\')">Open ' + escapeHtml(title) + '</button></section>';
+    }
+
+    function formatCentsInput_(cents) {
+      if (cents === null || cents === undefined || cents === '') return '—';
+      return '$' + (Number(cents) / 100).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function inputAccountOptions_(accounts, selected) {
+      return '<option value="">Choose ACODE</option>' + accounts.map(function(account) {
+        return '<option value="' + escapeHtml(account.code) + '" ' +
+          (account.code === selected ? 'selected' : '') + '>' +
+          escapeHtml(account.code + ' — ' + account.name) + '</option>';
+      }).join('');
+    }
+
+    function inputEntityOptions_(entities) {
+      return entities.map(function(entity) {
+        return '<option value="' + escapeHtml(entity.id) + '">' +
+          escapeHtml(entity.name) + '</option>';
+      }).join('');
+    }
+
+    function renderReceiptPaymentForm(data, kind) {
+      const receipt = kind === 'receipt';
+      document.getElementById('output').innerHTML =
+        '<h2>Manual ' + (receipt ? 'Receipt' : 'Payment') + '</h2>' +
+        '<p>Attach the transaction proof. The file stays on your device/OneDrive; Nilavaram records its identity and reference.</p>' +
+        '<form id="manual-cash-form"><div class="form-grid">' +
+          '<div><label>Date</label><input id="cash-date" type="date" required></div>' +
+          '<div><label>Entity</label><select id="cash-entity">' + inputEntityOptions_(data.entities) + '</select></div>' +
+          '<div><label>Description / party</label><input id="cash-description" required></div>' +
+          '<div><label>Amount</label><input id="cash-amount" type="number" min="0.01" step="0.01" required></div>' +
+          '<div><label>Bank / cash ACODE</label><select id="cash-bank">' + inputAccountOptions_(data.accounts, '11110') + '</select></div>' +
+          '<div><label>' + (receipt ? 'Credit' : 'Debit') + ' ACODE</label><select id="cash-counter">' + inputAccountOptions_(data.accounts, '') + '</select></div>' +
+          '<div><label>Supporting proof</label><input id="cash-proof" type="file" required></div>' +
+          '<div><label>OneDrive / HDD reference</label><input id="cash-storage" value="E:\\nn\\Nilavaram Data\\00 Inbox" required></div>' +
+          '<div><label>Audit note</label><textarea id="cash-note" required></textarea></div>' +
+        '</div><button class="primary-button" type="submit">Save ' + (receipt ? 'receipt' : 'payment') + ' draft</button> ' +
+        '<button class="secondary-button" type="button" onclick="showInputWorkspace(\'input-main\')">Back</button> ' +
+        '<span id="cash-message"></span></form>';
+      document.getElementById('manual-cash-form').onsubmit = function(event) {
+        saveManualCashEntry(event, kind);
+      };
+    }
+
+    async function saveManualCashEntry(event, kind) {
+      event.preventDefault();
+      const file = document.getElementById('cash-proof').files[0];
+      if (!file) return;
+      const bank = document.getElementById('cash-bank').value;
+      const counter = document.getElementById('cash-counter').value;
+      const receipt = kind === 'receipt';
+      const message = document.getElementById('cash-message');
+      message.textContent = ' Calculating proof identity...';
+      try {
+        const hash = await sha256File(file);
+        const input = {
+          entryPurpose: 'manual',
+          entityId: document.getElementById('cash-entity').value,
+          date: document.getElementById('cash-date').value,
+          description: document.getElementById('cash-description').value,
+          amount: document.getElementById('cash-amount').value,
+          debitAccountCode: receipt ? bank : counter,
+          creditAccountCode: receipt ? counter : bank,
+          evidenceName: file.name,
+          fileHash: hash,
+          storageReference: document.getElementById('cash-storage').value,
+          auditNote: document.getElementById('cash-note').value
+        };
+        message.textContent = ' Saving...';
+        google.script.run.withSuccessHandler(function(result) {
+          message.innerHTML = '<span class="success">' + escapeHtml(result.message) + '</span>';
+        }).withFailureHandler(function(error) {
+          message.innerHTML = '<span class="error">' + escapeHtml(error.message) + '</span>';
+        }).saveEvidenceBackedJournalEntry(input);
+      } catch (error) {
+        message.innerHTML = '<span class="error">' + escapeHtml(error.message) + '</span>';
+      }
+    }
+
+    function renderMultiLineJournal(data) {
+      window.nilavaramJournalRow = 0;
+      document.getElementById('output').innerHTML =
+        '<h2>Manual Journal</h2><p>Add rows until Total Debit equals Total Credit. Evidence and an audit note are mandatory.</p>' +
+        '<form id="multi-journal-form"><div class="form-grid">' +
+          '<div><label>Date</label><input id="journal-date" type="date" required></div>' +
+          '<div><label>Entity</label><select id="journal-entity">' + inputEntityOptions_(data.entities) + '</select></div>' +
+          '<div><label>Description</label><input id="journal-description" required></div>' +
+          '<div><label>Evidence</label><input id="journal-proof" type="file" required></div>' +
+          '<div><label>OneDrive / HDD reference</label><input id="journal-storage" value="E:\\nn\\Nilavaram Data\\00 Inbox" required></div>' +
+          '<div><label>Audit note</label><textarea id="journal-note" required></textarea></div>' +
+        '</div><div id="journal-lines"></div>' +
+        '<div class="button-row"><button class="secondary-button" type="button" onclick="addJournalRow()">Add row</button>' +
+        '<b id="journal-totals">Debit $0.00 | Credit $0.00 | Difference $0.00</b></div>' +
+        '<div class="button-row"><button class="primary-button" id="journal-save" type="submit" disabled>Save balanced journal draft</button>' +
+        '<button class="secondary-button" type="button" onclick="showInputWorkspace(\'input-main\')">Back</button> ' +
+        '<span id="journal-message"></span></div></form>';
+      addJournalRow();
+      addJournalRow();
+      document.getElementById('multi-journal-form').onsubmit = saveMultiJournalForm;
+    }
+
+    function addJournalRow() {
+      const data = window.nilavaramInputWorkspace;
+      const rowNumber = ++window.nilavaramJournalRow;
+      const row = document.createElement('div');
+      row.className = 'journal-row';
+      row.dataset.row = rowNumber;
+      row.innerHTML = '<div><label>ACODE</label><select class="journal-acode">' +
+        inputAccountOptions_(data.accounts, '') + '</select></div>' +
+        '<div><label>Debit</label><input class="journal-debit" type="number" min="0" step="0.01"></div>' +
+        '<div><label>Credit</label><input class="journal-credit" type="number" min="0" step="0.01"></div>' +
+        '<div><label>Row note</label><input class="journal-memo"></div>' +
+        '<button class="secondary-button" type="button" onclick="this.parentElement.remove(); updateJournalTotals()">Remove</button>';
+      document.getElementById('journal-lines').appendChild(row);
+      row.querySelector('.journal-debit').oninput = updateJournalTotals;
+      row.querySelector('.journal-credit').oninput = updateJournalTotals;
+      updateJournalTotals();
+    }
+
+    function updateJournalTotals() {
+      let debit = 0;
+      let credit = 0;
+      document.querySelectorAll('.journal-row').forEach(function(row) {
+        debit += Number(row.querySelector('.journal-debit').value || 0);
+        credit += Number(row.querySelector('.journal-credit').value || 0);
+      });
+      const difference = debit - credit;
+      document.getElementById('journal-totals').textContent =
+        'Debit $' + debit.toFixed(2) + ' | Credit $' + credit.toFixed(2) +
+        ' | Difference $' + difference.toFixed(2);
+      document.getElementById('journal-save').disabled = !(debit > 0 && Math.abs(difference) < .005);
+    }
+
+    async function saveMultiJournalForm(event) {
+      event.preventDefault();
+      const file = document.getElementById('journal-proof').files[0];
+      if (!file) return;
+      const message = document.getElementById('journal-message');
+      message.textContent = ' Calculating proof identity...';
+      try {
+        const input = {
+          date: document.getElementById('journal-date').value,
+          entityId: document.getElementById('journal-entity').value,
+          description: document.getElementById('journal-description').value,
+          evidenceName: file.name,
+          fileHash: await sha256File(file),
+          storageReference: document.getElementById('journal-storage').value,
+          auditNote: document.getElementById('journal-note').value,
+          lines: Array.from(document.querySelectorAll('.journal-row')).map(function(row) {
+            return {accountCode: row.querySelector('.journal-acode').value,
+              debit: row.querySelector('.journal-debit').value,
+              credit: row.querySelector('.journal-credit').value,
+              memo: row.querySelector('.journal-memo').value};
+          })
+        };
+        message.textContent = ' Saving...';
+        google.script.run.withSuccessHandler(function(result) {
+          message.innerHTML = '<span class="success">' + escapeHtml(result.message) + '</span>';
+        }).withFailureHandler(function(error) {
+          message.innerHTML = '<span class="error">' + escapeHtml(error.message) + '</span>';
+        }).saveMultiLineJournalDraft(input);
+      } catch (error) {
+        message.innerHTML = '<span class="error">' + escapeHtml(error.message) + '</span>';
+      }
+    }
+
+    function renderFileBatchRegistration(data, type) {
+      document.getElementById('output').innerHTML =
+        '<h2>' + escapeHtml(type.toUpperCase()) + ' File Upload</h2>' +
+        '<p>Select the related account before choosing the file. The parser will preserve the original file identity and create a separate source batch.</p>' +
+        '<div class="form-grid"><div><label>Related bank / credit account</label><select>' +
+          inputAccountOptions_(data.accounts, '') + '</select></div>' +
+          '<div><label>Source file</label><input type="file" accept="' +
+          (type === 'pdf' ? '.pdf' : type === 'image' ? 'image/*' : type === 'txt' ? '.txt' : '.csv') + '"></div></div>' +
+        '<p class="status-yellow">File parsing and row preview are not yet enabled. Do not use this screen for production imports yet.</p>' +
+        '<div class="button-row"><button class="secondary-button" type="button" onclick="showInputWorkspace(\'input-main\')">Back</button></div>';
+    }
+
+    function ensureTransactionModal_() {
+      let dialog = document.getElementById('transaction-review-modal');
+      if (!dialog) {
+        dialog = document.createElement('dialog');
+        dialog.id = 'transaction-review-modal';
+        dialog.className = 'transaction-modal';
+        document.body.appendChild(dialog);
+      }
+      return dialog;
+    }
+
+    function inputGroupByEncodedKey_(encoded) {
+      const key = decodeURIComponent(encoded);
+      return (window.nilavaramInputWorkspace.groups || []).find(function(group) {
+        return group.key === key;
+      });
+    }
+
+    function renderDownloadedRow_(record, runningCents, mode, index) {
+      const statusClass = mode === 'acode'
+        ? ((record.accountSuggestion || {}).status === 'green-confirm' ? 'green' : 'red')
+        : (record.externalBalanceCents == null ? 'yellow' : 'green');
+      const suggestion = record.accountSuggestion || {};
+      let action = '<span class="status-' + statusClass + '">' +
+        (statusClass === 'green' ? 'Match' : statusClass === 'yellow' ? 'Review' : 'Fix') + '</span>';
+      if (mode === 'acode') {
+        action = '<select class="batch-acode" data-id="' + escapeHtml(record.id) + '">' +
+          inputAccountOptions_(window.nilavaramInputWorkspace.accounts,
+            suggestion.counterAccountCode || '') + '</select>' +
+          '<label><input class="batch-rule" type="checkbox" data-id="' + escapeHtml(record.id) + '"> Save as rule</label>' +
+          '<select class="batch-rule-operator" data-id="' + escapeHtml(record.id) + '">' +
+            '<option value="contains">Contains</option><option value="exactly">Is exactly</option></select>' +
+          '<input class="batch-rule-text" data-id="' + escapeHtml(record.id) + '" value="' +
+            escapeHtml(record.description || '') + '" aria-label="Rule text">';
+      }
+      return '<div class="download-row ' + statusClass + '" data-index="' + index + '">' +
+        '<div class="download-cell"><small>Transaction ID</small>' + escapeHtml(record.sourceRecordNumber) + '</div>' +
+        '<div class="download-cell"><small>Proof</small>' + escapeHtml(record.proofLabel) + '</div>' +
+        '<div class="download-cell"><small>Raw transaction</small>' + escapeHtml(record.transactionDate) +
+          '<br>' + escapeHtml(record.description) + '<br><small>External ref: ' + escapeHtml(record.externalReference || '—') + '</small></div>' +
+        '<div class="download-cell"><small>Receipt</small>' + formatCentsInput_(record.receiptCents || 0) + '</div>' +
+        '<div class="download-cell"><small>Payment</small>' + formatCentsInput_(record.paymentCents || 0) + '</div>' +
+        '<div class="download-cell"><small>Sys balance</small>' + (runningCents == null ? 'Enter opening balance' : formatCentsInput_(runningCents)) + '</div>' +
+        '<div class="download-cell"><small>External bal.</small>' + formatCentsInput_(record.externalBalanceCents) + '</div>' +
+        '<div class="download-cell"><small>' + (mode === 'acode' ? 'ACODE / rule' : 'Difference / status') + '</small>' + action + '</div>' +
+        '</div>';
+    }
+
+    function openReconciliationPopup(encoded) {
+      const group = inputGroupByEncodedKey_(encoded);
+      if (!group) return;
+      window.nilavaramActiveInputGroup = group;
+      const dialog = ensureTransactionModal_();
+      dialog.innerHTML = '<div class="modal-shell"><div class="modal-header"><h2>Reconciliation — ' +
+        escapeHtml(group.proofLabel) + '</h2><p>' + group.recordCount +
+        ' transactions. Yellow means the feed did not supply a transaction-level external balance.</p></div>' +
+        '<div class="modal-body"><div class="form-grid">' +
+          '<div><label>External opening balance</label><input id="batch-opening" type="number" step="0.01"></div>' +
+          '<div><label>External ending balance</label><input id="batch-ending" type="number" step="0.01"></div>' +
+        '</div><div id="recon-batch-summary" class="status-yellow">Enter both balances to calculate the system balance and difference.</div>' +
+        '<div id="recon-rows">' + group.records.map(function(record, index) {
+          return renderDownloadedRow_(record, null, 'reconciliation', index);
+        }).join('') + '</div></div>' +
+        '<div class="modal-footer"><label><input id="recon-confirm-all" type="checkbox"> I reviewed every transaction in this account batch.</label>' +
+        '<div class="button-row"><button id="recon-save" class="primary-button" type="button" disabled>One-click reconcile batch</button>' +
+        '<button class="secondary-button" type="button" onclick="closeTransactionPopup()">Close</button> <span id="recon-message"></span></div></div></div>';
+      dialog.showModal();
+      document.getElementById('batch-opening').oninput = updateReconciliationPopup;
+      document.getElementById('batch-ending').oninput = updateReconciliationPopup;
+      document.getElementById('recon-confirm-all').onchange = updateReconciliationPopup;
+      document.getElementById('recon-save').onclick = saveReconciliationPopup;
+    }
+
+    function updateReconciliationPopup() {
+      const group = window.nilavaramActiveInputGroup;
+      const openingText = document.getElementById('batch-opening').value;
+      const endingText = document.getElementById('batch-ending').value;
+      const opening = openingText === '' ? null : Math.round(Number(openingText) * 100);
+      const ending = endingText === '' ? null : Math.round(Number(endingText) * 100);
+      let running = opening;
+      if (opening !== null && isFinite(opening)) {
+        document.getElementById('recon-rows').innerHTML = group.records.map(function(record, index) {
+          running += Number(record.receiptCents || 0) - Number(record.paymentCents || 0);
+          return renderDownloadedRow_(record, running, 'reconciliation', index);
+        }).join('');
+      }
+      const difference = opening === null || ending === null ? null : ending - running;
+      const summary = document.getElementById('recon-batch-summary');
+      summary.className = difference === 0 ? 'status-green' : 'status-red';
+      summary.textContent = difference === null
+        ? 'Enter both balances to calculate the system balance and difference.'
+        : 'System ending ' + formatCentsInput_(running) + ' | External ending ' +
+          formatCentsInput_(ending) + ' | Difference ' + formatCentsInput_(difference);
+      document.getElementById('recon-save').disabled = !(difference === 0 &&
+        document.getElementById('recon-confirm-all').checked);
+    }
+
+    function saveReconciliationPopup() {
+      const group = window.nilavaramActiveInputGroup;
+      document.getElementById('recon-message').textContent = ' Saving...';
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('recon-message').innerHTML = result.success
+          ? '<span class="success">' + escapeHtml(result.message) + '</span>'
+          : '<span class="error">' + escapeHtml(result.message) + '</span>';
+        if (result.success) setTimeout(function() {
+          closeTransactionPopup();
+          showInputWorkspace('input-main');
+        }, 800);
+      }).withFailureHandler(function(error) {
+        document.getElementById('recon-message').innerHTML = '<span class="error">' +
+          escapeHtml(error.message) + '</span>';
+      }).saveSourceBatchReconciliation({
+        sourceRecordIds: group.records.map(function(record) { return record.id; }),
+        openingBalance: document.getElementById('batch-opening').value,
+        externalEndingBalance: document.getElementById('batch-ending').value,
+        confirmAll: document.getElementById('recon-confirm-all').checked
+      });
+    }
+
+    function openAcodePopup(encoded) {
+      const group = inputGroupByEncodedKey_(encoded);
+      if (!group) return;
+      window.nilavaramActiveInputGroup = group;
+      window.nilavaramAcodePage = 1;
+      const dialog = ensureTransactionModal_();
+      dialog.innerHTML = '<div class="modal-shell"><div class="modal-header"><h2>ACODE Assignment — ' +
+        escapeHtml(group.proofLabel) + '</h2><p>Rules suggest the opposite ACODE. Review 25 lines at a time; nothing posts automatically.</p>' +
+        '<div id="acode-page-nav"></div></div>' +
+        '<div class="modal-body" id="acode-rows"></div>' +
+        '<div class="modal-footer"><label><input id="acode-confirm-all" type="checkbox"> I reviewed every ACODE assignment displayed in this set of 25.</label>' +
+        '<div class="button-row"><button id="acode-save" class="primary-button" type="button" disabled>Save these ACODE assignments once</button>' +
+        '<button class="secondary-button" type="button" onclick="closeTransactionPopup()">Close</button> <span id="acode-message"></span></div></div></div>';
+      dialog.showModal();
+      document.getElementById('acode-confirm-all').onchange = function() {
+        document.getElementById('acode-save').disabled = !this.checked;
+      };
+      document.getElementById('acode-save').onclick = saveAcodePopup;
+      renderAcodePopupPage();
+    }
+
+    function currentAcodeRecords_() {
+      const group = window.nilavaramActiveInputGroup;
+      const start = (Number(window.nilavaramAcodePage || 1) - 1) * 25;
+      return group.records.slice(start, start + 25);
+    }
+
+    function renderAcodePopupPage() {
+      const group = window.nilavaramActiveInputGroup;
+      const pages = Math.max(1, Math.ceil(group.records.length / 25));
+      const page = Math.min(Math.max(1, Number(window.nilavaramAcodePage || 1)), pages);
+      window.nilavaramAcodePage = page;
+      document.getElementById('acode-page-nav').innerHTML =
+        '<div class="button-row"><button class="secondary-button" type="button" ' +
+        (page === 1 ? 'disabled ' : '') + 'onclick="changeAcodePage(-1)">Previous 25</button>' +
+        '<b>Set ' + page + ' of ' + pages + '</b>' +
+        '<button class="secondary-button" type="button" ' +
+        (page === pages ? 'disabled ' : '') + 'onclick="changeAcodePage(1)">Next 25</button></div>';
+      document.getElementById('acode-rows').innerHTML = currentAcodeRecords_()
+        .map(function(record, index) {
+          return renderDownloadedRow_(record, null, 'acode', index);
+        }).join('');
+      document.getElementById('acode-confirm-all').checked = false;
+      document.getElementById('acode-save').disabled = true;
+      document.getElementById('acode-message').textContent = '';
+    }
+
+    function changeAcodePage(change) {
+      window.nilavaramAcodePage = Number(window.nilavaramAcodePage || 1) + change;
+      renderAcodePopupPage();
+    }
+
+    function saveAcodePopup() {
+      const assignments = currentAcodeRecords_().map(function(record) {
+        const select = document.querySelector('.batch-acode[data-id="' + record.id + '"]');
+        const rule = document.querySelector('.batch-rule[data-id="' + record.id + '"]');
+        const operator = document.querySelector('.batch-rule-operator[data-id="' + record.id + '"]');
+        const ruleText = document.querySelector('.batch-rule-text[data-id="' + record.id + '"]');
+        return {sourceRecordId: record.id,
+          counterAccountCode: select ? select.value : '',
+          createRule: !!(rule && rule.checked),
+          ruleText: ruleText ? ruleText.value : record.description,
+          ruleName: 'Rule — ' + (ruleText ? ruleText.value : record.description),
+          operator: operator ? operator.value : 'contains',
+          priority: 50};
+      });
+      document.getElementById('acode-message').textContent = ' Saving...';
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('acode-message').innerHTML = '<span class="success">' +
+          escapeHtml(result.message) + '</span>';
+        setTimeout(function() {
+          closeTransactionPopup();
+          showInputWorkspace('input-main');
+        }, 800);
+      }).withFailureHandler(function(error) {
+        document.getElementById('acode-message').innerHTML = '<span class="error">' +
+          escapeHtml(error.message) + '</span>';
+      }).saveSourceBatchAcodeAssignments({assignments: assignments,
+        confirmAll: document.getElementById('acode-confirm-all').checked});
+    }
+
+    function closeTransactionPopup() {
+      const dialog = document.getElementById('transaction-review-modal');
+      if (dialog && dialog.open) dialog.close();
     }
 
     function showTransactionWorkbench(view) {
