@@ -186,6 +186,19 @@ These rules were confirmed on 2026-08-08:
    transaction. Such a change requires the controlled correction process and,
    when material or uncertain, qualified CPA review.
 
+## Locked cloud-storage boundary
+
+1. Microsoft OneDrive is the authoritative backend for downloaded/imported
+   source transactions and evidence files.
+2. Source transactions are stored in verified JSON files separated by source
+   account and calendar/tax year. A OneDrive index retains stable drive/item
+   IDs, record counts and SHA-256 content hashes.
+3. Firestore is limited to essential control and index information. Full source
+   rows must not continue as the active Firestore backend after migration.
+4. Migration is copy-and-verify first. Existing Firestore source rows are not
+   deleted until the OneDrive record count and hashes are verified and the
+   owner separately authorizes cleanup.
+
 ## Implementation status
 
 - Step 1 — permanent transaction header and journal-line structure: completed.

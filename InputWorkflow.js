@@ -120,7 +120,7 @@ function saveSourceBatchReconciliation(input) {
   if (!input.confirmAll) {
     throw new Error('Confirm that every displayed transaction was reviewed.');
   }
-  const all = firestoreGetCollection_('sourceRecords').map(fromFirestoreDocument_);
+  const all = getSourceRecords_();
   const byId = {};
   all.forEach(function(record) { byId[record.id] = record; });
   const records = ids.map(function(id) {
@@ -169,7 +169,7 @@ function saveSourceBatchReconciliation(input) {
     };
   }
   const now = new Date();
-  const writes = records.map(function(record) {
+  records.forEach(function(record) {
     const updated = copyRecordWithoutId_(record);
     updated.reconciliationStatus = 'reconciled';
     updated.reconciliationBasis = sandboxZeroBased
@@ -187,12 +187,10 @@ function saveSourceBatchReconciliation(input) {
     updated.alertMessage = updated.accountApprovalStatus === 'approved'
       ? '' : 'Reconciliation passed; ACODE assignment remains pending.';
     updated.updatedAt = now;
-    return {collection: 'sourceRecords', id: record.id,
-      fields: toFirestoreFields_(updated)};
+    updated.id = record.id;
+    byId[record.id] = updated;
   });
-  for (let index = 0; index < writes.length; index += 400) {
-    firestoreCommitDocuments_(writes.slice(index, index + 400));
-  }
+  saveAllSourceRecords_(all.map(function(record) { return byId[record.id] || record; }));
   writeAudit_('source-account-batch-reconciled', user.email, {
     groupKey: groupKey,
     recordCount: records.length,
@@ -227,7 +225,7 @@ function saveSourceBatchAcodeAssignments(input) {
   if (!input.confirmAll && !input.savePartial) {
     throw new Error('Confirm the complete ACODE review or choose Save progress.');
   }
-  const records = firestoreGetCollection_('sourceRecords').map(fromFirestoreDocument_);
+  const records = getSourceRecords_();
   const byId = {};
   records.forEach(function(record) { byId[record.id] = record; });
   const accounts = getSimpleTransactionSetup().accounts;
@@ -238,7 +236,7 @@ function saveSourceBatchAcodeAssignments(input) {
     .filter(function(rule) { return rule.status === 'active'; });
   const priorPatterns = getPriorApprovedPatterns_(records);
   const now = new Date();
-  const writes = [];
+  const ruleWrites = [];
   let createdRules = 0;
   const existingRuleKeys = {};
   activeRules.forEach(function(rule) {
@@ -296,8 +294,8 @@ function saveSourceBatchAcodeAssignments(input) {
     updated.alertMessage = updated.reconciliationStatus === 'reconciled'
       ? '' : 'ACODE approved; reconciliation remains pending.';
     updated.updatedAt = now;
-    writes.push({collection: 'sourceRecords', id: id,
-      fields: toFirestoreFields_(updated)});
+    updated.id = id;
+    byId[id] = updated;
 
     if (assignment.createRule) {
       const matchText = String(assignment.ruleText || record.description || '').trim();
@@ -339,13 +337,14 @@ function saveSourceBatchAcodeAssignments(input) {
         createdAt: now,
         updatedAt: now
       };
-      writes.push({collection: 'transactionRules', id: ruleId,
+      ruleWrites.push({collection: 'transactionRules', id: ruleId,
         fields: toFirestoreFields_(rule)});
       createdRules += 1;
     }
   });
-  for (let index = 0; index < writes.length; index += 400) {
-    firestoreCommitDocuments_(writes.slice(index, index + 400));
+  saveAllSourceRecords_(records.map(function(record) { return byId[record.id] || record; }));
+  for (let index = 0; index < ruleWrites.length; index += 400) {
+    firestoreCommitDocuments_(ruleWrites.slice(index, index + 400));
   }
   writeAudit_('source-account-batch-acode-approved', user.email, {
     assignmentCount: assignments.length,
@@ -367,7 +366,7 @@ function applyPendingAcodeRule(input) {
   const counterCode = String(input && input.counterAccountCode || '').trim();
   const operator = String(input && input.operator || 'contains').trim();
   const matchText = String(input && input.ruleText || '').trim();
-  const records = firestoreGetCollection_('sourceRecords').map(fromFirestoreDocument_);
+  const records = getSourceRecords_();
   const source = records.find(function(record) { return record.id === sourceRecordId; });
   if (!source) throw new Error('The source transaction was not found.');
   if (source.reconciliationStatus !== 'reconciled') {

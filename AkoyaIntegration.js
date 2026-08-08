@@ -493,6 +493,11 @@ function akoyaTransactionDescription_(transaction) {
  */
 function importAkoyaSandboxCheckingTransactions() {
   const user = requireAccountingEditor_();
+  if (!isOneDriveSourceBackendReady_()) {
+    throw new Error(
+      'Initialize OneDrive source storage before importing more transactions.'
+    );
+  }
   const status = validateAkoyaConnectionForUi();
   if (!status.connected) {
     throw new Error('Connect Akoya Sandbox before importing transactions.');
@@ -508,8 +513,7 @@ function importAkoyaSandboxCheckingTransactions() {
     startTime,
     endTime
   );
-  const existing = firestoreGetCollection_('sourceRecords')
-    .map(fromFirestoreDocument_);
+  const existing = getSourceRecords_();
   const existingKeys = {};
   existing.forEach(function(record) {
     if (record.externalSourceKey) {
@@ -520,7 +524,7 @@ function importAkoyaSandboxCheckingTransactions() {
   const now = new Date();
   const batchId = 'akoya-' +
     Utilities.formatDate(now, 'America/Los_Angeles', 'yyyyMMdd-HHmmss');
-  const writes = [];
+  const newRecords = [];
   let skipped = 0;
   let invalid = 0;
   transactions.forEach(function(transaction) {
@@ -601,15 +605,12 @@ function importAkoyaSandboxCheckingTransactions() {
       createdAt: now,
       updatedAt: now
     };
-    writes.push({
-      collection: 'sourceRecords',
-      id: record.sourceRecordId,
-      fields: toFirestoreFields_(record)
-    });
+    record.id = record.sourceRecordId;
+    newRecords.push(record);
   });
 
-  if (writes.length) {
-    firestoreCommitDocuments_(writes);
+  if (newRecords.length) {
+    saveAllSourceRecords_(existing.concat(newRecords));
   }
   const batch = {
     sourceBatchId: batchId,
@@ -626,7 +627,7 @@ function importAkoyaSandboxCheckingTransactions() {
     requestedStartTime: startTime,
     requestedEndTime: endTime,
     downloadedCount: transactions.length,
-    addedCount: writes.length,
+    addedCount: newRecords.length,
     duplicateSkippedCount: skipped,
     invalidSkippedCount: invalid,
     booksStatus: 'outside-books',
@@ -634,27 +635,28 @@ function importAkoyaSandboxCheckingTransactions() {
     importedBy: user.email,
     importedAt: now
   };
-  firestoreSetDocument_(
-    'sourceBatches',
-    batchId,
-    toFirestoreFields_(batch)
-  );
-  writeAudit_('akoya-sandbox-source-imported', user.email, {
-    sourceBatchId: batchId,
-    sourceAccountId: accountId,
-    downloadedCount: transactions.length,
-    addedCount: writes.length,
-    duplicateSkippedCount: skipped,
-    invalidSkippedCount: invalid,
-    booksStatus: 'outside-books'
-  });
+  try {
+    firestoreSetDocument_(
+      'sourceBatches', batchId, toFirestoreFields_(batch)
+    );
+    writeAudit_('akoya-sandbox-source-imported', user.email, {
+      sourceBatchId: batchId,
+      sourceAccountId: accountId,
+      downloadedCount: transactions.length,
+      addedCount: newRecords.length,
+      duplicateSkippedCount: skipped,
+      invalidSkippedCount: invalid,
+      booksStatus: 'outside-books',
+      storageProvider: 'Microsoft OneDrive'
+    });
+  } catch (ignoreFirestoreQuotaError) {}
   return {
     success: true,
     sourceBatchId: batchId,
     accountType: String(account.accountType || 'CHECKING'),
     accountDisplay: batch.sourceAccountDisplay,
     downloadedCount: transactions.length,
-    addedCount: writes.length,
+    addedCount: newRecords.length,
     duplicateSkippedCount: skipped,
     invalidSkippedCount: invalid,
     booksStatus: 'outside-books',

@@ -247,8 +247,7 @@ function getTransactionWorkbench() {
   requireCurrentUser_();
   ensureAccountingFoundation_();
   setupTransactionWorkbench_();
-  const allSourceRecords = firestoreGetCollection_('sourceRecords')
-    .map(fromFirestoreDocument_)
+  const allSourceRecords = getSourceRecords_()
     .sort(function(a, b) {
       return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
     });
@@ -339,8 +338,7 @@ function registerSourceRecord(input) {
     throw new Error('Enter the external HDD or OneDrive storage reference.');
   }
 
-  const existing = firestoreGetCollection_('sourceRecords')
-    .map(fromFirestoreDocument_);
+  const existing = getSourceRecords_();
   const duplicate = existing.find(function(record) {
     return record.fileHash === fileHash &&
       record.externalReference === externalReference &&
@@ -383,11 +381,9 @@ function registerSourceRecord(input) {
     createdAt: now,
     updatedAt: now
   };
-  firestoreSetDocument_(
-    'sourceRecords',
-    identity.id,
-    toFirestoreFields_(record)
-  );
+  record.id = identity.id;
+  existing.push(record);
+  saveAllSourceRecords_(existing);
   writeAudit_('source-record-registered', user.email, {
     sourceRecordId: identity.id,
     sourceRecordNumber: record.sourceRecordNumber,
@@ -406,7 +402,8 @@ function registerSourceRecord(input) {
 function saveSourceReconciliation(input) {
   const user = requireAccountingEditor_();
   const id = String(input && input.sourceRecordId || '').trim();
-  const source = getDocumentOrNull_('sourceRecords', id);
+  const sourceRecords = getSourceRecords_();
+  const source = sourceRecords.find(function(record) { return record.id === id; });
   if (!source) throw new Error('The source record was not found.');
   const externalBeginning = normalizeWorkbenchMoney_(
     input.externalBeginning, 'External beginning balance', true
@@ -455,7 +452,9 @@ function saveSourceReconciliation(input) {
       : 'Account assignment still requires approval.')
     : 'Reconciliation difference requires review. Do not force the balance.';
   updated.updatedAt = now;
-  firestoreSetDocument_('sourceRecords', id, toFirestoreFields_(updated));
+  sourceRecords[sourceRecords.indexOf(source)] = updated;
+  updated.id = id;
+  saveAllSourceRecords_(sourceRecords);
   writeAudit_('source-reconciliation-checked', user.email, {
     sourceRecordId: id,
     differenceCents: difference,
@@ -475,7 +474,8 @@ function saveSourceReconciliation(input) {
 function approveSourceAccountAssignment(input) {
   const user = requireAccountingEditor_();
   const id = String(input && input.sourceRecordId || '').trim();
-  const source = getDocumentOrNull_('sourceRecords', id);
+  const sourceRecords = getSourceRecords_();
+  const source = sourceRecords.find(function(record) { return record.id === id; });
   if (!source) throw new Error('The source record was not found.');
   const debitCode = String(input && input.debitAccountCode || '').trim();
   const creditCode = String(input && input.creditAccountCode || '').trim();
@@ -522,7 +522,9 @@ function approveSourceAccountAssignment(input) {
       ? ''
       : 'Account assignment passed; reconciliation remains pending.';
   updated.updatedAt = now;
-  firestoreSetDocument_('sourceRecords', id, toFirestoreFields_(updated));
+  sourceRecords[sourceRecords.indexOf(source)] = updated;
+  updated.id = id;
+  saveAllSourceRecords_(sourceRecords);
   writeAudit_('source-account-assignment-approved', user.email, {
     sourceRecordId: id,
     ruleId: updated.ruleId,

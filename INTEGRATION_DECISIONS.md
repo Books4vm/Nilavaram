@@ -22,9 +22,14 @@ must not be silently weakened or removed during implementation.
 ## System responsibilities
 
 - Google Apps Script runs the Nilavaram application code.
-- Firestore is the live structured operational store for transactions, journal
-  lines, account codes, reconciliation state, document metadata, alerts,
-  configuration and audit history. Current reports are derived from this data.
+- OneDrive is the authoritative file backend for downloaded/imported source
+  transactions, annual source-data files, statements, evidence, exports and
+  backups. Source files are separated by account and calendar/tax year.
+- Firestore is restricted to essential structured controls: the Chart of
+  Accounts, users and permissions, compact OneDrive indexes, durable drive/item
+  references, rules, locks, posting controls and essential audit metadata. It
+  must not retain a second working copy of every downloaded source row after a
+  verified OneDrive migration.
 - External evidence is registered by durable metadata: source-record ID,
   document name, external/cloud reference and file hash. File contents remain
   on the approved external HDD/OneDrive storage path.
@@ -38,7 +43,9 @@ must not be silently weakened or removed during implementation.
   `E:\nn\Nilavaram Data` tree. The file-sync source for manual OneDrive
   synchronization is `E:\nn\Nilavaram Data\04 OneDrive Sync`; private data
   must not be placed inside either Git repository.
-- Firestore stores the Microsoft drive ID and item ID for every linked file.
+- Firestore stores only the essential Microsoft drive ID/item ID index needed
+  to locate linked files; each annual OneDrive file also contains its own
+  manifest and SHA-256 verification value.
   Accounting relationships and reports must not depend on a Windows path or
   visible OneDrive folder name.
 - Moving or renaming a OneDrive document must not change its transaction link or

@@ -1112,6 +1112,10 @@
             '<a class="secondary-button" ' +
             'href="' + escapeHtml(access.appsScriptWebApp || '#') +
             '?validateOneDrive=1">Validate live OneDrive quota</a>' +
+            '<button id="migrate-onedrive-source" class="primary-button" type="button" ' +
+            'onclick="migrateSourceDataToOneDrive()">Initialize OneDrive data storage and copy existing source records</button>' +
+            '<button class="secondary-button" type="button" ' +
+            'onclick="showOneDriveSourceStorageStatus()">Check OneDrive data-file status</button>' +
           '</div>';
       }
 
@@ -1206,6 +1210,41 @@
           showError(error);
         })
         .validateMicrosoftConnectionForUi();
+    }
+
+    function migrateSourceDataToOneDrive() {
+      const button = document.getElementById('migrate-onedrive-source');
+      if (button) button.disabled = true;
+      const output = document.getElementById('output');
+      output.insertAdjacentHTML('afterbegin',
+        '<p id="onedrive-migration-status"><b>Copying source records to annual OneDrive files and verifying hashes…</b></p>');
+      google.script.run.withSuccessHandler(function(result) {
+        if (button) button.disabled = false;
+        document.getElementById('onedrive-migration-status').innerHTML =
+          '<span class="success"><b>' + escapeHtml(result.message) + '</b></span>';
+      }).withFailureHandler(function(error) {
+        if (button) button.disabled = false;
+        document.getElementById('onedrive-migration-status').innerHTML =
+          '<span class="error"><b>OneDrive migration did not complete:</b> ' +
+          escapeHtml(error.message) + '</span>';
+      }).migrateFirestoreSourceRecordsToOneDrive();
+    }
+
+    function showOneDriveSourceStorageStatus() {
+      const output = document.getElementById('output');
+      output.insertAdjacentHTML('afterbegin',
+        '<p id="onedrive-storage-status"><b>Reading the OneDrive data-file index…</b></p>');
+      google.script.run.withSuccessHandler(function(status) {
+        document.getElementById('onedrive-storage-status').innerHTML = status.ready
+          ? '<span class="success"><b>OneDrive source storage is active.</b> ' +
+            escapeHtml(status.recordCount) + ' records in ' +
+            escapeHtml(status.fileCount) + ' verified annual file(s). Last index update: ' +
+            escapeHtml(status.updatedAt) + '.</span>'
+          : '<span class="error"><b>OneDrive source storage is not initialized.</b></span>';
+      }).withFailureHandler(function(error) {
+        document.getElementById('onedrive-storage-status').innerHTML =
+          '<span class="error">Status check failed: ' + escapeHtml(error.message) + '</span>';
+      }).getOneDriveSourceStorageStatus();
     }
 
     function connectMicrosoftOneDrive() {
