@@ -116,10 +116,6 @@ function saveSourceBatchReconciliation(input) {
   if (!input.confirmAll) {
     throw new Error('Confirm that every displayed transaction was reviewed.');
   }
-  const openingCents = centsFromSignedInput_(input.openingBalance, 'Opening balance');
-  const externalEndingCents = centsFromSignedInput_(
-    input.externalEndingBalance, 'External ending balance'
-  );
   const all = firestoreGetCollection_('sourceRecords').map(fromFirestoreDocument_);
   const byId = {};
   all.forEach(function(record) { byId[record.id] = record; });
@@ -127,6 +123,11 @@ function saveSourceBatchReconciliation(input) {
     if (!byId[id]) throw new Error('A selected source record was not found.');
     return byId[id];
   });
+  const sandboxZeroBased = records.every(function(record) {
+    return record.sourceEnvironment === 'sandbox';
+  }) && !!input.zeroBasedSandboxReview;
+  const openingCents = sandboxZeroBased ? 0 :
+    centsFromSignedInput_(input.openingBalance, 'Opening balance');
   const groupKey = [records[0].sourceProvider, records[0].sourceEnvironment,
     records[0].sourceAccountId].join('|');
   const duplicateKeys = {};
@@ -146,6 +147,8 @@ function saveSourceBatchReconciliation(input) {
     else throw new Error('A transaction has no reliable receipt/payment direction.');
   });
   const systemEndingCents = openingCents + receipts - payments;
+  const externalEndingCents = sandboxZeroBased ? systemEndingCents :
+    centsFromSignedInput_(input.externalEndingBalance, 'External ending balance');
   const differenceCents = externalEndingCents - systemEndingCents;
   if (differenceCents !== 0) {
     return {
@@ -163,6 +166,9 @@ function saveSourceBatchReconciliation(input) {
   const writes = records.map(function(record) {
     const updated = copyRecordWithoutId_(record);
     updated.reconciliationStatus = 'reconciled';
+    updated.reconciliationBasis = sandboxZeroBased
+      ? 'sandbox-zero-based-arithmetic-review'
+      : 'external-balance-comparison';
     updated.batchOpeningBalanceCents = openingCents;
     updated.batchReceiptCents = receipts;
     updated.batchPaymentCents = payments;
@@ -188,7 +194,10 @@ function saveSourceBatchReconciliation(input) {
     receiptCents: receipts,
     paymentCents: payments,
     externalEndingBalanceCents: externalEndingCents,
-    differenceCents: 0
+    differenceCents: 0,
+    reconciliationBasis: sandboxZeroBased
+      ? 'sandbox-zero-based-arithmetic-review'
+      : 'external-balance-comparison'
   });
   return {
     success: true,
@@ -197,7 +206,9 @@ function saveSourceBatchReconciliation(input) {
     systemEndingCents: systemEndingCents,
     externalEndingCents: externalEndingCents,
     differenceCents: 0,
-    message: 'Green: the batch is reviewed and reconciled. ACODE assignment remains separate.'
+    message: sandboxZeroBased
+      ? 'Green: sandbox arithmetic reviewed from a $0.00 starting balance. The displayed ending balance is calculated, not obtained from a real bank statement.'
+      : 'Green: the batch is reviewed and reconciled to the external ending balance. ACODE assignment remains separate.'
   };
 }
 

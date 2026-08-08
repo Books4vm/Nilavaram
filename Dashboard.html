@@ -2155,14 +2155,20 @@
       const group = inputGroupByEncodedKey_(encoded);
       if (!group) return;
       window.nilavaramActiveInputGroup = group;
+      const sandbox = group.environment === 'sandbox';
       const dialog = ensureTransactionModal_();
       dialog.innerHTML = '<div class="modal-shell"><div class="modal-header"><h2>Reconciliation — ' +
         escapeHtml(group.proofLabel) + '</h2><p>' + group.recordCount +
-        ' transactions. Yellow means the feed did not supply a transaction-level external balance.</p></div>' +
+        ' transactions. ' + (sandbox
+          ? 'Sandbox review starts from $0.00 and displays the calculated ending balance.'
+          : 'Yellow means the feed did not supply a transaction-level external balance.') + '</p></div>' +
         '<div class="modal-body"><div class="form-grid">' +
-          '<div><label>External opening balance</label><input id="batch-opening" type="number" step="0.01"></div>' +
-          '<div><label>External ending balance</label><input id="batch-ending" type="number" step="0.01"></div>' +
-        '</div><div id="recon-batch-summary" class="status-yellow">Enter both balances to calculate the system balance and difference.</div>' +
+          '<div><label>' + (sandbox ? 'Sandbox starting balance' : 'External opening balance') + '</label><input id="batch-opening" type="number" step="0.01" ' +
+            (sandbox ? 'value="0.00" readonly' : '') + '></div>' +
+          '<div><label>' + (sandbox ? 'Calculated sandbox ending balance' : 'External ending balance') + '</label><input id="batch-ending" type="number" step="0.01" ' +
+            (sandbox ? 'readonly' : '') + '></div>' +
+        '</div><div id="recon-batch-summary" class="status-yellow">' +
+          (sandbox ? 'Calculating from $0.00...' : 'Enter both balances to calculate the system balance and difference.') + '</div>' +
         '<div id="recon-rows">' + group.records.map(function(record, index) {
           return renderDownloadedRow_(record, null, 'reconciliation', index);
         }).join('') + '</div></div>' +
@@ -2174,6 +2180,7 @@
       document.getElementById('batch-ending').oninput = updateReconciliationPopup;
       document.getElementById('recon-confirm-all').onchange = updateReconciliationPopup;
       document.getElementById('recon-save').onclick = saveReconciliationPopup;
+      updateReconciliationPopup();
     }
 
     function updateReconciliationPopup() {
@@ -2189,13 +2196,18 @@
           return renderDownloadedRow_(record, running, 'reconciliation', index);
         }).join('');
       }
-      const difference = opening === null || ending === null ? null : ending - running;
+      const sandbox = group.environment === 'sandbox';
+      if (sandbox && running !== null && isFinite(running)) {
+        document.getElementById('batch-ending').value = (running / 100).toFixed(2);
+      }
+      const effectiveEnding = sandbox ? running : ending;
+      const difference = opening === null || effectiveEnding === null ? null : effectiveEnding - running;
       const summary = document.getElementById('recon-batch-summary');
       summary.className = difference === 0 ? 'status-green' : 'status-red';
       summary.textContent = difference === null
         ? 'Enter both balances to calculate the system balance and difference.'
         : 'System ending ' + formatCentsInput_(running) + ' | External ending ' +
-          formatCentsInput_(ending) + ' | Difference ' + formatCentsInput_(difference);
+          formatCentsInput_(effectiveEnding) + ' | Difference ' + formatCentsInput_(difference);
       document.getElementById('recon-save').disabled = !(difference === 0 &&
         document.getElementById('recon-confirm-all').checked);
     }
@@ -2218,6 +2230,7 @@
         sourceRecordIds: group.records.map(function(record) { return record.id; }),
         openingBalance: document.getElementById('batch-opening').value,
         externalEndingBalance: document.getElementById('batch-ending').value,
+        zeroBasedSandboxReview: group.environment === 'sandbox',
         confirmAll: document.getElementById('recon-confirm-all').checked
       });
     }
