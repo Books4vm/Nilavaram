@@ -8,7 +8,7 @@ const NILAVARAM_INITIAL_ADMIN_EMAILS = [
   'mangai8100@gmail.com',
   'vm8100@gmail.com'
 ];
-const NILAVARAM_NAVIGATION_VERSION = 17;
+const NILAVARAM_NAVIGATION_VERSION = 18;
 
 /**
  * Creates or refreshes the Firestore-driven navigation.
@@ -184,6 +184,32 @@ function setupNavigation_() {
       order: item.order,
       enabled: item.enabled,
       roles: item.roles
+    }));
+  });
+
+  // These records belonged to the earlier four-step Transaction Workbench.
+  // Firestore does not remove documents merely because they are no longer in
+  // the current menu definition, so explicitly retire them to prevent the old
+  // and new Input menus from being displayed together.
+  [
+    'transaction-workbench',
+    'source-input',
+    'reconciliation-validation',
+    'account-rule-review',
+    'manual-journal-entry'
+  ].forEach(function(itemId) {
+    firestoreSetDocument_('menuItems', itemId, toFirestoreFields_({
+      menuId: 'transactions',
+      parentId: 'transactions',
+      level: 2,
+      label: 'Retired Input Workflow Item',
+      description: 'Replaced by the Input main menu and its organized submenus.',
+      moduleId: '',
+      type: 'link',
+      order: 999,
+      enabled: false,
+      roles: ['admin', 'editor', 'reader', 'ltd'],
+      retiredAt: new Date()
     }));
   });
 
