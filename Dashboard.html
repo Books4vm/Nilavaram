@@ -2147,9 +2147,19 @@
     }
 
     function renderDownloadedRow_(record, runningCents, mode, index) {
+      const sandboxReconciliation = mode === 'reconciliation' &&
+        window.nilavaramActiveInputGroup &&
+        window.nilavaramActiveInputGroup.environment === 'sandbox' &&
+        runningCents !== null;
+      const calculatedExternalCents = record.externalBalanceCents == null &&
+        sandboxReconciliation ? runningCents : record.externalBalanceCents;
+      const rowDifferenceCents = runningCents == null ||
+        calculatedExternalCents == null
+        ? null : calculatedExternalCents - runningCents;
       const statusClass = mode === 'acode'
         ? ((record.accountSuggestion || {}).status === 'green-confirm' ? 'green' : 'red')
-        : (record.externalBalanceCents == null ? 'yellow' : 'green');
+        : (rowDifferenceCents === 0 ? 'green' :
+          calculatedExternalCents == null ? 'yellow' : 'red');
       const suggestion = record.accountSuggestion || {};
       let action = '<span class="status-' + statusClass + '">' +
         (statusClass === 'green' ? 'Match' : statusClass === 'yellow' ? 'Review' : 'Fix') + '</span>';
@@ -2162,6 +2172,13 @@
             '<option value="contains">Contains</option><option value="exactly">Is exactly</option></select>' +
           '<input class="batch-rule-text" data-id="' + escapeHtml(record.id) + '" value="' +
             escapeHtml(record.description || '') + '" aria-label="Rule text">';
+      } else {
+        action = (rowDifferenceCents === null
+          ? '—'
+          : formatCentsInput_(rowDifferenceCents)) + '<br>' +
+          '<span class="status-' + statusClass + '">' +
+          (statusClass === 'green' ? 'Matching' :
+            statusClass === 'yellow' ? 'Review' : 'Fix') + '</span>';
       }
       return '<div class="download-row ' + statusClass + '" data-index="' + index + '">' +
         '<div class="download-cell"><small>Transaction ID</small>' + escapeHtml(record.sourceRecordNumber) + '</div>' +
@@ -2170,8 +2187,8 @@
           '<br>' + escapeHtml(record.description) + '<br><small>External ref: ' + escapeHtml(record.externalReference || '—') + '</small></div>' +
         '<div class="download-cell"><small>Receipt</small>' + formatCentsInput_(record.receiptCents || 0) + '</div>' +
         '<div class="download-cell"><small>Payment</small>' + formatCentsInput_(record.paymentCents || 0) + '</div>' +
-        '<div class="download-cell"><small>Sys balance</small>' + (runningCents == null ? 'Enter opening balance' : formatCentsInput_(runningCents)) + '</div>' +
-        '<div class="download-cell"><small>External bal.</small>' + formatCentsInput_(record.externalBalanceCents) + '</div>' +
+        '<div class="download-cell"><small>Sys running bal.</small>' + (runningCents == null ? 'Enter opening balance' : formatCentsInput_(runningCents)) + '</div>' +
+        '<div class="download-cell"><small>External running bal.</small>' + formatCentsInput_(calculatedExternalCents) + '</div>' +
         '<div class="download-cell"><small>' + (mode === 'acode' ? 'ACODE / rule' : 'Difference / status') + '</small>' + action + '</div>' +
         '</div>';
     }
