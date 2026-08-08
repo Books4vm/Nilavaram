@@ -68,10 +68,12 @@
       }).join('');
     }
     function pageRecords() {
+      if (!group || !Array.isArray(group.records)) return [];
       const start = (page - 1) * pageSize;
       return group.records.slice(start, start + pageSize);
     }
     function captureDrafts() {
+      if (!group || !Array.isArray(group.records)) return;
       pageRecords().forEach(function(record) {
         const id = record.id;
         const select = document.querySelector('.acode[data-id="' + id + '"]');
@@ -126,7 +128,7 @@
       render();
     }
     function loadData(savedMessage) {
-      captureDrafts();
+      if (group) captureDrafts();
       document.getElementById('message').textContent = ' Loading...';
       google.script.run.withSuccessHandler(function(data) {
         workspace = data;
