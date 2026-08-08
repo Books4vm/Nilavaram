@@ -611,8 +611,7 @@
     }
 
     function loadStartup() {
-      google.script.run
-        .withSuccessHandler(function(shell) {
+      const activateShell = function(shell, recoveryMessage) {
           const data = shell.info;
           window.nilavaramDashboardInfo = data;
           renderStartupInfo(data);
@@ -641,10 +640,25 @@
             return;
           }
           buildMenu(shell.navigation || []);
-          const loading = document.getElementById('dashboard-loading');
-          if (loading) loading.textContent = 'Menu ready.';
+          if (recoveryMessage) {
+            showRestrictedOneDriveRecovery(recoveryMessage);
+          } else {
+            const loading = document.getElementById('dashboard-loading');
+            if (loading) loading.textContent = 'Menu ready.';
+          }
+      };
+      google.script.run
+        .withSuccessHandler(function(shell) { activateShell(shell, ''); })
+        .withFailureHandler(function(error) {
+          const originalMessage = error && error.message
+            ? error.message : String(error);
+          google.script.run
+            .withSuccessHandler(function(shell) {
+              activateShell(shell, originalMessage);
+            })
+            .withFailureHandler(showError)
+            .getPrimaryAdminRecoveryShell();
         })
-        .withFailureHandler(showError)
         .getDashboardShell();
     }
 
@@ -1040,6 +1054,33 @@
       );
     }
 
+    function showRestrictedOneDriveRecovery(originalMessage) {
+      const status = CONNECTIONS_BOOTSTRAP.microsoftStatus || {};
+      const output = document.getElementById('output');
+      let html = '<h2>Restricted OneDrive Recovery</h2>' +
+        '<p class="error"><b>Firestore is temporarily unavailable.</b> ' +
+        'This one-purpose screen is available only to a configured administrator.</p>' +
+        '<p>The normal menus, transactions, accounts, reports, Akoya controls and user ' +
+        'administration are disabled here.</p>' +
+        '<p><b>Primary repository:</b> ' +
+        escapeHtml(status.expectedAccount || 'vmurugan@hotmail.com') + '</p>' +
+        '<p><b>Microsoft authorization:</b> ' +
+        (status.connected ? '<span class="success">Saved</span>' :
+          '<span class="error">Not available</span>') + '</p>' +
+        '<p class="help-meta">Startup error: ' + escapeHtml(originalMessage) + '</p>';
+      if (status.connected) {
+        html += '<div class="button-row">' +
+          '<button id="migrate-onedrive-source" class="primary-button" type="button" ' +
+          'onclick="migrateSourceDataToOneDrive()">Copy and verify source data in OneDrive</button>' +
+          '<button class="secondary-button" type="button" ' +
+          'onclick="showOneDriveSourceStorageStatus()">Check recovery status</button>' +
+          '</div>' +
+          '<p>After a successful verified copy, this recovery screen disables itself. ' +
+          'The Firestore copies are retained and are not deleted.</p>';
+      }
+      output.innerHTML = html;
+    }
+
     function renderMicrosoftConnection(status) {
       const output = document.getElementById('output');
       const access = window.nilavaramAdminAccessInfo || {};
@@ -1221,7 +1262,8 @@
       google.script.run.withSuccessHandler(function(result) {
         if (button) button.disabled = false;
         document.getElementById('onedrive-migration-status').innerHTML =
-          '<span class="success"><b>' + escapeHtml(result.message) + '</b></span>';
+          '<span class="success"><b>' + escapeHtml(result.message) + '</b> ' +
+          'Recovery mode is now disabled. Refresh Nilavaram to return to normal startup.</span>';
       }).withFailureHandler(function(error) {
         if (button) button.disabled = false;
         document.getElementById('onedrive-migration-status').innerHTML =

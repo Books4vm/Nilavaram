@@ -154,6 +154,51 @@ function getDashboardShell() {
   };
 }
 
+/**
+ * Narrow emergency shell used only when Firestore is unavailable. It is
+ * limited to the configured initial Admins and exposes only the OneDrive
+ * evacuation/verification controls without weakening normal team access.
+ */
+function getPrimaryAdminRecoveryShell() {
+  const email = getCurrentEmail_();
+  if (NILAVARAM_INITIAL_ADMIN_EMAILS.map(normalizeEmail_).indexOf(email) === -1) {
+    throw new Error('The recovery screen is restricted to a configured Admin.');
+  }
+  if (isOneDriveSourceBackendReady_()) {
+    throw new Error(
+      'OneDrive source storage is already active. Recovery mode is disabled.'
+    );
+  }
+  return {
+    info: {
+      applicationName: 'Nilavaram',
+      version: '1.0',
+      project: 'nn',
+      user: email,
+      role: 'admin — storage recovery',
+      accessStatus: 'active',
+      dateTime: new Date().toLocaleString(),
+      status: 'Firestore unavailable — OneDrive recovery mode'
+    },
+    navigation: [{
+      id: 'system-recovery',
+      label: 'System Recovery',
+      description: 'Restricted storage recovery controls.',
+      type: 'group',
+      moduleId: '',
+      children: [{
+        id: 'connections-recovery',
+        label: 'OneDrive recovery',
+        description: 'Copies source records to verified OneDrive files.',
+        moduleId: 'onedrive-recovery',
+        type: 'link',
+        level: 2,
+        children: []
+      }]
+    }]
+  };
+}
+
 
 /**
  * Temporary response until the module is implemented.

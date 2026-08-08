@@ -11,8 +11,8 @@ const NILAVARAM_ONEDRIVE_READY_PROPERTY = 'ONEDRIVE_SOURCE_BACKEND_READY';
 
 function requirePrimaryAdminForOneDriveStorage_() {
   const email = getCurrentEmail_();
-  if (email !== NILAVARAM_PRIMARY_ADMIN_EMAIL) {
-    throw new Error('Primary Admin permission is required for storage migration.');
+  if (NILAVARAM_INITIAL_ADMIN_EMAILS.map(normalizeEmail_).indexOf(email) === -1) {
+    throw new Error('Configured Admin permission is required for storage migration.');
   }
   return {email: email, role: 'admin'};
 }
