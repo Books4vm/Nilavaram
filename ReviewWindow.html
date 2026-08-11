@@ -329,6 +329,39 @@
         document.getElementById('rows').innerHTML = '<p class="error">' + esc(error.message) + '</p>';
       }).getInputWorkspace();
     }
+    function refreshAcodeList(savedMessage) {
+      if (!workspace || !group) {
+        loadData(savedMessage || 'ACODE list refreshed.');
+        return;
+      }
+      captureDrafts();
+      document.getElementById('message').textContent =
+        ' Refreshing active ACODEs directly from the Chart of Accounts…';
+      google.script.run.withSuccessHandler(function(setup) {
+        workspace.accounts = setup.accounts || [];
+        workspace.entities = setup.entities || workspace.entities || [];
+        pageRecords().forEach(function(record) {
+          drafts[record.id] = drafts[record.id] || {};
+          drafts[record.id].category = 'all';
+          drafts[record.id].owner = 'all';
+        });
+        if (pendingNewAccountRowId && pendingNewAccountCode) {
+          drafts[pendingNewAccountRowId] = drafts[pendingNewAccountRowId] || {};
+          drafts[pendingNewAccountRowId].counterAccountCode = pendingNewAccountCode;
+          dirty[pendingNewAccountRowId] = true;
+          pendingNewAccountRowId = '';
+          pendingNewAccountCode = '';
+        }
+        render();
+        document.getElementById('message').innerHTML =
+          '<span class="success">' + esc(savedMessage || 'ACODE list refreshed.') +
+          ' ' + esc(workspace.accounts.length) +
+          ' active entry ACODE(s) loaded. Filters reset to All.</span>';
+      }).withFailureHandler(function(error) {
+        document.getElementById('message').innerHTML =
+          '<span class="error">ACODE refresh failed: ' + esc(error.message) + '</span>';
+      }).getSimpleTransactionSetup();
+    }
     function save(completeSet) {
       captureDrafts();
       const recordsToSave = completeSet ? pageRecords() : group.records.filter(function(record) {
@@ -378,11 +411,13 @@
     }
     document.getElementById('save-progress').onclick = function() { save(false); };
     document.getElementById('complete').onclick = function() { save(true); };
-    document.getElementById('refresh').onclick = function() { loadData('ACODE list refreshed.'); };
+    document.getElementById('refresh').onclick = function() {
+      refreshAcodeList('ACODE list refreshed.');
+    };
     window.addEventListener('message', function(event) {
       if (!event.data || event.data.type !== 'nilavaram-account-saved') return;
       pendingNewAccountCode = String(event.data.code || '');
-      loadData('New ACODE added and selected for this row.');
+      refreshAcodeList('New ACODE added and selected for this row.');
     });
     loadData('');
   </script>
