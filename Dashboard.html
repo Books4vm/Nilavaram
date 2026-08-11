@@ -1836,7 +1836,13 @@
           '</form>';
       }
 
-      output.innerHTML += '<div id="accounts-list"></div>';
+      output.innerHTML +=
+        '<div class="button-row">' +
+          '<label><input id="show-hidden-accounts" type="checkbox"> ' +
+          'Show hidden accounts</label>' +
+        '</div>' +
+        '<div id="account-deletion-review"></div>' +
+        '<div id="accounts-list"></div>';
       if (data.canEdit) {
         document.getElementById('account-form').onsubmit = saveAccountForm;
         document.getElementById('account-cancel').onclick = clearAccountForm;
@@ -1847,6 +1853,9 @@
           suggestAccountDetails();
         };
       }
+      document.getElementById('show-hidden-accounts').onchange = function() {
+        renderAccountsTable(window.nilavaramChartData);
+      };
       try {
         renderAccountsTable(data);
       } catch (error) {
@@ -1868,21 +1877,106 @@
       if (data.canEdit) html += '<th></th>';
       html += '</tr></thead><tbody>';
 
+      const showHidden = Boolean(document.getElementById('show-hidden-accounts') &&
+        document.getElementById('show-hidden-accounts').checked);
+      let displayed = 0;
       data.accounts.forEach(function(account, index) {
+        if (account.isHidden && !showHidden) return;
+        displayed += 1;
         html += '<tr><td>' + escapeHtml(account.code) + '</td>' +
-          '<td>' + escapeHtml(account.name) + '</td>' +
+          '<td>' + escapeHtml(account.name) +
+          (account.isHidden ? ' <span class="help-meta">(hidden)</span>' : '') + '</td>' +
           '<td>' + escapeHtml(entityNames[account.entityId] || account.entityId) + '</td>' +
           '<td><b>' + escapeHtml(account.displayMark) + '</b></td>' +
           '<td>' + escapeHtml(account.parentCode || '') + '</td>' +
           '<td>' + escapeHtml(account.displayExplanation) + '</td>';
         if (data.canEdit) {
-          html += '<td><button type="button" onclick="editChartAccount(' +
-            index + ')">Edit</button></td>';
+          html += '<td><div class="button-row">' +
+            '<button type="button" onclick="editChartAccount(' + index + ')">Edit</button>' +
+            '<button type="button" onclick="changeChartAccountVisibility(' + index + ', ' +
+              (account.isHidden ? 'true' : 'false') + ')">' +
+              (account.isHidden ? 'Restore' : 'Hide') + '</button>' +
+            '<button type="button" onclick="reviewChartAccountDeletion(' + index +
+              ')">Review deletion</button></div></td>';
         }
         html += '</tr>';
       });
       html += '</tbody></table>';
+      if (!displayed) {
+        html = '<p>No accounts match the current visibility selection.</p>';
+      }
       document.getElementById('accounts-list').innerHTML = html;
+    }
+
+    function changeChartAccountVisibility(index, makeVisible) {
+      const account = window.nilavaramChartData.accounts[index];
+      if (!account) return;
+      const message = makeVisible
+        ? 'Restore ' + account.code + ' for future account selection?'
+        : 'Hide ' + account.code + '? Historical references will remain, but it will not be available for new entries.';
+      if (!window.confirm(message)) return;
+      document.getElementById('account-deletion-review').innerHTML = '<p>Updating visibility…</p>';
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('account-deletion-review').innerHTML =
+          '<p class="success">' + escapeHtml(result.message) + '</p>';
+        showChartOfAccounts();
+      }).withFailureHandler(function(error) {
+        document.getElementById('account-deletion-review').innerHTML =
+          '<p class="error">' + escapeHtml(error.message) + '</p>';
+      }).setChartAccountVisibility(account.id, makeVisible);
+    }
+
+    function reviewChartAccountDeletion(index) {
+      const account = window.nilavaramChartData.accounts[index];
+      if (!account) return;
+      const target = document.getElementById('account-deletion-review');
+      target.innerHTML = '<p>Checking every reference to ' + escapeHtml(account.code) + '…</p>';
+      google.script.run.withSuccessHandler(renderChartAccountDeletionReview)
+        .withFailureHandler(function(error) {
+          target.innerHTML = '<p class="error">' + escapeHtml(error.message) + '</p>';
+        }).getChartAccountDeletionReview(account.id);
+    }
+
+    function renderChartAccountDeletionReview(review) {
+      const target = document.getElementById('account-deletion-review');
+      let html = '<article class="alert-item"><h3>Deletion review — ' +
+        escapeHtml(review.account.code) + ' · ' + escapeHtml(review.account.name) + '</h3>';
+      if (review.canDelete) {
+        html += '<p class="success"><b>No references were found.</b> This account may be deleted.</p>' +
+          '<button class="primary-button" type="button" onclick="deleteReviewedChartAccount(\'' +
+          escapeHtml(review.account.id) + '\', \'' + escapeHtml(review.account.code) +
+          '\')">Permanently delete unused account</button>';
+      } else {
+        html += '<p class="error"><b>Deletion blocked:</b> ' +
+          escapeHtml(review.referenceCount) +
+          ' reference(s) must be reassigned first.</p>' +
+          '<table><thead><tr><th>Where used</th><th>Date</th><th>Description</th>' +
+          '<th>Status</th><th>ID</th></tr></thead><tbody>' +
+          (review.references || []).map(function(item) {
+            return '<tr><td>' + escapeHtml(item.collection) + '</td><td>' +
+              escapeHtml(item.date) + '</td><td>' + escapeHtml(item.description) +
+              '</td><td>' + escapeHtml(item.status) + '</td><td><code>' +
+              escapeHtml(item.id) + '</code></td></tr>';
+          }).join('') + '</tbody></table>' +
+          (review.referencesTruncated
+            ? '<p class="error">Only the first 200 references are displayed.</p>' : '');
+      }
+      target.innerHTML = html + '</article>';
+      target.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
+
+    function deleteReviewedChartAccount(accountId, accountCode) {
+      if (!window.confirm(
+        'Permanently delete unused account ' + accountCode +
+        '? This action removes it from the Chart of Accounts. An audit-history copy will remain.'
+      )) return;
+      google.script.run.withSuccessHandler(function(result) {
+        window.alert(result.message);
+        showChartOfAccounts();
+      }).withFailureHandler(function(error) {
+        document.getElementById('account-deletion-review').innerHTML =
+          '<p class="error">' + escapeHtml(error.message) + '</p>';
+      }).deleteUnusedChartAccount(accountId);
     }
 
     function editChartAccount(index) {

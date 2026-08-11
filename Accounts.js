@@ -704,20 +704,20 @@ function suggestChartAccount(input) {
 function getChartOfAccountsData() {
   const user = requireCurrentUser_();
   ensureAccountingFoundation_();
-  const activeAccounts = firestoreGetCollection_('accounts')
+  const accounts = firestoreGetCollection_('accounts')
     .map(fromFirestoreDocument_)
-    .filter(function(account) { return account.status === 'active'; })
     .sort(function(a, b) {
       return String(a.exportCode || a.code)
         .localeCompare(String(b.exportCode || b.code));
     });
-  activeAccounts.forEach(function(account) {
+  accounts.forEach(function(account) {
     const classification = getAccountClassification_(
       account,
-      activeAccounts
+      accounts
     );
     account.displayMark = classification.mark;
     account.displayExplanation = classification.explanation;
+    account.isHidden = account.status === 'inactive';
   });
 
   return {
@@ -729,8 +729,119 @@ function getChartOfAccountsData() {
       .map(fromFirestoreDocument_)
       .filter(function(entity) { return entity.status === 'active'; })
       .sort(function(a, b) { return a.name.localeCompare(b.name); }),
-    accounts: activeAccounts
+    accounts: accounts
   };
+}
+
+function setChartAccountVisibility(accountId, visible) {
+  const admin = requireAdmin_();
+  const account = getDocumentOrNull_('accounts', String(accountId || ''));
+  if (!account) throw new Error('The account was not found.');
+  const nextStatus = visible ? 'active' : 'inactive';
+  firestoreSetDocument_('accountHistory', Utilities.getUuid(), toFirestoreFields_({
+    accountId: account.id,
+    previousRecord: account,
+    changeType: visible ? 'restored' : 'hidden',
+    changedBy: admin.email,
+    changedAt: new Date()
+  }));
+  const updated = {};
+  Object.keys(account).forEach(function(key) {
+    if (key !== 'id') updated[key] = account[key];
+  });
+  updated.status = nextStatus;
+  updated.updatedAt = new Date();
+  updated.updatedBy = admin.email;
+  firestoreSetDocument_('accounts', account.id, toFirestoreFields_(updated));
+  writeAudit_(visible ? 'chart-account-restored' : 'chart-account-hidden',
+    admin.email, {accountId: account.id, code: account.code});
+  return {success: true, message: visible ? 'Account restored.' : 'Account hidden.'};
+}
+
+function accountReferenceMatches_(record, account) {
+  const code = String(account.code || '');
+  const id = String(account.id || '');
+  return [
+    record.accountId,
+    record.accountCode,
+    record.debitAccountId,
+    record.creditAccountId,
+    record.debitAccountCode,
+    record.creditAccountCode,
+    record.counterAccountCode,
+    record.bankAccountCode,
+    record.suggestedDebitAccountCode,
+    record.suggestedCreditAccountCode
+  ].some(function(value) {
+    const text = String(value || '');
+    return text && (text === id || text === code);
+  });
+}
+
+function summarizeAccountReference_(collection, record) {
+  return {
+    collection: collection,
+    id: String(record.id || record.transactionId || record.sourceRecordId || ''),
+    date: String(record.transactionDate || record.date || record.createdAt || ''),
+    description: String(record.description || record.payee || record.name ||
+      record.matchText || record.ruleName || ''),
+    status: String(record.postingStatus || record.accountApprovalStatus ||
+      record.status || '')
+  };
+}
+
+function getChartAccountDeletionReview(accountId) {
+  requireAdmin_();
+  const account = getDocumentOrNull_('accounts', String(accountId || ''));
+  if (!account) throw new Error('The account was not found.');
+  const references = [];
+  const inspect = function(collection, records, matcher) {
+    (records || []).forEach(function(record) {
+      if ((matcher || accountReferenceMatches_)(record, account)) {
+        references.push(summarizeAccountReference_(collection, record));
+      }
+    });
+  };
+  inspect('Child account', firestoreGetCollection_('accounts').map(fromFirestoreDocument_),
+    function(record) { return String(record.parentCode || '') === String(account.code || ''); });
+  inspect('Transaction', firestoreGetCollection_('transactions').map(fromFirestoreDocument_));
+  inspect('Journal line', firestoreGetCollection_('journalLines').map(fromFirestoreDocument_));
+  inspect('ACODE rule', firestoreGetCollection_('transactionRules').map(fromFirestoreDocument_));
+  inspect('Source input', getSourceRecords_());
+  return {
+    account: {id: account.id, code: account.code, name: account.name,
+      status: account.status},
+    canDelete: references.length === 0,
+    referenceCount: references.length,
+    references: references.slice(0, 200),
+    referencesTruncated: references.length > 200
+  };
+}
+
+function deleteUnusedChartAccount(accountId) {
+  const admin = requireAdmin_();
+  const review = getChartAccountDeletionReview(accountId);
+  if (!review.canDelete) {
+    throw new Error(
+      'Account ' + review.account.code + ' has ' + review.referenceCount +
+      ' reference(s). Reassign them before deletion.'
+    );
+  }
+  const previous = getDocumentOrNull_('accounts', review.account.id);
+  firestoreSetDocument_('accountHistory', Utilities.getUuid(), toFirestoreFields_({
+    accountId: previous.id,
+    previousRecord: previous,
+    changeType: 'deleted-unused-account',
+    changedBy: admin.email,
+    changedAt: new Date()
+  }));
+  firestoreDeleteDocument_('accounts', previous.id);
+  writeAudit_('unused-chart-account-deleted', admin.email, {
+    accountId: previous.id,
+    code: previous.code,
+    name: previous.name
+  });
+  return {success: true, message: 'Unused account ' + previous.code + ' was deleted.'};
 }
 
 function saveChartAccount(input) {
