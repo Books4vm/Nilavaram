@@ -158,10 +158,28 @@ function uploadOneDriveJson_(parentId, fileName, value) {
 }
 
 function downloadOneDriveJson_(itemId) {
-  const response = microsoftGraphRequestRaw_(
-    '/me/drive/items/' + encodeURIComponent(itemId) + '/content',
-    'get', undefined, 'application/json'
+  // Graph /content redirects to a short-lived, preauthenticated OneDrive URL.
+  // Do not forward the Graph bearer token to that separate download host.
+  const metadata = microsoftGraphJsonRequest_(
+    '/me/drive/items/' + encodeURIComponent(itemId) +
+      '?$select=id,name,@microsoft.graph.downloadUrl',
+    'get'
   );
+  const downloadUrl = String(metadata['@microsoft.graph.downloadUrl'] || '');
+  if (!downloadUrl) {
+    throw new Error('Microsoft Graph did not provide a OneDrive download URL.');
+  }
+  const response = UrlFetchApp.fetch(downloadUrl, {
+    method: 'get',
+    muteHttpExceptions: true,
+    followRedirects: true
+  });
+  const status = response.getResponseCode();
+  if (status < 200 || status >= 300) {
+    throw new Error(
+      'OneDrive verification download failed (HTTP ' + status + ').'
+    );
+  }
   const text = response.getContentText();
   const value = JSON.parse(text);
   return {value: value, content: text, sha256: oneDriveSha256_(text)};
