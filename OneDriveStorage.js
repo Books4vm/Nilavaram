@@ -159,26 +159,42 @@ function uploadOneDriveJson_(parentId, fileName, value) {
 
 function downloadOneDriveJson_(itemId) {
   // Graph /content redirects to a short-lived, preauthenticated OneDrive URL.
-  // Do not forward the Graph bearer token to that separate download host.
-  const metadata = microsoftGraphJsonRequest_(
-    '/me/drive/items/' + encodeURIComponent(itemId) +
-      '?$select=id,name,@microsoft.graph.downloadUrl',
-    'get'
-  );
-  const downloadUrl = String(metadata['@microsoft.graph.downloadUrl'] || '');
-  if (!downloadUrl) {
-    throw new Error('Microsoft Graph did not provide a OneDrive download URL.');
+  // Capture that redirect, then fetch it without forwarding the bearer token.
+  const graphUrl = 'https://graph.microsoft.com/v1.0/me/drive/items/' +
+    encodeURIComponent(itemId) + '/content';
+  const fetchGraphContent = function(token) {
+    return UrlFetchApp.fetch(graphUrl, {
+      method: 'get',
+      headers: {Authorization: 'Bearer ' + token},
+      muteHttpExceptions: true,
+      followRedirects: false
+    });
+  };
+  let response = fetchGraphContent(getMicrosoftAccessToken_());
+  if (response.getResponseCode() === 401) {
+    clearMicrosoftAccessToken_();
+    response = fetchGraphContent(getMicrosoftAccessToken_(true));
   }
-  const response = UrlFetchApp.fetch(downloadUrl, {
-    method: 'get',
-    muteHttpExceptions: true,
-    followRedirects: true
-  });
-  const status = response.getResponseCode();
+  let status = response.getResponseCode();
+  if (status >= 300 && status < 400) {
+    const headers = response.getAllHeaders();
+    const downloadUrl = String(headers.Location || headers.location || '');
+    if (!downloadUrl) {
+      throw new Error('Microsoft Graph content redirect did not include a download URL.');
+    }
+    response = UrlFetchApp.fetch(downloadUrl, {
+      method: 'get',
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+    status = response.getResponseCode();
+  }
   if (status < 200 || status >= 300) {
-    throw new Error(
+    const error = new Error(
       'OneDrive verification download failed (HTTP ' + status + ').'
     );
+    error.httpStatus = status;
+    throw error;
   }
   const text = response.getContentText();
   const value = JSON.parse(text);
