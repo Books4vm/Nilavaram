@@ -50,7 +50,12 @@ function microsoftGraphRequestRaw_(path, method, payload, contentType) {
       const parsed = JSON.parse(message);
       message = parsed.error && parsed.error.message || message;
     } catch (ignore) {}
-    const error = new Error('Microsoft Graph storage request failed: ' + message);
+    const safePath = String(path || '').split('?')[0];
+    const error = new Error(
+      'Microsoft Graph storage request failed during ' +
+      String(method || 'get').toUpperCase() + ' ' + safePath +
+      ' (HTTP ' + status + '): ' + message
+    );
     error.httpStatus = status;
     throw error;
   }
