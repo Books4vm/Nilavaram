@@ -48,6 +48,7 @@
   </footer>
   <script>
     const GROUP_KEY = <?!= groupKeyJson ?>;
+    const APPS_SCRIPT_WEB_APP = <?!= appsScriptWebAppJson ?>;
     let workspace = null;
     let group = null;
     let page = 1;
@@ -233,7 +234,7 @@
       pendingNewAccountRowId = id;
       const category = document.querySelector('.row-category[data-id="' + id + '"]');
       const owner = document.querySelector('.row-owner[data-id="' + id + '"]');
-      const url = window.location.href.split('?')[0] + '?accountWindow=new&owner=' +
+      const url = APPS_SCRIPT_WEB_APP + '?accountWindow=new&owner=' +
         encodeURIComponent(owner ? owner.value : 'all') + '&category=' +
         encodeURIComponent(category ? category.value : 'member-payment');
       const popup = window.open(url, 'NilavaramAddAcode',

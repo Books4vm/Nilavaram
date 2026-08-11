@@ -98,6 +98,9 @@ function doGet(e) {
     reviewTemplate.groupKeyJson = JSON.stringify(
       String(parameters.groupKey || '')
     ).replace(/</g, '\\u003c');
+    reviewTemplate.appsScriptWebAppJson = JSON.stringify(
+      buildStorageAccessInfo_().appsScriptWebApp
+    ).replace(/</g, '\\u003c');
     return reviewTemplate.evaluate().setTitle('Nilavaram ACODE Assignment');
   }
   if (parameters.startAkoya === '1') {
