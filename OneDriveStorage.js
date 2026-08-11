@@ -170,30 +170,52 @@ function downloadOneDriveJson_(itemId) {
       followRedirects: false
     });
   };
-  let response = fetchGraphContent(getMicrosoftAccessToken_());
-  if (response.getResponseCode() === 401) {
-    clearMicrosoftAccessToken_();
-    response = fetchGraphContent(getMicrosoftAccessToken_(true));
-  }
-  let status = response.getResponseCode();
-  if (status >= 300 && status < 400) {
+  let response;
+  let status = 0;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    response = fetchGraphContent(getMicrosoftAccessToken_());
+    if (response.getResponseCode() === 401) {
+      clearMicrosoftAccessToken_();
+      response = fetchGraphContent(getMicrosoftAccessToken_(true));
+    }
+    status = response.getResponseCode();
+    if (status >= 200 && status < 300) break;
+    if (status < 300 || status >= 400) {
+      const graphError = new Error(
+        'Microsoft Graph could not prepare the OneDrive file (HTTP ' + status + ').'
+      );
+      graphError.httpStatus = status;
+      throw graphError;
+    }
     const headers = response.getAllHeaders();
     const downloadUrl = String(headers.Location || headers.location || '');
     if (!downloadUrl) {
-      throw new Error('Microsoft Graph content redirect did not include a download URL.');
+      throw new Error(
+        'Microsoft Graph content redirect did not include a download URL.'
+      );
     }
-    response = UrlFetchApp.fetch(downloadUrl, {
-      method: 'get',
-      muteHttpExceptions: true,
-      followRedirects: true
-    });
-    status = response.getResponseCode();
+    try {
+      response = UrlFetchApp.fetch(downloadUrl, {
+        method: 'get',
+        muteHttpExceptions: true,
+        followRedirects: true
+      });
+      status = response.getResponseCode();
+      if (status >= 200 && status < 300) break;
+    } catch (downloadError) {
+      status = 0;
+      // Never expose Microsoft's temporary preauthenticated URL in an error.
+    }
+    if (attempt < 2) Utilities.sleep(250 * (attempt + 1));
   }
   if (status < 200 || status >= 300) {
     const error = new Error(
-      'OneDrive verification download failed (HTTP ' + status + ').'
+      'OneDrive temporarily could not provide the requested data file after ' +
+      'three safe attempts. Please try again.' +
+      (status ? ' (HTTP ' + status + ')' : '')
     );
     error.httpStatus = status;
+    error.retryable = true;
     throw error;
   }
   const text = response.getContentText();
