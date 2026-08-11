@@ -937,6 +937,13 @@ function saveChartAccount(input) {
     updatedAt: new Date(),
     updatedBy: admin.email
   };
+  if (/^7[MASR]\d{3}$/.test(code)) {
+    savedAccount.categoryFamily =
+      /(employment|paycheck|deposit|income|receipt)/i.test(name)
+        ? 'member-receipt' : 'member-use';
+  } else if (previous && previous.categoryFamily) {
+    savedAccount.categoryFamily = previous.categoryFamily;
+  }
   const classification = getAccountClassification_(
     savedAccount,
     accounts.concat([savedAccount])

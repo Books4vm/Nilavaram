@@ -73,6 +73,7 @@
       if (account.categoryFamily === 'member-receipt') return 'member-receipt';
       if (/^7[MASR]/.test(code) &&
           /(employment|paycheck|deposit|income|receipt)/.test(name)) return 'member-receipt';
+      if (/^7[MASR]\d{3}$/.test(code)) return 'member-payment';
       if (account.accountType === 'asset') return 'asset';
       if (account.accountType === 'liability') return 'liability';
       if (account.accountType === 'clearing') return 'clearing';
