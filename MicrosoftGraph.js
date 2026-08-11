@@ -137,7 +137,7 @@ function storeMicrosoftTokens_(tokens) {
   properties.setProperties(values);
 }
 
-function getMicrosoftAccessToken_() {
+function getMicrosoftAccessToken_(forceRefresh) {
   const properties = PropertiesService.getScriptProperties();
   const accessToken = String(
     properties.getProperty('MICROSOFT_ACCESS_TOKEN') || ''
@@ -145,7 +145,9 @@ function getMicrosoftAccessToken_() {
   const expiresAt = Number(
     properties.getProperty('MICROSOFT_ACCESS_TOKEN_EXPIRES_AT') || 0
   );
-  if (accessToken && expiresAt > Date.now() + 120000) return accessToken;
+  if (!forceRefresh && accessToken && expiresAt > Date.now() + 120000) {
+    return accessToken;
+  }
 
   const refreshToken = String(
     properties.getProperty('MICROSOFT_REFRESH_TOKEN') || ''
@@ -167,17 +169,27 @@ function getMicrosoftAccessToken_() {
   return String(tokens.access_token);
 }
 
+function clearMicrosoftAccessToken_() {
+  const properties = PropertiesService.getScriptProperties();
+  properties.deleteProperty('MICROSOFT_ACCESS_TOKEN');
+  properties.deleteProperty('MICROSOFT_ACCESS_TOKEN_EXPIRES_AT');
+}
+
 function microsoftGraphGet_(path) {
-  const response = UrlFetchApp.fetch(
-    'https://graph.microsoft.com/v1.0' + path,
-    {
+  const url = 'https://graph.microsoft.com/v1.0' + path;
+  let response = UrlFetchApp.fetch(url, {
+    method: 'get',
+    headers: {Authorization: 'Bearer ' + getMicrosoftAccessToken_()},
+    muteHttpExceptions: true
+  });
+  if (response.getResponseCode() === 401) {
+    clearMicrosoftAccessToken_();
+    response = UrlFetchApp.fetch(url, {
       method: 'get',
-      headers: {
-        Authorization: 'Bearer ' + getMicrosoftAccessToken_()
-      },
+      headers: {Authorization: 'Bearer ' + getMicrosoftAccessToken_(true)},
       muteHttpExceptions: true
-    }
-  );
+    });
+  }
   return parseMicrosoftResponse_(response, 'Microsoft Graph');
 }
 

@@ -18,20 +18,31 @@ function requirePrimaryAdminForOneDriveStorage_() {
 }
 
 function microsoftGraphRequestRaw_(path, method, payload, contentType) {
-  const options = {
-    method: method || 'get',
-    headers: {Authorization: 'Bearer ' + getMicrosoftAccessToken_()},
-    muteHttpExceptions: true,
-    followRedirects: true
+  const buildOptions = function(token) {
+    const options = {
+      method: method || 'get',
+      headers: {Authorization: 'Bearer ' + token},
+      muteHttpExceptions: true,
+      followRedirects: true
+    };
+    if (payload !== undefined) {
+      options.contentType = contentType || 'application/json';
+      options.payload = payload;
+    }
+    return options;
   };
-  if (payload !== undefined) {
-    options.contentType = contentType || 'application/json';
-    options.payload = payload;
-  }
-  const response = UrlFetchApp.fetch(
-    'https://graph.microsoft.com/v1.0' + path,
-    options
+  const url = 'https://graph.microsoft.com/v1.0' + path;
+  let response = UrlFetchApp.fetch(
+    url,
+    buildOptions(getMicrosoftAccessToken_())
   );
+  if (response.getResponseCode() === 401) {
+    clearMicrosoftAccessToken_();
+    response = UrlFetchApp.fetch(
+      url,
+      buildOptions(getMicrosoftAccessToken_(true))
+    );
+  }
   const status = response.getResponseCode();
   if (status < 200 || status >= 300) {
     let message = response.getContentText();
