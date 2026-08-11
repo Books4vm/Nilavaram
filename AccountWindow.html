@@ -33,7 +33,7 @@
         <div><label for="parent">Parent ACODE</label><input id="parent" maxlength="5"></div>
       </div>
       <label for="notes">Notes (optional)</label><textarea id="notes"></textarea>
-      <div class="buttons"><button class="primary" type="submit">Save and use this ACODE</button><button type="button" onclick="window.close()">Cancel</button></div>
+      <div class="buttons"><button id="save" class="primary" type="submit">Save and verify this ACODE</button><button id="use-close" type="button" style="display:none">Use ACODE and close</button><button type="button" onclick="window.close()">Cancel</button></div>
       <p id="message" role="status"></p>
     </form>
   </main>
@@ -48,24 +48,40 @@
         if(INITIAL_CATEGORY==='member-receipt') document.getElementById('purpose').value='paycheck';
       }).withFailureHandler(fail).getChartOfAccountsData();
     }
-    function fail(error){document.getElementById('message').innerHTML='<span class="error">'+esc(error.message)+'</span>';}
+    function fail(error){document.getElementById('save').disabled=false;document.getElementById('message').innerHTML='<span class="error">'+esc(error.message)+'</span>';}
     function suggestionInput(){return {entityId:document.getElementById('entity').value,purpose:document.getElementById('purpose').value,name:document.getElementById('name').value,lastFour:'',nearCode:document.getElementById('near').value};}
     function persist(){
       const input={id:'',entityId:document.getElementById('entity').value,code:document.getElementById('code').value,name:document.getElementById('name').value,accountType:document.getElementById('type').value,parentCode:document.getElementById('parent').value,status:'active',notes:document.getElementById('notes').value};
       google.script.run.withSuccessHandler(function(result){
-        document.getElementById('message').innerHTML='<span class="success">'+esc(result.message)+'</span>';
-        if(window.opener&&!window.opener.closed) window.opener.postMessage({type:'nilavaram-account-saved',code:input.code},'*');
-        window.setTimeout(function(){window.close();},500);
+        document.getElementById('message').textContent='Saved. Verifying that the ACODE is available for transaction entry…';
+        google.script.run.withSuccessHandler(function(setup){
+          const verified=(setup.accounts||[]).some(function(account){return account.code===input.code;});
+          if(!verified){
+            document.getElementById('message').innerHTML='<span class="error">The account was saved but is not eligible for transaction selection. Check that it is Active, is an Entry account, and has no child accounts.</span>';
+            document.getElementById('save').disabled=false;
+            return;
+          }
+          document.getElementById('message').innerHTML='<span class="success"><b>Saved and verified:</b> '+esc(input.code)+' — '+esc(input.name)+'. It is available in ACODE dropdowns.</span>';
+          document.getElementById('save').disabled=true;
+          const closeButton=document.getElementById('use-close');
+          closeButton.style.display='';
+          const notify=function(){if(window.opener&&!window.opener.closed) window.opener.postMessage({type:'nilavaram-account-saved',code:input.code,name:input.name},'*');};
+          notify();
+          closeButton.onclick=function(){notify();window.close();};
+        }).withFailureHandler(function(error){
+          document.getElementById('message').innerHTML='<span class="error">Saved, but verification failed: '+esc(error.message)+'. Keep this window open and try again.</span>';
+          document.getElementById('save').disabled=false;
+        }).getSimpleTransactionSetup();
       }).withFailureHandler(fail).saveChartAccount(input);
     }
     document.getElementById('form').onsubmit=function(event){
-      event.preventDefault();document.getElementById('message').textContent='Preparing and saving…';
+      event.preventDefault();document.getElementById('save').disabled=true;document.getElementById('message').textContent='Preparing and saving…';
       if(document.getElementById('code').value){persist();return;}
       google.script.run.withSuccessHandler(function(s){
         const choice=(s.choices||[s])[0];document.getElementById('code').value=choice.code;
         document.getElementById('name').value=choice.name;document.getElementById('type').value=choice.accountType;
         document.getElementById('parent').value=choice.parentCode;persist();
-      }).withFailureHandler(fail).suggestChartAccount(suggestionInput());
+      }).withFailureHandler(function(error){document.getElementById('save').disabled=false;fail(error);}).suggestChartAccount(suggestionInput());
     };
     load();
   </script>
