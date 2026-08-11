@@ -622,7 +622,10 @@ function suggestChartAccount(input) {
       throw new Error('No unused member-use suffix remains in the Chart of Accounts.');
     }
 
-    const memberName = memberLetter + ' — ' + name;
+    // Accept either "Internet" or a user-entered "R — Internet" without
+    // duplicating the member prefix in the saved account name.
+    const plainMemberName = name.replace(/^[MASR]\s*[—-]\s*/i, '').trim();
+    const memberName = memberLetter + ' — ' + plainMemberName;
     const choices = suffixChoices.map(function(suffix) {
       const visibleCode = '7' + memberLetter + suffix;
       return {

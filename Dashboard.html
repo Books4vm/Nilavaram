@@ -1793,20 +1793,22 @@
                   '<option value="other">Something else</option>' +
                 '</select></div>' +
               '<div><label for="account-name">Plain account name</label>' +
-                '<input id="account-name" required></div>' +
+                '<input id="account-name" required placeholder="Example: Internet"></div>' +
               '<div><label for="account-last-four">Last four digits, if applicable</label>' +
                 '<input id="account-last-four" inputmode="numeric" maxlength="4"></div>' +
               '<div><label for="account-near-code">Place near ACODE, if desired</label>' +
-                '<input id="account-near-code" maxlength="5" placeholder="Example: 7R020"></div>' +
+                '<input id="account-near-code" maxlength="5" placeholder="Example: 7R020">' +
+                '<span class="help-meta">Optional. Nilavaram will choose the next unused ACODE.</span></div>' +
             '</div>' +
             '<button class="secondary-button" id="account-suggest" type="button" ' +
               'onclick="suggestAccountDetails(); return false;">' +
               'Suggest accounting details</button>' +
             '<p id="account-suggestion" class="help-meta" role="status" aria-live="polite"></p>' +
-            '<details id="account-advanced"><summary>Review accounting details</summary>' +
+            '<details id="account-advanced" open><summary>Accounting details — filled automatically; you may change them</summary>' +
             '<div class="form-grid">' +
-              '<div><label for="account-code">Five-character code</label>' +
-                '<input id="account-code" maxlength="5" required></div>' +
+              '<div><label for="account-code">ACODE</label>' +
+                '<input id="account-code" maxlength="5" placeholder="Prepared when you suggest or save">' +
+                '<span class="help-meta">Required. If blank, Save account will prepare it for you.</span></div>' +
               '<div><label for="account-type">Account type</label>' +
                 '<select id="account-type">' +
                   '<option value="group">Group / heading</option>' +
@@ -2075,6 +2077,41 @@
 
     function saveAccountForm(event) {
       event.preventDefault();
+      const name = document.getElementById('account-name').value.trim();
+      if (!name) {
+        document.getElementById('account-message').innerHTML =
+          ' <span class="error">Enter the plain account name.</span>';
+        document.getElementById('account-name').focus();
+        return;
+      }
+      if (!document.getElementById('account-code').value.trim()) {
+        document.getElementById('account-message').textContent =
+          ' Preparing the missing ACODE and accounting details…';
+        google.script.run.withSuccessHandler(function(suggestion) {
+          window.nilavaramAccountSuggestions = suggestion.choices || [suggestion];
+          applyAccountSuggestion(0);
+          document.getElementById('account-suggestion').innerHTML =
+            '<span class="success"><b>Prepared:</b> ' +
+            escapeHtml(document.getElementById('account-code').value) + ' — ' +
+            escapeHtml(document.getElementById('account-name').value) + '</span>';
+          persistAccountForm();
+        }).withFailureHandler(function(error) {
+          document.getElementById('account-message').innerHTML =
+            ' <span class="error">Please correct this: ' +
+            escapeHtml(error.message) + '</span>';
+        }).suggestChartAccount({
+          entityId: document.getElementById('account-entity').value,
+          purpose: document.getElementById('account-purpose').value,
+          name: name,
+          lastFour: document.getElementById('account-last-four').value,
+          nearCode: document.getElementById('account-near-code').value
+        });
+        return;
+      }
+      persistAccountForm();
+    }
+
+    function persistAccountForm() {
       const input = {
         id: document.getElementById('account-id').value,
         entityId: document.getElementById('account-entity').value,
