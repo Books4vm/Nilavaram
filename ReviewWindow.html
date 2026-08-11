@@ -55,6 +55,8 @@
     const drafts = {};
     const dirty = {};
     let copiedAcode = '';
+    let pendingNewAccountRowId = '';
+    let pendingNewAccountCode = '';
 
     function esc(value) {
       return String(value == null ? '' : value)
@@ -91,6 +93,7 @@
     }
     function accountOptions(selected, category, owner) {
       return '<option value="">Choose ACODE</option>' +
+        '<option value="__ADD_NEW__">＋ ADD NEW ACODE</option>' +
         filteredAccounts(selected, category, owner).map(function(account) {
         return '<option value="' + esc(account.code) + '" ' +
           (account.code === selected ? 'selected' : '') + '>' +
@@ -190,6 +193,11 @@
       });
       document.querySelectorAll('.acode').forEach(function(select) {
         select.onchange = function() {
+          if (this.value === '__ADD_NEW__') {
+            openNewAcodeWindow(this.dataset.id);
+            this.value = '';
+            return;
+          }
           dirty[this.dataset.id] = true;
           captureDrafts();
           applyRuleImmediately(this.dataset.id);
@@ -219,6 +227,21 @@
           document.getElementById('message').innerHTML = '<span class="success">This row is marked for partial saving.</span>';
         };
       });
+    }
+    function openNewAcodeWindow(id) {
+      captureDrafts();
+      pendingNewAccountRowId = id;
+      const category = document.querySelector('.row-category[data-id="' + id + '"]');
+      const owner = document.querySelector('.row-owner[data-id="' + id + '"]');
+      const url = window.location.href.split('?')[0] + '?accountWindow=new&owner=' +
+        encodeURIComponent(owner ? owner.value : 'all') + '&category=' +
+        encodeURIComponent(category ? category.value : 'member-payment');
+      const popup = window.open(url, 'NilavaramAddAcode',
+        'popup=yes,width=1000,height=760,resizable=yes,scrollbars=yes');
+      if (!popup) {
+        document.getElementById('message').innerHTML =
+          '<span class="error">Allow pop-ups for Nilavaram, then choose ADD NEW again.</span>';
+      }
     }
     function updateRowChoices(id) {
       const category = document.querySelector('.row-category[data-id="' + id + '"]');
@@ -291,6 +314,13 @@
           document.getElementById('rows').innerHTML = '<p class="error">Complete reconciliation before assigning ACODEs.</p>';
           return;
         }
+        if (pendingNewAccountRowId && pendingNewAccountCode) {
+          drafts[pendingNewAccountRowId] = drafts[pendingNewAccountRowId] || {};
+          drafts[pendingNewAccountRowId].counterAccountCode = pendingNewAccountCode;
+          dirty[pendingNewAccountRowId] = true;
+          pendingNewAccountRowId = '';
+          pendingNewAccountCode = '';
+        }
         render();
         document.getElementById('message').innerHTML = savedMessage
           ? '<span class="success">' + esc(savedMessage) + '</span>' : '';
@@ -348,6 +378,11 @@
     document.getElementById('save-progress').onclick = function() { save(false); };
     document.getElementById('complete').onclick = function() { save(true); };
     document.getElementById('refresh').onclick = function() { loadData('ACODE list refreshed.'); };
+    window.addEventListener('message', function(event) {
+      if (!event.data || event.data.type !== 'nilavaram-account-saved') return;
+      pendingNewAccountCode = String(event.data.code || '');
+      loadData('New ACODE added and selected for this row.');
+    });
     loadData('');
   </script>
 </body>

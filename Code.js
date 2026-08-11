@@ -28,6 +28,12 @@ function include(filename) {
  */
 function doGet(e) {
   const parameters = e && e.parameter || {};
+  if (parameters.accountWindow === 'new') {
+    const accountTemplate = HtmlService.createTemplateFromFile('AccountWindow');
+    accountTemplate.ownerJson = JSON.stringify(String(parameters.owner || 'all'));
+    accountTemplate.categoryJson = JSON.stringify(String(parameters.category || 'member-payment'));
+    return accountTemplate.evaluate().setTitle('Nilavaram — Add New ACODE');
+  }
   if (parameters.reconnectOneDrive === '1') {
     try {
       const request = getMicrosoftRecoveryAuthorizationUrl_();

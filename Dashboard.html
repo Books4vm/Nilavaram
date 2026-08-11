@@ -878,7 +878,15 @@
         return;
       }
       if (moduleId === 'chart-of-accounts') {
-        showChartOfAccounts();
+        showChartOfAccounts('list');
+        return;
+      }
+      if (moduleId === 'account-add-new') {
+        showChartOfAccounts('add');
+        return;
+      }
+      if (moduleId === 'account-batch-edit') {
+        showChartOfAccounts('batch');
         return;
       }
       if ([
@@ -1725,7 +1733,8 @@
       loadUsers();
     }
 
-    function showChartOfAccounts() {
+    function showChartOfAccounts(mode) {
+      window.nilavaramChartMode = mode || 'list';
       document.getElementById('output').textContent =
         'Loading Chart of Accounts...';
       google.script.run
@@ -1859,7 +1868,17 @@
         renderAccountsTable(window.nilavaramChartData);
       };
       try {
-        renderAccountsTable(data);
+        if (window.nilavaramChartMode === 'batch') {
+          renderAccountsBatchEdit(data);
+          document.getElementById('account-form').style.display = 'none';
+        } else {
+          renderAccountsTable(data);
+          if (window.nilavaramChartMode === 'list') {
+            document.getElementById('account-form').style.display = 'none';
+          } else {
+            document.getElementById('account-name').focus();
+          }
+        }
       } catch (error) {
         document.getElementById('accounts-list').innerHTML =
           '<p class="error">The account list could not be displayed, but the ' +
@@ -1893,13 +1912,8 @@
           '<td>' + escapeHtml(account.parentCode || '') + '</td>' +
           '<td>' + escapeHtml(account.displayExplanation) + '</td>';
         if (data.canEdit) {
-          html += '<td><div class="button-row">' +
-            '<button type="button" onclick="editChartAccount(' + index + ')">Edit</button>' +
-            '<button type="button" onclick="changeChartAccountVisibility(' + index + ', ' +
-              (account.isHidden ? 'true' : 'false') + ')">' +
-              (account.isHidden ? 'Restore' : 'Hide') + '</button>' +
-            '<button type="button" onclick="reviewChartAccountDeletion(' + index +
-              ')">Review deletion</button></div></td>';
+          html += '<td><button type="button" onclick="editChartAccount(' +
+            index + ')">Edit</button></td>';
         }
         html += '</tr>';
       });
@@ -1908,6 +1922,41 @@
         html = '<p>No accounts match the current visibility selection.</p>';
       }
       document.getElementById('accounts-list').innerHTML = html;
+    }
+
+    function renderAccountsBatchEdit(data) {
+      let html = '<h3>Batch Edit</h3>' +
+        '<p>Select accounts, then hide or restore them together. This never deletes history.</p>' +
+        '<div class="button-row"><button type="button" onclick="saveAccountBatchVisibility(false)">Hide selected</button>' +
+        '<button type="button" onclick="saveAccountBatchVisibility(true)">Restore selected</button>' +
+        '<span id="account-batch-message"></span></div>' +
+        '<table><thead><tr><th>Select</th><th>ACODE</th><th>Account</th><th>Status</th></tr></thead><tbody>';
+      data.accounts.forEach(function(account) {
+        html += '<tr><td><input class="account-batch-check" type="checkbox" value="' +
+          escapeHtml(account.id) + '"></td><td>' + escapeHtml(account.code) +
+          '</td><td>' + escapeHtml(account.name) + '</td><td>' +
+          (account.isHidden ? 'Hidden' : 'Active') + '</td></tr>';
+      });
+      document.getElementById('accounts-list').innerHTML = html + '</tbody></table>';
+    }
+
+    function saveAccountBatchVisibility(makeVisible) {
+      const ids = Array.prototype.map.call(
+        document.querySelectorAll('.account-batch-check:checked'),
+        function(box) { return box.value; }
+      );
+      const message = document.getElementById('account-batch-message');
+      if (!ids.length) {
+        message.innerHTML = '<span class="error"> Select at least one account.</span>';
+        return;
+      }
+      message.textContent = ' Updating…';
+      google.script.run.withSuccessHandler(function(result) {
+        message.innerHTML = '<span class="success"> ' + escapeHtml(result.message) + '</span>';
+        showChartOfAccounts('batch');
+      }).withFailureHandler(function(error) {
+        message.innerHTML = '<span class="error"> ' + escapeHtml(error.message) + '</span>';
+      }).setChartAccountsVisibilityBatch(ids, makeVisible);
     }
 
     function changeChartAccountVisibility(index, makeVisible) {
@@ -1993,6 +2042,19 @@
       document.getElementById('account-status').value = account.status || 'active';
       document.getElementById('account-notes').value = account.notes || '';
       document.getElementById('account-advanced').open = true;
+      document.getElementById('account-form').style.display = '';
+      let actions = document.getElementById('account-edit-actions');
+      if (!actions) {
+        actions = document.createElement('div');
+        actions.id = 'account-edit-actions';
+        actions.className = 'button-row';
+        document.getElementById('account-form').appendChild(actions);
+      }
+      actions.innerHTML = '<button type="button" onclick="changeChartAccountVisibility(' +
+        index + ', ' + (account.isHidden ? 'true' : 'false') + ')">' +
+        (account.isHidden ? 'Restore account' : 'Hide account') + '</button>' +
+        '<button type="button" onclick="reviewChartAccountDeletion(' + index +
+        ')">Review / delete account</button>';
       document.getElementById('account-code').focus();
     }
 

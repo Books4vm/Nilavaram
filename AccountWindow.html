@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    *{box-sizing:border-box} body{font:16px system-ui,"Segoe UI",sans-serif;margin:0;background:#eef8ff;color:#111}
+    header,main{padding:18px} header{background:#fff;border-bottom:1px solid #8abbd2}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:14px}
+    label{display:block;font-weight:700;margin-bottom:5px} input,select,textarea,button{font:inherit;padding:9px;width:100%}
+    textarea{min-height:85px}.buttons{display:flex;gap:10px;margin-top:16px}.buttons button{width:auto}
+    .primary{background:#075985;color:#fff;border:1px solid #075985}.error{color:#a40000;font-weight:700}.success{color:#075f2c;font-weight:700}
+    @media(max-width:700px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header><h1>Add New ACODE</h1><p>Create the account without leaving ACODE assignment.</p></header>
+  <main>
+    <form id="form">
+      <div class="grid">
+        <div><label for="entity">Owner / organization</label><select id="entity"></select></div>
+        <div><label for="purpose">Account category</label><select id="purpose">
+          <option value="expense">Payment — member use/payments</option>
+          <option value="paycheck">Receipt — member income/deposits</option>
+          <option value="bank">Bank account / asset</option><option value="credit-card">Credit card</option>
+          <option value="loan">Loan</option><option value="property">Property</option>
+          <option value="investment">Investment</option><option value="equity">Net worth / equity</option>
+          <option value="other">Other / clearing</option></select></div>
+        <div><label for="name">Plain account name</label><input id="name" required placeholder="Example: Internet"></div>
+        <div><label for="near">Place near ACODE (optional)</label><input id="near" maxlength="5" placeholder="Example: 7R020"></div>
+        <div><label for="code">ACODE (prepared automatically)</label><input id="code" maxlength="5"></div>
+        <div><label for="type">Account type</label><select id="type"><option value="net-worth">Member net worth</option><option value="asset">Asset</option><option value="liability">Liability</option><option value="income">Income</option><option value="expense">Expense</option><option value="clearing">Clearing</option></select></div>
+        <div><label for="parent">Parent ACODE</label><input id="parent" maxlength="5"></div>
+      </div>
+      <label for="notes">Notes (optional)</label><textarea id="notes"></textarea>
+      <div class="buttons"><button class="primary" type="submit">Save and use this ACODE</button><button type="button" onclick="window.close()">Cancel</button></div>
+      <p id="message" role="status"></p>
+    </form>
+  </main>
+  <script>
+    const INITIAL_OWNER = <?!= ownerJson ?>;
+    const INITIAL_CATEGORY = <?!= categoryJson ?>;
+    function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    function load(){
+      google.script.run.withSuccessHandler(function(data){
+        document.getElementById('entity').innerHTML=(data.entities||[]).map(function(e){return '<option value="'+esc(e.id)+'">'+esc(e.name)+'</option>';}).join('');
+        if(INITIAL_OWNER && INITIAL_OWNER!=='all') document.getElementById('entity').value=INITIAL_OWNER;
+        if(INITIAL_CATEGORY==='member-receipt') document.getElementById('purpose').value='paycheck';
+      }).withFailureHandler(fail).getChartOfAccountsData();
+    }
+    function fail(error){document.getElementById('message').innerHTML='<span class="error">'+esc(error.message)+'</span>';}
+    function suggestionInput(){return {entityId:document.getElementById('entity').value,purpose:document.getElementById('purpose').value,name:document.getElementById('name').value,lastFour:'',nearCode:document.getElementById('near').value};}
+    function persist(){
+      const input={id:'',entityId:document.getElementById('entity').value,code:document.getElementById('code').value,name:document.getElementById('name').value,accountType:document.getElementById('type').value,parentCode:document.getElementById('parent').value,status:'active',notes:document.getElementById('notes').value};
+      google.script.run.withSuccessHandler(function(result){
+        document.getElementById('message').innerHTML='<span class="success">'+esc(result.message)+'</span>';
+        if(window.opener&&!window.opener.closed) window.opener.postMessage({type:'nilavaram-account-saved',code:input.code},'*');
+        window.setTimeout(function(){window.close();},500);
+      }).withFailureHandler(fail).saveChartAccount(input);
+    }
+    document.getElementById('form').onsubmit=function(event){
+      event.preventDefault();document.getElementById('message').textContent='Preparing and saving…';
+      if(document.getElementById('code').value){persist();return;}
+      google.script.run.withSuccessHandler(function(s){
+        const choice=(s.choices||[s])[0];document.getElementById('code').value=choice.code;
+        document.getElementById('name').value=choice.name;document.getElementById('type').value=choice.accountType;
+        document.getElementById('parent').value=choice.parentCode;persist();
+      }).withFailureHandler(fail).suggestChartAccount(suggestionInput());
+    };
+    load();
+  </script>
+</body>
+</html>

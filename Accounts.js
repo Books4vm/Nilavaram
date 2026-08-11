@@ -761,6 +761,22 @@ function setChartAccountVisibility(accountId, visible) {
   return {success: true, message: visible ? 'Account restored.' : 'Account hidden.'};
 }
 
+function setChartAccountsVisibilityBatch(accountIds, visible) {
+  requireAdmin_();
+  const ids = (accountIds || []).map(String).filter(Boolean);
+  if (!ids.length) throw new Error('Select at least one account.');
+  if (ids.length > 100) throw new Error('A batch may contain no more than 100 accounts.');
+  const results = ids.map(function(id) {
+    return setChartAccountVisibility(id, Boolean(visible));
+  });
+  return {
+    success: true,
+    count: results.length,
+    message: results.length + ' account(s) were ' +
+      (visible ? 'restored.' : 'hidden.')
+  };
+}
+
 function accountReferenceMatches_(record, account) {
   const code = String(account.code || '');
   const id = String(account.id || '');

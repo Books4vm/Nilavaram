@@ -8,7 +8,7 @@ const NILAVARAM_INITIAL_ADMIN_EMAILS = [
   'mangai8100@gmail.com',
   'vm8100@gmail.com'
 ];
-const NILAVARAM_NAVIGATION_VERSION = 18;
+const NILAVARAM_NAVIGATION_VERSION = 19;
 
 /**
  * Creates or refreshes the Firestore-driven navigation.
@@ -50,7 +50,10 @@ function setupNavigation_() {
     { id: 'journal-decisions', menuId: 'private-journal', parentId: 'private-journal', level: 2, label: 'Decisions', description: 'Records private decisions with reasons and version history.', moduleId: 'journal-decisions', order: 10, enabled: true, roles: ['admin'] },
     { id: 'strategy-reviews', menuId: 'private-journal', parentId: 'private-journal', level: 2, label: 'Strategy Reviews', description: 'Reviews and updates private strategies over time.', moduleId: 'strategy-reviews', order: 20, enabled: true, roles: ['admin'] },
     { id: 'journal-follow-ups', menuId: 'private-journal', parentId: 'private-journal', level: 2, label: 'Follow-up Dates', description: 'Tracks dates for reconsidering private decisions.', moduleId: 'journal-follow-ups', order: 30, enabled: true, roles: ['admin'] },
-    { id: 'chart-of-accounts', menuId: 'accounting', parentId: 'accounting', level: 2, label: 'Chart of Accounts', description: 'Views and maintains the five-character Firestore Chart of Accounts.', moduleId: 'chart-of-accounts', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'chart-of-accounts', menuId: 'accounting', parentId: 'accounting', level: 2, label: 'Chart of Accounts', description: 'Adds, views and batch-maintains ACODEs.', moduleId: '', type: 'group', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'account-add-new', menuId: 'accounting', parentId: 'chart-of-accounts', level: 3, label: 'Add New', description: 'Creates one new ACODE using a simple guided form.', moduleId: 'account-add-new', order: 10, enabled: true, roles: ['admin', 'editor'] },
+    { id: 'account-chart-list', menuId: 'accounting', parentId: 'chart-of-accounts', level: 3, label: 'Chart of Accounts', description: 'Displays the account list and opens individual Edit controls.', moduleId: 'chart-of-accounts', order: 20, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'account-batch-edit', menuId: 'accounting', parentId: 'chart-of-accounts', level: 3, label: 'Batch Edit', description: 'Hides or restores multiple selected accounts together.', moduleId: 'account-batch-edit', order: 30, enabled: true, roles: ['admin'] },
     { id: 'input-main', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Main Menu', description: 'Opens the complete transaction-input workspace.', moduleId: 'input-main', order: 5, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'input-receipt', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Receipt', description: 'Records a manual receipt with supporting evidence.', moduleId: 'input-receipt', order: 10, enabled: true, roles: ['admin', 'editor'] },
     { id: 'input-payment', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Payment', description: 'Records a manual payment with supporting evidence.', moduleId: 'input-payment', order: 20, enabled: true, roles: ['admin', 'editor'] },
