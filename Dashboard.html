@@ -1848,6 +1848,10 @@
       }
 
       output.innerHTML +=
+        '<div id="chart-account-search-panel"><label for="chart-account-search"><b>Search Chart of Accounts</b></label>' +
+          '<input id="chart-account-search" type="search" ' +
+          'placeholder="Type a few letters from the account name or ACODE">' +
+          '<p id="chart-account-search-count" class="help-meta"></p></div>' +
         '<div class="button-row">' +
           '<label><input id="show-hidden-accounts" type="checkbox"> ' +
           'Show hidden accounts</label>' +
@@ -1867,10 +1871,14 @@
       document.getElementById('show-hidden-accounts').onchange = function() {
         renderAccountsTable(window.nilavaramChartData);
       };
+      document.getElementById('chart-account-search').oninput = function() {
+        renderAccountsTable(window.nilavaramChartData);
+      };
       try {
         if (window.nilavaramChartMode === 'batch') {
           renderAccountsBatchEdit(data);
           document.getElementById('account-form').style.display = 'none';
+          document.getElementById('chart-account-search-panel').style.display = 'none';
         } else {
           renderAccountsTable(data);
           if (window.nilavaramChartMode === 'list') {
@@ -1900,9 +1908,15 @@
 
       const showHidden = Boolean(document.getElementById('show-hidden-accounts') &&
         document.getElementById('show-hidden-accounts').checked);
+      const query = String(document.getElementById('chart-account-search') &&
+        document.getElementById('chart-account-search').value || '')
+        .trim().toLowerCase();
       let displayed = 0;
       data.accounts.forEach(function(account, index) {
         if (account.isHidden && !showHidden) return;
+        if (query &&
+            String(account.code || '').toLowerCase().indexOf(query) === -1 &&
+            String(account.name || '').toLowerCase().indexOf(query) === -1) return;
         displayed += 1;
         html += '<tr><td>' + escapeHtml(account.code) + '</td>' +
           '<td>' + escapeHtml(account.name) +
@@ -1922,6 +1936,8 @@
         html = '<p>No accounts match the current visibility selection.</p>';
       }
       document.getElementById('accounts-list').innerHTML = html;
+      const count = document.getElementById('chart-account-search-count');
+      if (count) count.textContent = displayed + ' matching account(s).';
     }
 
     function renderAccountsBatchEdit(data) {
