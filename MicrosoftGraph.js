@@ -63,6 +63,22 @@ function buildQueryString_(values) {
  */
 function getMicrosoftAuthorizationUrl() {
   const admin = requireAdmin_();
+  return createMicrosoftAuthorizationRequest_(admin.email, 'select_account');
+}
+
+/**
+ * Recovery-only reconnect. This avoids a Firestore user read while remaining
+ * restricted to the configured initial administrators.
+ */
+function getMicrosoftRecoveryAuthorizationUrl_() {
+  const email = getCurrentEmail_();
+  if (NILAVARAM_INITIAL_ADMIN_EMAILS.map(normalizeEmail_).indexOf(email) === -1) {
+    throw new Error('The OneDrive reconnect is restricted to a configured Admin.');
+  }
+  return createMicrosoftAuthorizationRequest_(email, 'consent');
+}
+
+function createMicrosoftAuthorizationRequest_(adminEmail, prompt) {
   const config = getMicrosoftConfig_();
   const missing = getMissingMicrosoftConfig_(config);
   if (missing.length) {
@@ -76,7 +92,7 @@ function getMicrosoftAuthorizationUrl() {
   PropertiesService.getScriptProperties().setProperties({
     MICROSOFT_PENDING_STATE: state,
     MICROSOFT_PENDING_STATE_CREATED_AT: String(Date.now()),
-    MICROSOFT_PENDING_STATE_STARTED_BY: admin.email
+    MICROSOFT_PENDING_STATE_STARTED_BY: adminEmail
   });
 
   return {
@@ -88,7 +104,7 @@ function getMicrosoftAuthorizationUrl() {
         response_mode: 'query',
         scope: NILAVARAM_MICROSOFT_SCOPES,
         state: state,
-        prompt: 'select_account'
+        prompt: prompt || 'select_account'
       }),
     expectedAccount: NILAVARAM_MICROSOFT_ACCOUNT
   };

@@ -28,6 +28,28 @@ function include(filename) {
  */
 function doGet(e) {
   const parameters = e && e.parameter || {};
+  if (parameters.reconnectOneDrive === '1') {
+    try {
+      const request = getMicrosoftRecoveryAuthorizationUrl_();
+      return HtmlService.createHtmlOutput(
+        '<!doctype html><html><head><base target="_top">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>Reconnect OneDrive</title></head><body>' +
+        '<h1>Reconnect OneDrive</h1>' +
+        '<p>Microsoft must issue fresh authorization for the Nilavaram ' +
+        'repository account.</p>' +
+        '<p><b>Expected account:</b> ' +
+        escapeHtmlServer_(request.expectedAccount) + '</p>' +
+        '<p><a href="' + escapeHtmlServer_(request.authorizationUrl) +
+        '" target="_top">Continue to Microsoft sign-in</a></p>' +
+        '<p>Sign in only as the expected Microsoft account. Do not share its ' +
+        'password, code or token in Nilavaram or this chat.</p>' +
+        '</body></html>'
+      ).setTitle('Reconnect OneDrive');
+    } catch (error) {
+      return buildAuthorizationErrorPage_('Reconnect OneDrive', error);
+    }
+  }
   if (parameters.migrateOneDriveSource === '1') {
     try {
       const result = migrateFirestoreSourceRecordsToOneDrive();
@@ -50,8 +72,14 @@ function doGet(e) {
         '<title>OneDrive Recovery Status</title></head><body>' +
         '<h1>OneDrive recovery did not complete</h1>' +
         '<p><b>' + escapeHtmlServer_(error && error.message || error) + '</b></p>' +
-        '<p>No Firestore records were deleted. If the message says quota exceeded, ' +
-        'wait for the Firestore daily quota to reset and use this link again.</p>' +
+        '<p>No Firestore records were deleted.</p>' +
+        (String(error && error.message || error).indexOf('Unauthenticated') !== -1
+          ? '<p><a href="' + escapeHtmlServer_(
+              buildStorageAccessInfo_().appsScriptWebApp
+            ) + '?reconnectOneDrive=1" target="_top">Reconnect OneDrive</a>, ' +
+            'then run the recovery again.</p>'
+          : '<p>If the message says quota exceeded, wait for the Firestore daily ' +
+            'quota to reset and use this link again.</p>') +
         '<p><a href="' + escapeHtmlServer_(
           buildStorageAccessInfo_().appsScriptWebApp
         ) + '" target="_top">Return to Nilavaram</a></p>' +
