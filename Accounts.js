@@ -863,6 +863,81 @@ function deleteUnusedChartAccount(accountId) {
   return {success: true, message: 'Unused account ' + previous.code + ' was deleted.'};
 }
 
+function reviewAndDeleteUnusedChartAccountsBatch(accountIds) {
+  const admin = requireAdmin_();
+  const ids = (accountIds || []).map(String).filter(Boolean);
+  if (!ids.length) throw new Error('Select at least one account.');
+  if (ids.length > 100) throw new Error('A batch may contain no more than 100 accounts.');
+
+  // Load each source once so a batch review does not repeatedly read OneDrive
+  // or Firestore for every selected account.
+  const accounts = firestoreGetCollection_('accounts').map(fromFirestoreDocument_);
+  const transactions = firestoreGetCollection_('transactions').map(fromFirestoreDocument_);
+  const journalLines = firestoreGetCollection_('journalLines').map(fromFirestoreDocument_);
+  const rules = firestoreGetCollection_('transactionRules').map(fromFirestoreDocument_);
+  const sourceRecords = getSourceRecords_();
+  const accountById = {};
+  accounts.forEach(function(account) { accountById[account.id] = account; });
+  const deleted = [];
+  const blocked = [];
+
+  ids.forEach(function(id) {
+    const account = accountById[id];
+    if (!account) {
+      blocked.push({id: id, code: '', name: '', referenceCount: 0,
+        reason: 'Account was not found. Refresh Batch Edit.'});
+      return;
+    }
+    const references = [];
+    const inspect = function(collection, records, matcher) {
+      records.forEach(function(record) {
+        if ((matcher || accountReferenceMatches_)(record, account)) {
+          references.push(summarizeAccountReference_(collection, record));
+        }
+      });
+    };
+    inspect('Child account', accounts, function(record) {
+      return record.id !== account.id &&
+        String(record.parentCode || '') === String(account.code || '');
+    });
+    inspect('Transaction', transactions);
+    inspect('Journal line', journalLines);
+    inspect('ACODE rule', rules);
+    inspect('Source input', sourceRecords);
+    if (references.length) {
+      blocked.push({
+        id: account.id,
+        code: account.code,
+        name: account.name,
+        referenceCount: references.length,
+        reason: 'Reassign the listed references before deletion.',
+        references: references.slice(0, 25),
+        referencesTruncated: references.length > 25
+      });
+      return;
+    }
+    firestoreSetDocument_('accountHistory', Utilities.getUuid(), toFirestoreFields_({
+      accountId: account.id,
+      previousRecord: account,
+      changeType: 'batch-deleted-unused-account',
+      changedBy: admin.email,
+      changedAt: new Date()
+    }));
+    firestoreDeleteDocument_('accounts', account.id);
+    writeAudit_('unused-chart-account-batch-deleted', admin.email, {
+      accountId: account.id, code: account.code, name: account.name
+    });
+    deleted.push({id: account.id, code: account.code, name: account.name});
+  });
+  return {
+    success: true,
+    deleted: deleted,
+    blocked: blocked,
+    message: deleted.length + ' unused account(s) deleted; ' +
+      blocked.length + ' protected account(s) retained.'
+  };
+}
+
 function saveChartAccount(input) {
   const admin = requireAdmin_();
   const id = String(input && input.id || '').trim();

@@ -1942,10 +1942,12 @@
 
     function renderAccountsBatchEdit(data) {
       let html = '<h3>Batch Edit</h3>' +
-        '<p>Select accounts, then hide or restore them together. This never deletes history.</p>' +
+        '<p>Select accounts to hide, restore, or clean up. Deletion is allowed only when no transactions, journal lines, source inputs, rules or child accounts use the ACODE.</p>' +
         '<div class="button-row"><button type="button" onclick="saveAccountBatchVisibility(false)">Hide selected</button>' +
         '<button type="button" onclick="saveAccountBatchVisibility(true)">Restore selected</button>' +
+        '<button type="button" onclick="reviewDeleteAccountBatch()">Review / delete selected</button>' +
         '<span id="account-batch-message"></span></div>' +
+        '<div id="account-batch-results"></div>' +
         '<table><thead><tr><th>Select</th><th>ACODE</th><th>Account</th><th>Status</th></tr></thead><tbody>';
       data.accounts.forEach(function(account) {
         html += '<tr><td><input class="account-batch-check" type="checkbox" value="' +
@@ -1973,6 +1975,69 @@
       }).withFailureHandler(function(error) {
         message.innerHTML = '<span class="error"> ' + escapeHtml(error.message) + '</span>';
       }).setChartAccountsVisibilityBatch(ids, makeVisible);
+    }
+
+    function selectedBatchAccountIds() {
+      return Array.prototype.map.call(
+        document.querySelectorAll('.account-batch-check:checked'),
+        function(box) { return box.value; }
+      );
+    }
+
+    function reviewDeleteAccountBatch() {
+      const ids = selectedBatchAccountIds();
+      const message = document.getElementById('account-batch-message');
+      const results = document.getElementById('account-batch-results');
+      if (!ids.length) {
+        message.innerHTML = '<span class="error"> Select at least one account.</span>';
+        return;
+      }
+      if (!window.confirm(
+        'Review ' + ids.length + ' selected account(s) and permanently delete only those with no references? Protected accounts will be retained.'
+      )) return;
+      message.textContent = ' Reviewing references and deleting only unused accounts…';
+      results.innerHTML = '';
+      google.script.run.withSuccessHandler(function(result) {
+        message.innerHTML = '<span class="success"> ' + escapeHtml(result.message) + '</span>';
+        let html = '';
+        if ((result.deleted || []).length) {
+          html += '<article class="alert-item"><h3>Deleted unused accounts</h3><ul>' +
+            result.deleted.map(function(account) {
+              return '<li>' + escapeHtml(account.code + ' — ' + account.name) + '</li>';
+            }).join('') + '</ul></article>';
+        }
+        if ((result.blocked || []).length) {
+          html += '<article class="alert-item"><h3 class="error">Protected — action required</h3>' +
+            '<p class="error"><b>These accounts were not deleted.</b> Reassign their references, then run Review / delete selected again.</p>' +
+            result.blocked.map(function(account) {
+              return '<section><p class="error"><b>' +
+                escapeHtml(account.code + ' — ' + account.name) + '</b>: ' +
+                escapeHtml(account.referenceCount) + ' reference(s). ' +
+                escapeHtml(account.reason) + '</p>' +
+                ((account.references || []).length
+                  ? '<ul>' + account.references.map(function(ref) {
+                      return '<li>' + escapeHtml(ref.collection + ': ' +
+                        (ref.date || '') + ' ' + (ref.description || ref.id)) + '</li>';
+                    }).join('') + '</ul>' : '') +
+                (account.referencesTruncated
+                  ? '<p class="error">Only the first 25 references are shown.</p>' : '') +
+                '</section>';
+            }).join('') +
+            '<div class="button-row"><button type="button" onclick="showChartOfAccounts(\'batch\')">Continue Batch Edit</button>' +
+            '<button type="button" onclick="showInputWorkspace(\'input-main\')">Go to Input / ACODE work</button></div></article>';
+        }
+        results.innerHTML = html || '<p>No accounts were changed.</p>';
+        document.querySelectorAll('.account-batch-check:checked').forEach(function(box) {
+          if ((result.deleted || []).some(function(item) { return item.id === box.value; })) {
+            box.closest('tr').remove();
+          } else {
+            box.checked = false;
+          }
+        });
+        results.scrollIntoView({behavior: 'smooth', block: 'start'});
+      }).withFailureHandler(function(error) {
+        message.innerHTML = '<span class="error"> ' + escapeHtml(error.message) + '</span>';
+      }).reviewAndDeleteUnusedChartAccountsBatch(ids);
     }
 
     function changeChartAccountVisibility(index, makeVisible) {
