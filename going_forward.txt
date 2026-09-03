@@ -1,0 +1,13 @@
+going forward. Recommended rhythm:
+   (checklist open during development and 
+    check off each item as you finish each small coding step.)
+
+Define the task
+Review the relevant project rules
+Edit in VS Code
+Push with Clasp
+Test in Apps Script /dev
+Save relevant metadata in Firestore if needed
+Store files in OneDrive
+Commit and push to GitHub
+Update the checklist and proceed to the next step

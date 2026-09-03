@@ -46,6 +46,35 @@ function requireAdmin_() {
   return user;
 }
 
+function defaultPrivateRecord_(record, ownerEmail) {
+  const normalizedOwner = normalizeEmail_(ownerEmail || record && record.ownerEmail || '');
+  const safeRecord = Object.assign({}, record || {});
+  safeRecord.visibility = safeRecord.visibility || 'private';
+  safeRecord.ownerEmail = normalizedOwner || safeRecord.ownerEmail || NILAVARAM_PRIMARY_ADMIN_EMAIL;
+  safeRecord.allowedUsers = Array.isArray(safeRecord.allowedUsers)
+    ? safeRecord.allowedUsers.map(normalizeEmail_)
+    : [];
+  safeRecord.updatedAt = safeRecord.updatedAt || new Date();
+  if (!safeRecord.createdBy) {
+    safeRecord.createdBy = normalizeEmail_(Session.getActiveUser().getEmail()) || NILAVARAM_PRIMARY_ADMIN_EMAIL;
+  }
+  return safeRecord;
+}
+
+function canAccessPrivateRecord_(record, email) {
+  const userEmail = normalizeEmail_(email);
+  if (!record || !record.visibility || record.visibility !== 'private') {
+    return true;
+  }
+  if (normalizeEmail_(record.ownerEmail) === userEmail) {
+    return true;
+  }
+  if ((record.allowedUsers || []).map(normalizeEmail_).indexOf(userEmail) !== -1) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Lists users for the Admin Users page.
  *

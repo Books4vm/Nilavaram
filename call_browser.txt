@@ -1,0 +1,4 @@
+open_browser_page({
+  url: "https://script.google.com/macros/s/AKfycbxMMqgLL6xmJp__dI4vDHj0zZ_6ZyZsb_-KsspdNU99WXW1ZJrRzJTaVObTJ8C2s-3Q/exec",
+  forceNew: true
+})

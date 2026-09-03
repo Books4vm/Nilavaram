@@ -127,6 +127,69 @@ function ensureOneDriveFolderPath_(segments) {
   return parentId;
 }
 
+function listOneDriveFolderChildren_(segments) {
+  const path = oneDrivePathAddress_(segments);
+  const folder = microsoftGraphTryGet_(
+    '/me/drive/root:/' + path + '?$select=id,name,webUrl'
+  );
+  if (!folder || !folder.id) return [];
+  const response = microsoftGraphJsonRequest_(
+    '/me/drive/items/' + encodeURIComponent(folder.id) + '/children?$select=id,name,webUrl,createdDateTime,lastModifiedDateTime,size,file,folder',
+    'get'
+  );
+  return response.value || [];
+}
+
+function getOneDriveBackupFiles() {
+  requireAdmin_();
+  const folderSets = [
+    ['Nilavaram', 'Backups'],
+    ['Nilavaram', 'Backups', 'Older']
+  ];
+  const items = [];
+
+  folderSets.forEach(function(segments) {
+    const children = listOneDriveFolderChildren_(segments);
+    children.forEach(function(item) {
+      if (!item.file) return;
+      const entry = {
+        itemId: String(item.id || ''),
+        name: String(item.name || 'backup-file'),
+        webUrl: String(item.webUrl || ''),
+        size: Number(item.size || 0),
+        createdDateTime: item.createdDateTime || '',
+        lastModifiedDateTime: item.lastModifiedDateTime || '',
+        content: '',
+        value: null
+      };
+      try {
+        const payload = downloadOneDriveJson_(entry.itemId);
+        entry.content = payload.content || '';
+        entry.value = payload.value || null;
+        entry.sha256 = payload.sha256 || '';
+      } catch (error) {
+        entry.content = '';
+        entry.value = null;
+        entry.error = 'This backup file could not be loaded as JSON.';
+      }
+      items.push(entry);
+    });
+  });
+
+  items.sort(function(a, b) {
+    const aDate = new Date(a.lastModifiedDateTime || a.createdDateTime || 0).getTime();
+    const bDate = new Date(b.lastModifiedDateTime || b.createdDateTime || 0).getTime();
+    return bDate - aDate;
+  });
+
+  return {
+    success: true,
+    count: items.length,
+    files: items,
+    folderPaths: folderSets.map(function(segments) { return segments.join('/'); })
+  };
+}
+
 function oneDriveSha256_(text) {
   return Utilities.computeDigest(
     Utilities.DigestAlgorithm.SHA_256,

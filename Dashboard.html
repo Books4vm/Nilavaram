@@ -847,6 +847,15 @@
         showPendingFeatures();
         return;
       }
+      if (['backup-status', 'wizard-backup', 'back-up', 'backup'].indexOf(moduleId) !== -1 ||
+          /backup/i.test(String(label || '')) || /back up/i.test(String(label || ''))) {
+        showBackupStatus();
+        return;
+      }
+      if (['archive-library', 'upload-documents', 'missing-documents', 'expiring-documents', 'archived-documents'].indexOf(moduleId) !== -1) {
+        showDocumentArchive();
+        return;
+      }
       if (moduleId === 'about-version-history') {
         showCodeChangeHistory();
         return;
@@ -1604,6 +1613,118 @@
         .withSuccessHandler(renderReminders)
         .withFailureHandler(showError)
         .getMyReminders();
+    }
+
+    function showBackupStatus() {
+      document.getElementById('output').textContent = 'Loading backup status...';
+      google.script.run
+        .withSuccessHandler(renderBackupStatus)
+        .withFailureHandler(showError)
+        .getBackupStatus();
+    }
+
+    function showDocumentArchive() {
+      document.getElementById('output').textContent = 'Loading document archive...';
+      google.script.run
+        .withSuccessHandler(renderDocumentArchive)
+        .withFailureHandler(showError)
+        .getDocumentArchiveStatus();
+    }
+
+    function renderBackupStatus(status) {
+      const output = document.getElementById('output');
+      const backupFiles = status.oneDriveBackups || [];
+      const backupFileHtml = backupFiles.length
+        ? '<article class="alert-item">' +
+            '<h3>OneDrive backup files</h3>' +
+            '<ul>' +
+              backupFiles.map(function(file) {
+                const fileLabel = escapeHtml(file.name || 'backup file');
+                const link = file.webUrl ? '<a href="' + escapeHtml(file.webUrl) + '" target="_blank" rel="noopener noreferrer">Open in OneDrive</a>' : 'No link available';
+                const preview = file.value ? '<pre>' + escapeHtml(JSON.stringify(file.value, null, 2)) + '</pre>' : (file.content ? '<pre>' + escapeHtml(file.content) + '</pre>' : '<p class="help-meta">No readable content available.</p>');
+                return '<li><p><b>' + fileLabel + '</b></p><p>' + link + '</p>' + preview + '</li>';
+              }).join('') +
+            '</ul>' +
+          '</article>'
+        : '<article class="alert-item"><h3>OneDrive backup files</h3><p>No backup files were found in the Nilavaram/Backups folder yet.</p></article>';
+
+      output.innerHTML = '<h2>Backup Status</h2>' +
+        '<p>' + escapeHtml(status.summary || '') + '</p>' +
+        '<article class="alert-item">' +
+          '<h3>Primary source and code repository</h3>' +
+          '<p><b>Authoritative code folder:</b> ' + escapeHtml(status.project.authoritativeCodeFolder || '') + '</p>' +
+          '<p><b>GitHub repo:</b> ' + escapeHtml(status.project.githubRepository || '') + '</p>' +
+          '<p><b>Branch:</b> ' + escapeHtml(status.project.githubBranch || '') + '</p>' +
+          '<p><b>Apps Script web app:</b> ' + escapeHtml(status.project.appsScriptWebApp || '') + '</p>' +
+        '</article>' +
+        '<article class="alert-item">' +
+          '<h3>External backup and sync locations</h3>' +
+          '<p><b>External code backup:</b> ' + escapeHtml(status.externalCopies.externalCodeBackup || '') + '</p>' +
+          '<p><b>Data root:</b> ' + escapeHtml(status.externalCopies.dataRoot || '') + '</p>' +
+          '<p><b>OneDrive sync source:</b> ' + escapeHtml(status.externalCopies.oneDriveSyncSource || '') + '</p>' +
+          '<p><b>Archive folder:</b> ' + escapeHtml(status.externalCopies.archiveFolder || '') + '</p>' +
+        '</article>' +
+        '<article class="alert-item">' +
+          '<h3>File storage and Firestore separation</h3>' +
+          '<p><b>Local OneDrive:</b> ' + escapeHtml(status.fileStorage.localOneDrive || '') + '</p>' +
+          '<p><b>Primary OneDrive account:</b> ' + escapeHtml(status.fileStorage.primaryOneDriveAccount || '') + '</p>' +
+          '<p><b>External drive:</b> ' + escapeHtml(status.fileStorage.externalDrive || '') + ' (' + escapeHtml(status.fileStorage.externalDriveLabel || '') + ')</p>' +
+          '<p><b>Firestore role:</b> ' + escapeHtml(status.firestore.purpose || '') + '</p>' +
+          '<p><b>Secret rule:</b> ' + escapeHtml(status.firestore.notForSecrets || '') + '</p>' +
+        '</article>' +
+        '<article class="alert-item">' +
+          '<h3>Backup routine</h3>' +
+          '<ul>' +
+            (status.backupRoutine || []).map(function(item) {
+              return '<li>' + escapeHtml(item) + '</li>';
+            }).join('') +
+          '</ul>' +
+          '<p><b>Next action:</b> ' + escapeHtml(status.nextAction || '') + '</p>' +
+          '<p class="help-meta"><b>Last checked:</b> ' + escapeHtml(status.updatedAt || '') + '</p>' +
+        '</article>' +
+        backupFileHtml +
+        '<button class="primary-button" type="button" id="safe-backup-button">Create safe backup package</button>';
+      document.getElementById('safe-backup-button').onclick = function() {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            const message = document.createElement('p');
+            message.className = 'help-meta';
+            message.textContent = result.message;
+            output.appendChild(message);
+          })
+          .withFailureHandler(showError)
+          .createSafeBackupPackage();
+      };
+    }
+
+    function renderDocumentArchive(documentArchive) {
+      const output = document.getElementById('output');
+      output.innerHTML = '<h2>Document Archive</h2>' +
+        '<p>' + escapeHtml(documentArchive.summary || '') + '</p>' +
+        '<article class="alert-item">' +
+          '<h3>Storage model</h3>' +
+          '<p><b>OneDrive root:</b> ' + escapeHtml(documentArchive.storage.oneDriveRoot || '') + '</p>' +
+          '<p><b>External sync source:</b> ' + escapeHtml(documentArchive.storage.syncSource || '') + '</p>' +
+          '<p><b>Archive folder:</b> ' + escapeHtml(documentArchive.storage.archiveFolder || '') + '</p>' +
+          '<p><b>External drive:</b> ' + escapeHtml(documentArchive.storage.externalDrive || '') + ' (' + escapeHtml(documentArchive.storage.externalDriveLabel || '') + ')</p>' +
+        '</article>' +
+        '<article class="alert-item">' +
+          '<h3>Archive rules</h3>' +
+          '<ul>' +
+            (documentArchive.rules || []).map(function(item) {
+              return '<li>' + escapeHtml(item) + '</li>';
+            }).join('') +
+          '</ul>' +
+        '</article>' +
+        '<article class="alert-item">' +
+          '<h3>Document groups</h3>' +
+          '<ul>' +
+            (documentArchive.categories || []).map(function(category) {
+              return '<li><b>' + escapeHtml(category.title) + ':</b> ' + escapeHtml(category.description) + ' <span class="help-meta">(' + escapeHtml(category.status) + ')</span></li>';
+            }).join('') +
+          '</ul>' +
+          '<p class="help-meta"><b>Last checked:</b> ' + escapeHtml(documentArchive.updatedAt || '') + '</p>' +
+        '</article>';
     }
 
     function renderReminders(reminders) {

@@ -87,6 +87,160 @@ function getAdminStorageAccessInfo() {
   return buildStorageAccessInfo_();
 }
 
+function getBackupStatus() {
+  requireAdmin_();
+  const access = buildStorageAccessInfo_();
+  const backupFiles = getOneDriveBackupFiles().files;
+  const status = {
+    status: 'planned',
+    summary: 'Safe backup is configured as a layered local and cloud process. The authoritative code remains in VS Code and GitHub, while large files and document content remain in OneDrive and the external backup copy.',
+    project: {
+      authoritativeCodeFolder: access.vscodeFolder,
+      githubRepository: access.githubRepository,
+      githubBranch: access.githubBranch,
+      appsScriptWebApp: access.appsScriptWebApp
+    },
+    externalCopies: {
+      externalCodeBackup: access.externalCodeBackup,
+      dataRoot: access.dataRoot,
+      oneDriveSyncSource: access.oneDriveSyncSource,
+      archiveFolder: access.recommendedArchiveFolder
+    },
+    fileStorage: {
+      localOneDrive: access.localOneDrive,
+      primaryOneDriveAccount: access.primaryOneDriveAccount,
+      externalDrive: access.externalDrive,
+      externalDriveLabel: access.externalDriveLabel
+    },
+    firestore: {
+      purpose: 'Stores vital application metadata, links, permissions, help articles, alerts, audit records and development tasks.',
+      notForSecrets: 'Passwords, tokens, private keys and service-account secrets must not be stored here.'
+    },
+    backupRoutine: [
+      'Keep the authoritative VS Code project on C: and treat the external E: code folder as a backup copy only.',
+      'Store large files, scans and attachments in OneDrive or Google Drive and keep their metadata in Firestore.',
+      'Keep the backup data root on the external HDD and archive old content in the archive folder.',
+      'Commit and push code changes to GitHub after the app is tested in the /dev deployment.'
+    ],
+    oneDriveBackups: backupFiles,
+    nextAction: 'Run a focused validation pass after each code change, then commit and push the source to GitHub and refresh the Apps Script /dev test.',
+    updatedAt: new Date().toISOString()
+  };
+
+  return status;
+}
+
+function createSafeBackupPackage() {
+  requireAdmin_();
+
+  const access = buildStorageAccessInfo_();
+  const timestamp = new Date();
+  const backupRecord = {
+    backupType: 'Nilavaram Safe Backup',
+    createdAt: timestamp.toISOString(),
+    owner: 'mangai8100@gmail.com',
+    source: {
+      codeFolder: access.vscodeFolder,
+      githubRepository: access.githubRepository,
+      githubBranch: access.githubBranch,
+      appsScriptWebApp: access.appsScriptWebApp
+    },
+    storage: {
+      oneDrive: {
+        root: access.localOneDrive,
+        syncSource: access.oneDriveSyncSource,
+        targetFolder: 'Nilavaram/Backups',
+        status: 'ready-to-store'
+      },
+      externalDrive: {
+        driveLetter: 'E:',
+        volumeLabel: access.externalDriveLabel,
+        path: 'E:\\nn\\Nilavaram Data\\99 Archive\\Backups',
+        status: 'local-copy-ready'
+      }
+    },
+    firestore: {
+      purpose: 'Metadata and links only; do not keep file payloads inside Firestore.'
+    },
+    notes: [
+      'The app stores the backup metadata in Firestore and the actual file payload in OneDrive.',
+      'The Windows local E: drive path is recorded as the required local external backup target for manual or scheduled sync.',
+      'Apps Script cannot directly write to the local Windows E: drive from the cloud runtime.'
+    ]
+  };
+
+  const folderId = ensureOneDriveFolderPath_(['Nilavaram', 'Backups']);
+  const fileName = 'nilavaram-safe-backup-' + Utilities.formatDate(timestamp, 'UTC', 'yyyyMMdd-HHmmss') + '.json';
+  const upload = uploadOneDriveJson_(folderId, fileName, backupRecord);
+
+  backupRecord.storage.oneDrive.itemId = upload.itemId;
+  backupRecord.storage.oneDrive.webUrl = upload.webUrl;
+  backupRecord.storage.oneDrive.status = 'saved-in-onedrive';
+  backupRecord.storage.externalDrive.status = 'ready-for-local-copy';
+  backupRecord.storage.externalDrive.manualCopyCommand = 'Copy the generated backup file from OneDrive to E:\\nn\\Nilavaram Data\\99 Archive\\Backups';
+
+  return {
+    success: true,
+    message: 'Safe backup prepared in OneDrive and scheduled for the local E: external-drive copy.',
+    backup: backupRecord
+  };
+}
+
+function getDocumentArchiveStatus() {
+  requireCurrentUser_();
+  const access = buildStorageAccessInfo_();
+  return {
+    status: 'planned',
+    summary: 'Nilavaram keeps document metadata in Firestore and preserves original files in OneDrive or the approved external archive tree. The archive is designed to keep the document link stable while the file remains in the authoritative storage backend.',
+    storage: {
+      oneDriveRoot: access.localOneDrive,
+      syncSource: access.oneDriveSyncSource,
+      archiveFolder: access.recommendedArchiveFolder,
+      externalDrive: access.externalDrive,
+      externalDriveLabel: access.externalDriveLabel
+    },
+    rules: [
+      'Firestore stores document metadata, references and retention notes, not the original binary file.',
+      'OneDrive or approved cloud storage remains the authoritative home for each preserved source file.',
+      'A document move or rename must not break the linked record or accounting trace.',
+      'Missing or expired documents must remain visible with a clear status record until resolved.'
+    ],
+    categories: [
+      {
+        id: 'archive-library',
+        title: 'Archive Library',
+        description: 'Preserved documents and their metadata, indexed for quick reference and recovery.',
+        status: 'ready for indexing'
+      },
+      {
+        id: 'upload-documents',
+        title: 'Upload Documents',
+        description: 'Adds approved evidence and long-term records to the repository without duplicating metadata.',
+        status: 'ready for upload workflow'
+      },
+      {
+        id: 'missing-documents',
+        title: 'Missing / To Retrieve',
+        description: 'Shows expected files that still need to be located or restored.',
+        status: 'waiting for document match'
+      },
+      {
+        id: 'expiring-documents',
+        title: 'Expiring Documents',
+        description: 'Displays records that need review for renewal, replacement or archive confirmation.',
+        status: 'review pending'
+      },
+      {
+        id: 'archived-documents',
+        title: 'Archived Documents',
+        description: 'Retains inactive files and their associated audit references for future access.',
+        status: 'archive retention active'
+      }
+    ],
+    updatedAt: new Date().toISOString()
+  };
+}
+
 function buildConnectionsBootstrap_() {
   const config = getMicrosoftConfig_();
   const missing = getMissingMicrosoftConfig_(config);
@@ -201,17 +355,39 @@ function getPrimaryAdminRecoveryShell() {
 
 
 /**
- * Temporary response until the module is implemented.
+ * Module launcher. For specific modules that are already implemented, return the
+ * live status summary directly rather than the generic placeholder response.
  */
 function openModule(moduleId) {
   requireCurrentUser_();
 
+  const normalizedId = String(moduleId || '').trim();
+
+  if (['backup-status', 'wizard-backup', 'back-up', 'backup'].indexOf(normalizedId) !== -1) {
+    const status = getBackupStatus();
+    return {
+      success: true,
+      message: 'Backup status: ' + status.summary + ' Next action: ' + status.nextAction
+    };
+  }
+
+  if ([
+    'archive-library',
+    'upload-documents',
+    'missing-documents',
+    'expiring-documents',
+    'archived-documents'
+  ].indexOf(normalizedId) !== -1) {
+    const status = getDocumentArchiveStatus();
+    return {
+      success: true,
+      message: 'Document archive: ' + status.summary
+    };
+  }
+
   return {
-
     success: true,
-
-    message: moduleId + " module is under development."
-
+    message: normalizedId + ' module is under development.'
   };
 
 }

@@ -8,7 +8,7 @@ const NILAVARAM_INITIAL_ADMIN_EMAILS = [
   'mangai8100@gmail.com',
   'vm8100@gmail.com'
 ];
-const NILAVARAM_NAVIGATION_VERSION = 19;
+const NILAVARAM_NAVIGATION_VERSION = 20;
 
 /**
  * Creates or refreshes the Firestore-driven navigation.
@@ -97,7 +97,6 @@ function setupNavigation_() {
     { id: 'wizard-export-csv', menuId: 'accounting-wizard', parentId: 'wizard-export', level: 3, label: 'Export to CSV', description: 'Exports approved tabular accounting data.', moduleId: 'wizard-export-csv', order: 10, enabled: true, roles: ['admin', 'editor', 'reader'] },
     { id: 'wizard-export-pdf', menuId: 'accounting-wizard', parentId: 'wizard-export', level: 3, label: 'Export to PDF', description: 'Exports approved financial reports as PDF files.', moduleId: 'wizard-export-pdf', order: 20, enabled: true, roles: ['admin', 'editor', 'reader'] },
     { id: 'wizard-utilities', menuId: 'accounting-wizard', parentId: 'accounting-wizard', level: 2, label: 'Utilities / Tools', description: 'Provides backup, documentation and search tools.', moduleId: '', type: 'group', order: 80, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
-    { id: 'wizard-backup', menuId: 'accounting-wizard', parentId: 'wizard-utilities', level: 3, label: 'Back Up', description: 'Opens backup status and external-copy guidance.', moduleId: 'backup-status', order: 10, enabled: true, roles: ['admin'] },
     { id: 'wizard-documentation', menuId: 'accounting-wizard', parentId: 'wizard-utilities', level: 3, label: 'Documentation', description: 'Opens the accounting workflow and operating rules.', moduleId: 'accounting-guide', order: 20, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'wizard-search', menuId: 'accounting-wizard', parentId: 'wizard-utilities', level: 3, label: 'Search', description: 'Searches transactions, account codes, evidence and audit references.', moduleId: 'wizard-search', order: 30, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'archive-library', menuId: 'documents', parentId: 'documents', level: 2, label: 'Archive Library', description: 'Lists preserved documents and their metadata.', moduleId: 'archive-library', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
@@ -212,6 +211,27 @@ function setupNavigation_() {
       order: 999,
       enabled: false,
       roles: ['admin', 'editor', 'reader', 'ltd'],
+      retiredAt: new Date()
+    }));
+  });
+
+  [
+    'wizard-backup',
+    'backup-status-legacy',
+    'back-up',
+    'backup'
+  ].forEach(function(itemId) {
+    firestoreSetDocument_('menuItems', itemId, toFirestoreFields_({
+      menuId: 'accounting-wizard',
+      parentId: 'wizard-utilities',
+      level: 3,
+      label: 'Retired Backup Entry',
+      description: 'Retired to prevent duplicate backup status links in the dashboard.',
+      moduleId: 'backup-status',
+      type: 'link',
+      order: 999,
+      enabled: false,
+      roles: ['admin'],
       retiredAt: new Date()
     }));
   });

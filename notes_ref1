@@ -56,3 +56,139 @@ through OneDrive on the web, or configure the selected file-sync application
 to copy the OneDrive Sync source. Do not require the complete cloud archive to
 remain downloaded on the laptop. The E: code folder is a backup copy; edit and
 commit only from the authoritative C: project.
+
+
+What has been done so far (9/1/2026 Tuesday)
+Project vision and rules are already defined
+
+Nilavaram is described as a private family/business information system.
+The app architecture, access model, and storage responsibilities are documented clearly.
+The business and accounting operating rules are locked and approved.
+Core architecture is established
+
+VS Code is the main code editor.
+Clasp pushes code to Google Apps Script.
+Firestore holds vital app data.
+OneDrive stores large files and documents.
+GitHub stores source history.
+This is reflected in notes_ref1 and README.md.
+Initial app foundation has been implemented
+
+Setup.js builds the initial Firestore records, including:
+initial admins
+menu structure
+menu-item hierarchy
+navigation configuration
+default app records
+This means the project already has a repeatable setup path.
+Development task system is in place
+
+Development.js creates project-intent tasks such as:
+owner privacy
+private decision journal
+safe backup
+document archive
+accounting workflow improvements
+reconciliation and family reporting features
+These tasks are tracked as Firestore development records.
+The app has a large menu and module structure
+
+Setup.js defines a broad Nilavaram navigation system for:
+Dashboard
+Personal & Life
+Businesses
+Assets & Estate
+Security
+Transactions
+Accounting
+Documents
+Tasks
+Reports
+System
+Help
+Security and access rules are already being treated as a real design constraint
+
+Roles like Admin, Editor, Reader, Ltd, Disabled are documented in README.md.
+Credential and secret rules are explicitly protected in notes_ref1.
+The project has a workflow rhythm and ongoing checklist
+
+going_forward.txt captures the recommended working rhythm.
+I also saved the live checklist in nilavaram-ongoing-checklist.md, intended to be kept active while coding continues.
+What is still needed next
+This is the most important part: the project is not “finished,” but it is structurally ready for the next implementation pass.
+
+High-priority next tasks
+Validate the live setup path
+
+Confirm the app can be initialized correctly through the setup function in Setup.js.
+Verify the initial Admins exist and the navigation is created correctly in Firestore.
+Check that the initial app can load cleanly through Apps Script.
+Confirm the Clasp-to-Google Apps Script pipeline
+
+Ensure the local repo at C:\Users\theso\Documents\nn\Nilavaram is properly connected with clasp.
+Push the current code and test through /dev.
+Confirm the project is synchronized with the Google Apps Script web app.
+Implement the next priority features in order
+
+Based on Development.js, the most important next items are:
+owner-private access
+private decision journal
+safe backup
+document lifetime archive
+session security
+dynamic dashboard attention
+family record structure
+accounting input and reconciliation flow
+Tighten the Firestore data design
+
+Make sure each collection and document matches the intended purpose:
+menus
+menuItems
+users
+auditLog
+helpArticles
+reminders
+developmentTasks
+Keep Firestore as the system of record for vital app data and metadata, not raw file payloads.
+Complete the OneDrive / document-integration path
+
+The repo specifically expects large files to live in OneDrive or Drive.
+The next step is to link document records to their metadata and storage references cleanly.
+Build the backup and restore discipline
+
+Keep the routine active:
+local VS Code working copy
+external HDD backup
+OneDrive sync source
+GitHub history
+This is already documented, but it needs to stay maintained during every change set.
+Continue the step-by-step development rhythm
+
+Use the checklist in nilavaram-ongoing-checklist.md.
+For each change:
+define task
+review rules
+edit in VS Code
+clasp push
+test in Apps Script
+commit to GitHub
+review Firestore/OneDrive implications
+update the checklist
+Best practical next move
+The most sensible next milestone is:
+
+validate setup and clasp sync,
+then implement the highest-priority task from Development.js,
+then continue through the project checklist in small, testable steps.
+This keeps the project aligned with the architecture already in place instead of jumping ahead into a large feature set.
+
+I have not run a project build or deployment test here, so this is a repo-based status review rather than a verified runtime validation.
+
+Current status summary (9/1/2026 Tue 11:13 PM Pacific Time)
+Clasp sync: working
+GitHub flow: ready
+Firestore architecture: already defined
+OneDrive storage plan: already defined
+Backup routine: documented and ready
+First privacy task: implemented and pushed
+I have not verified the browser/runtime behavior in Apps Script itself yet; the proven result so far is that the local project successfully synced via Clasp.

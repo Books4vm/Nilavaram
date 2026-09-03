@@ -18,6 +18,16 @@ function getNavigation() {
   const items = firestoreGetCollection_('menuItems')
     .map(fromFirestoreDocument_)
     .filter(function(item) {
+      const hiddenIds = ['wizard-backup', 'back-up', 'backup', 'backup-status-legacy'];
+      const hiddenLabels = ['back up', 'backup status', 'backup'];
+      const label = String(item.label || '').toLowerCase();
+      const id = String(item.id || '').toLowerCase();
+      const moduleId = String(item.moduleId || '').toLowerCase();
+      if (hiddenIds.indexOf(id) !== -1 || hiddenIds.indexOf(moduleId) !== -1 ||
+          hiddenLabels.indexOf(label) !== -1 ||
+          label.indexOf('back up') !== -1 || label.indexOf('backup') !== -1) {
+        return false;
+      }
       if (!item.enabled || (item.roles || []).indexOf(user.role) === -1) {
         return false;
       }
