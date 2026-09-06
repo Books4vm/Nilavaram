@@ -1,0 +1,1351 @@
+  <script>
+    function showInputWorkspace(moduleId) {
+      document.getElementById('output').textContent = 'Preparing Input...';
+      google.script.run.withSuccessHandler(function(data) {
+        window.nilavaramInputWorkspace = data;
+        renderInputWorkspace(data, moduleId || 'input-main');
+      }).withFailureHandler(showError).getInputWorkspace();
+    }
+
+    function renderInputWorkspace(data, moduleId) {
+      if (moduleId === 'input-receipt' || moduleId === 'input-payment') {
+        renderReceiptPaymentForm(data, moduleId === 'input-receipt' ? 'receipt' : 'payment');
+        return;
+      }
+      if (moduleId === 'input-journal') {
+        renderMultiLineJournal(data);
+        return;
+      }
+      if (String(moduleId).indexOf('input-upload-') === 0) {
+        renderFileBatchRegistration(data, moduleId.replace('input-upload-', ''));
+        return;
+      }
+      const output = document.getElementById('output');
+      let html = '<h2>Input â€” Main Menu</h2>' +
+        '<p>Manual entries, source files and downloaded transactions remain controlled separately from posting.</p>' +
+        '<div class="input-card-grid">' +
+          inputMenuCard_('Receipt', 'Manual money received with proof.', 'input-receipt') +
+          inputMenuCard_('Payment', 'Manual money paid with proof.', 'input-payment') +
+          inputMenuCard_('Journal', 'Balanced multi-row journal with attachments.', 'input-journal') +
+          inputMenuCard_('File Upload', 'CSV, PDF, image or text template for a selected account.', 'input-upload-csv') +
+        '</div><h3>Downloaded / uploaded account batches</h3>';
+      if (!data.groups.length) {
+        html += '<p>No source batches are available.</p>';
+      } else {
+        html += '<h3>Stage 1 â€” Reconciliation only</h3>' +
+          '<p>Review source completeness, cumulative balances and differences. No ACODE selection appears in this stage.</p>' +
+          '<div class="input-card-grid">' + data.groups.map(function(group) {
+          const encoded = encodeURIComponent(group.key);
+          return '<section class="input-card"><h3>' + escapeHtml(group.proofLabel) + '</h3>' +
+            '<p><b>Environment:</b> ' + escapeHtml(group.environment) +
+            '<br><b>Transactions:</b> ' + group.recordCount +
+            '<br><b>Receipts:</b> ' + formatCentsInput_(group.receiptCents) +
+            '<br><b>Payments:</b> ' + formatCentsInput_(group.paymentCents) + '</p>' +
+            '<p><span class="' + (group.reconciliationStatus === 'reconciled' ? 'status-green' : 'status-yellow') + '">' +
+              (group.reconciliationStatus === 'reconciled' ? 'Reconciled' : 'Reconciliation pending') + '</span></p>' +
+            '<div class="button-row"><button class="primary-button" type="button" onclick="openReconciliationPopup(\'' +
+              encoded + '\')">Review & reconcile</button>' +
+            (group.provider === 'akoya' && group.environment === 'sandbox'
+              ? '<a class="secondary-button" href="' + escapeHtml((CONNECTIONS_BOOTSTRAP.accessInfo || {}).appsScriptWebApp || '#') +
+                '?importAkoyaSandbox=1">Refresh download</a>' : '') +
+            '</div></section>';
+        }).join('') + '</div>' +
+          '<h3>Stage 2 â€” ACODE assignment only</h3>' +
+          '<p>This stage contains classification and rule controls only. It becomes available after reconciliation.</p>' +
+          '<div class="input-card-grid">' + data.groups.map(function(group) {
+            const encoded = encodeURIComponent(group.key);
+            const ready = group.reconciliationStatus === 'reconciled';
+            return '<section class="input-card"><h3>' + escapeHtml(group.proofLabel) + '</h3>' +
+              '<p><b>Transactions:</b> ' + group.recordCount +
+              '<br><b>ACODE approved:</b> ' + group.acodeApprovedCount +
+              '<br><b>ACODE pending:</b> ' + (group.recordCount - group.acodeApprovedCount) + '</p>' +
+              '<p><span class="' + (group.acodeStatus === 'complete' ? 'status-green' : 'status-red') + '">' +
+                (group.acodeStatus === 'complete' ? 'ACODE complete' : 'ACODE pending') + '</span></p>' +
+              '<button class="primary-button" type="button" ' + (ready ? '' : 'disabled ') +
+                'onclick="openAcodePopup(\'' + encoded + '\')">Assign ACODE</button>' +
+              (ready ? '' : '<p class="status-yellow">Complete reconciliation first.</p>') +
+              '</section>';
+          }).join('') + '</div>';
+      }
+      html += '<p class="error"><b>Posting remains disabled.</b> Reconciliation and ACODE approval do not post sandbox records.</p>';
+      output.innerHTML = html;
+      if (moduleId === 'input-acode-map' && data.groups.length) {
+        openAcodePopup(encodeURIComponent(data.groups[0].key));
+      }
+    }
+
+    function inputMenuCard_(title, description, moduleId) {
+      return '<section class="input-card"><h3>' + escapeHtml(title) + '</h3><p>' +
+        escapeHtml(description) + '</p><button class="primary-button" type="button" onclick="showInputWorkspace(\'' +
+        escapeHtml(moduleId) + '\')">Open ' + escapeHtml(title) + '</button></section>';
+    }
+
+    function formatCentsInput_(cents) {
+      if (cents === null || cents === undefined || cents === '') return 'â€”';
+      return '$' + (Number(cents) / 100).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function inputAccountOptions_(accounts, selected) {
+      return '<option value="">Choose ACODE</option>' + accounts.map(function(account) {
+        return '<option value="' + escapeHtml(account.code) + '" ' +
+          (account.code === selected ? 'selected' : '') + '>' +
+          escapeHtml(account.code + ' â€” ' + account.name) + '</option>';
+      }).join('');
+    }
+
+    function inputEntityOptions_(entities) {
+      return entities.map(function(entity) {
+        return '<option value="' + escapeHtml(entity.id) + '">' +
+          escapeHtml(entity.name) + '</option>';
+      }).join('');
+    }
+
+    function renderReceiptPaymentForm(data, kind) {
+      const receipt = kind === 'receipt';
+      document.getElementById('output').innerHTML =
+        '<h2>Manual ' + (receipt ? 'Receipt' : 'Payment') + '</h2>' +
+        '<p>Attach the transaction proof. The file stays on your device/OneDrive; Nilavaram records its identity and reference.</p>' +
+        '<form id="manual-cash-form"><div class="form-grid">' +
+          '<div><label>Date</label><input id="cash-date" type="date" required></div>' +
+          '<div><label>Entity</label><select id="cash-entity">' + inputEntityOptions_(data.entities) + '</select></div>' +
+          '<div><label>Description / party</label><input id="cash-description" required></div>' +
+          '<div><label>Amount</label><input id="cash-amount" type="number" min="0.01" step="0.01" required></div>' +
+          '<div><label>Bank / cash ACODE</label><select id="cash-bank">' + inputAccountOptions_(data.accounts, '11110') + '</select></div>' +
+          '<div><label>' + (receipt ? 'Credit' : 'Debit') + ' ACODE</label><select id="cash-counter">' + inputAccountOptions_(data.accounts, '') + '</select></div>' +
+          '<div><label>Supporting proof</label><input id="cash-proof" type="file" required></div>' +
+          '<div><label>OneDrive / HDD reference</label><input id="cash-storage" value="E:\\nn\\Nilavaram Data\\00 Inbox" required></div>' +
+          '<div><label>Audit note</label><textarea id="cash-note" required></textarea></div>' +
+        '</div><button class="primary-button" type="submit">Save ' + (receipt ? 'receipt' : 'payment') + ' draft</button> ' +
+        '<button class="secondary-button" type="button" onclick="showInputWorkspace(\'input-main\')">Back</button> ' +
+        '<span id="cash-message"></span></form>';
+      document.getElementById('manual-cash-form').onsubmit = function(event) {
+        saveManualCashEntry(event, kind);
+      };
+    }
+
+    async function saveManualCashEntry(event, kind) {
+      event.preventDefault();
+      const file = document.getElementById('cash-proof').files[0];
+      if (!file) return;
+      const bank = document.getElementById('cash-bank').value;
+      const counter = document.getElementById('cash-counter').value;
+      const receipt = kind === 'receipt';
+      const message = document.getElementById('cash-message');
+      message.textContent = ' Calculating proof identity...';
+      try {
+        const hash = await sha256File(file);
+        const input = {
+          entryPurpose: 'manual',
+          entityId: document.getElementById('cash-entity').value,
+          date: document.getElementById('cash-date').value,
+          description: document.getElementById('cash-description').value,
+          amount: document.getElementById('cash-amount').value,
+          debitAccountCode: receipt ? bank : counter,
+          creditAccountCode: receipt ? counter : bank,
+          evidenceName: file.name,
+          fileHash: hash,
+          storageReference: document.getElementById('cash-storage').value,
+          auditNote: document.getElementById('cash-note').value
+        };
+        message.textContent = ' Saving...';
+        google.script.run.withSuccessHandler(function(result) {
+          message.innerHTML = '<span class="success">' + escapeHtml(result.message) + '</span>';
+        }).withFailureHandler(function(error) {
+          message.innerHTML = '<span class="error">' + escapeHtml(error.message) + '</span>';
+        }).saveEvidenceBackedJournalEntry(input);
+      } catch (error) {
+        message.innerHTML = '<span class="error">' + escapeHtml(error.message) + '</span>';
+      }
+    }
+
+    function renderMultiLineJournal(data) {
+      window.nilavaramJournalRow = 0;
+      document.getElementById('output').innerHTML =
+        '<h2>Manual Journal</h2><p>Add rows until Total Debit equals Total Credit. Evidence and an audit note are mandatory.</p>' +
+        '<form id="multi-journal-form"><div class="form-grid">' +
+          '<div><label>Date</label><input id="journal-date" type="date" required></div>' +
+          '<div><label>Entity</label><select id="journal-entity">' + inputEntityOptions_(data.entities) + '</select></div>' +
+          '<div><label>Description</label><input id="journal-description" required></div>' +
+          '<div><label>Evidence</label><input id="journal-proof" type="file" required></div>' +
+          '<div><label>OneDrive / HDD reference</label><input id="journal-storage" value="E:\\nn\\Nilavaram Data\\00 Inbox" required></div>' +
+          '<div><label>Audit note</label><textarea id="journal-note" required></textarea></div>' +
+        '</div><div id="journal-lines"></div>' +
+        '<div class="button-row"><button class="secondary-button" type="button" onclick="addJournalRow()">Add row</button>' +
+        '<b id="journal-totals">Debit $0.00 | Credit $0.00 | Difference $0.00</b></div>' +
+        '<div class="button-row"><button class="primary-button" id="journal-save" type="submit" disabled>Save balanced journal draft</button>' +
+        '<button class="secondary-button" type="button" onclick="showInputWorkspace(\'input-main\')">Back</button> ' +
+        '<span id="journal-message"></span></div></form>';
+      addJournalRow();
+      addJournalRow();
+      document.getElementById('multi-journal-form').onsubmit = saveMultiJournalForm;
+    }
+
+    function addJournalRow() {
+      const data = window.nilavaramInputWorkspace;
+      const rowNumber = ++window.nilavaramJournalRow;
+      const row = document.createElement('div');
+      row.className = 'journal-row';
+      row.dataset.row = rowNumber;
+      row.innerHTML = '<div><label>ACODE</label><select class="journal-acode">' +
+        inputAccountOptions_(data.accounts, '') + '</select></div>' +
+        '<div><label>Debit</label><input class="journal-debit" type="number" min="0" step="0.01"></div>' +
+        '<div><label>Credit</label><input class="journal-credit" type="number" min="0" step="0.01"></div>' +
+        '<div><label>Row note</label><input class="journal-memo"></div>' +
+        '<button class="secondary-button" type="button" onclick="this.parentElement.remove(); updateJournalTotals()">Remove</button>';
+      document.getElementById('journal-lines').appendChild(row);
+      row.querySelector('.journal-debit').oninput = updateJournalTotals;
+      row.querySelector('.journal-credit').oninput = updateJournalTotals;
+      updateJournalTotals();
+    }
+
+    function updateJournalTotals() {
+      let debit = 0;
+      let credit = 0;
+      document.querySelectorAll('.journal-row').forEach(function(row) {
+        debit += Number(row.querySelector('.journal-debit').value || 0);
+        credit += Number(row.querySelector('.journal-credit').value || 0);
+      });
+      const difference = debit - credit;
+      document.getElementById('journal-totals').textContent =
+        'Debit $' + debit.toFixed(2) + ' | Credit $' + credit.toFixed(2) +
+        ' | Difference $' + difference.toFixed(2);
+      document.getElementById('journal-save').disabled = !(debit > 0 && Math.abs(difference) < .005);
+    }
+
+    async function saveMultiJournalForm(event) {
+      event.preventDefault();
+      const file = document.getElementById('journal-proof').files[0];
+      if (!file) return;
+      const message = document.getElementById('journal-message');
+      message.textContent = ' Calculating proof identity...';
+      try {
+        const input = {
+          date: document.getElementById('journal-date').value,
+          entityId: document.getElementById('journal-entity').value,
+          description: document.getElementById('journal-description').value,
+          evidenceName: file.name,
+          fileHash: await sha256File(file),
+          storageReference: document.getElementById('journal-storage').value,
+          auditNote: document.getElementById('journal-note').value,
+          lines: Array.from(document.querySelectorAll('.journal-row')).map(function(row) {
+            return {accountCode: row.querySelector('.journal-acode').value,
+              debit: row.querySelector('.journal-debit').value,
+              credit: row.querySelector('.journal-credit').value,
+              memo: row.querySelector('.journal-memo').value};
+          })
+        };
+        message.textContent = ' Saving...';
+        google.script.run.withSuccessHandler(function(result) {
+          message.innerHTML = '<span class="success">' + escapeHtml(result.message) + '</span>';
+        }).withFailureHandler(function(error) {
+          message.innerHTML = '<span class="error">' + escapeHtml(error.message) + '</span>';
+        }).saveMultiLineJournalDraft(input);
+      } catch (error) {
+        message.innerHTML = '<span class="error">' + escapeHtml(error.message) + '</span>';
+      }
+    }
+
+    function renderFileBatchRegistration(data, type) {
+      document.getElementById('output').innerHTML =
+        '<h2>' + escapeHtml(type.toUpperCase()) + ' File Upload</h2>' +
+        '<p>Select the related account before choosing the file. The parser will preserve the original file identity and create a separate source batch.</p>' +
+        '<div class="form-grid"><div><label>Related bank / credit account</label><select>' +
+          inputAccountOptions_(data.accounts, '') + '</select></div>' +
+          '<div><label>Source file</label><input type="file" accept="' +
+          (type === 'pdf' ? '.pdf' : type === 'image' ? 'image/*' : type === 'txt' ? '.txt' : '.csv') + '"></div></div>' +
+        '<p class="status-yellow">File parsing and row preview are not yet enabled. Do not use this screen for production imports yet.</p>' +
+        '<div class="button-row"><button class="secondary-button" type="button" onclick="showInputWorkspace(\'input-main\')">Back</button></div>';
+    }
+
+    function openDetachedReviewWindow_(title, content) {
+      const popup = window.open('', 'NilavaramTransactionReview',
+        'popup=yes,width=1500,height=900,resizable=yes,scrollbars=yes');
+      if (!popup) {
+        alert('The review window was blocked. Allow pop-ups for the Nilavaram Apps Script address and try again.');
+        return null;
+      }
+      window.nilavaramReviewWindow = popup;
+      popup.document.open();
+      popup.document.write('<!DOCTYPE html><html><head><title>' + escapeHtml(title) +
+        '</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>' +
+        'body{font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:16px;margin:0;background:#eaf7ff;color:#050505}' +
+        '.modal-shell{min-height:100vh}.modal-header,.modal-footer{background:#fff;padding:14px 18px;position:sticky;z-index:5}' +
+        '.modal-header{top:0;border-bottom:1px solid #7eb8d4}.modal-footer{bottom:0;border-top:1px solid #7eb8d4}' +
+        '.modal-body{padding:16px 18px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:12px}' +
+        'label{display:block;font-weight:700;margin:4px 0}input,select,button{font:inherit;min-height:40px;padding:7px}' +
+        'input,select{border:1px solid #7eb8d4;border-radius:6px;width:100%;box-sizing:border-box}' +
+        'button{border:1px solid #075985;border-radius:7px;cursor:pointer}.primary-button{background:#075985;color:#fff}' +
+        '.secondary-button{background:#fff;color:#050505}.button-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px}' +
+        '.download-row{background:#fff;border:1px solid #7eb8d4;border-left-width:7px;border-radius:8px;display:grid;gap:8px 12px;' +
+        'grid-template-columns:150px 190px minmax(260px,2fr) repeat(5,minmax(105px,1fr));margin-bottom:10px;padding:10px}' +
+        '.download-row.green{border-left-color:#16823a}.download-row.yellow{border-left-color:#d3a000}.download-row.red{border-left-color:#b42318}' +
+        '.download-row.acode-review-row{grid-template-columns:150px 190px minmax(280px,2fr) 150px minmax(220px,1fr) minmax(280px,1.5fr)}' +
+        '.download-cell small{color:#344054;display:block;font-weight:700}.status-green,.status-yellow,.status-red{border-radius:999px;display:inline-block;font-weight:800;padding:4px 10px}' +
+        '.status-green{background:#d8f5df;color:#075f2c}.status-yellow{background:#fff2b8;color:#6b4e00}.status-red{background:#ffd9d9;color:#8a0000}' +
+        '.success{color:#075f2c}.error{color:#a40000}@media(max-width:1100px){.download-row{grid-template-columns:repeat(2,minmax(180px,1fr))}}' +
+        '</style></head><body>' + content + '</body></html>');
+      popup.document.close();
+      popup.focus();
+      return popup;
+    }
+
+    function reviewDocument_() {
+      const popup = window.nilavaramReviewWindow;
+      return popup && !popup.closed ? popup.document : null;
+    }
+
+    function whenReviewWindowReady_(requiredIds, callback, attempt) {
+      const review = reviewDocument_();
+      const ready = review && requiredIds.every(function(id) {
+        return !!review.getElementById(id);
+      });
+      if (ready) {
+        callback(review);
+        return;
+      }
+      const nextAttempt = Number(attempt || 0) + 1;
+      if (nextAttempt > 40) {
+        if (review && review.body) {
+          review.body.insertAdjacentHTML('afterbegin',
+            '<p class="error">The review window could not finish loading. Close it and try again.</p>');
+        }
+        return;
+      }
+      setTimeout(function() {
+        whenReviewWindowReady_(requiredIds, callback, nextAttempt);
+      }, 50);
+    }
+
+    function inputGroupByEncodedKey_(encoded) {
+      const key = decodeURIComponent(encoded);
+      return (window.nilavaramInputWorkspace.groups || []).find(function(group) {
+        return group.key === key;
+      });
+    }
+
+    function renderDownloadedRow_(record, runningCents, mode, index) {
+      const suggestion = record.accountSuggestion || {};
+      if (mode === 'acode') {
+        const acodeStatus = suggestion.status === 'green-confirm' ? 'green' : 'red';
+        const acodeAction = '<select class="batch-acode" data-id="' + escapeHtml(record.id) + '">' +
+          inputAccountOptions_(window.nilavaramInputWorkspace.accounts,
+            suggestion.counterAccountCode || '') + '</select>' +
+          '<label><input class="batch-rule" type="checkbox" data-id="' + escapeHtml(record.id) + '"> Save as rule</label>' +
+          '<select class="batch-rule-operator" data-id="' + escapeHtml(record.id) + '">' +
+            '<option value="contains">Contains</option><option value="exactly">Is exactly</option></select>' +
+          '<input class="batch-rule-text" data-id="' + escapeHtml(record.id) + '" value="' +
+            escapeHtml(record.description || '') + '" aria-label="Rule text">';
+        return '<div class="download-row acode-review-row ' + acodeStatus + '" data-index="' + index + '">' +
+          '<div class="download-cell"><small>Transaction ID</small>' + escapeHtml(record.sourceRecordNumber) + '</div>' +
+          '<div class="download-cell"><small>Proof</small>' + escapeHtml(record.proofLabel) + '</div>' +
+          '<div class="download-cell"><small>Transaction to classify</small>' + escapeHtml(record.transactionDate) +
+            '<br>' + escapeHtml(record.description) + '<br><small>External ref: ' + escapeHtml(record.externalReference || 'â€”') + '</small></div>' +
+          '<div class="download-cell"><small>Direction</small>' + escapeHtml(record.direction || 'Review') +
+            '<br><small>Amount</small>' + formatCentsInput_(record.amountCents || 0) + '</div>' +
+          '<div class="download-cell"><small>Suggested rule</small>' +
+            escapeHtml(suggestion.reason || 'No matching rule') + '</div>' +
+          '<div class="download-cell"><small>ACODE / rule</small>' + acodeAction + '</div></div>';
+      }
+      const sandboxReconciliation = mode === 'reconciliation' &&
+        window.nilavaramActiveInputGroup &&
+        window.nilavaramActiveInputGroup.environment === 'sandbox' &&
+        runningCents !== null;
+      const calculatedExternalCents = record.externalBalanceCents == null &&
+        sandboxReconciliation ? runningCents : record.externalBalanceCents;
+      const rowDifferenceCents = runningCents == null ||
+        calculatedExternalCents == null
+        ? null : calculatedExternalCents - runningCents;
+      const statusClass = rowDifferenceCents === 0 ? 'green' :
+        calculatedExternalCents == null ? 'yellow' : 'red';
+      let action = '<span class="status-' + statusClass + '">' +
+        (statusClass === 'green' ? 'Match' : statusClass === 'yellow' ? 'Review' : 'Fix') + '</span>';
+      action = (rowDifferenceCents === null
+        ? 'â€”'
+        : formatCentsInput_(rowDifferenceCents)) + '<br>' +
+        '<span class="status-' + statusClass + '">' +
+        (statusClass === 'green' ? 'Matching' :
+          statusClass === 'yellow' ? 'Review' : 'Fix') + '</span>';
+      return '<div class="download-row ' + statusClass + '" data-index="' + index + '">' +
+        '<div class="download-cell"><small>Transaction ID</small>' + escapeHtml(record.sourceRecordNumber) + '</div>' +
+        '<div class="download-cell"><small>Proof</small>' + escapeHtml(record.proofLabel) + '</div>' +
+        '<div class="download-cell"><small>Raw transaction</small>' + escapeHtml(record.transactionDate) +
+          '<br>' + escapeHtml(record.description) + '<br><small>External ref: ' + escapeHtml(record.externalReference || 'â€”') + '</small></div>' +
+        '<div class="download-cell"><small>Receipt</small>' + formatCentsInput_(record.receiptCents || 0) + '</div>' +
+        '<div class="download-cell"><small>Payment</small>' + formatCentsInput_(record.paymentCents || 0) + '</div>' +
+        '<div class="download-cell"><small>Sys running bal.</small>' + (runningCents == null ? 'Enter opening balance' : formatCentsInput_(runningCents)) + '</div>' +
+        '<div class="download-cell"><small>External running bal.</small>' + formatCentsInput_(calculatedExternalCents) + '</div>' +
+        '<div class="download-cell"><small>Difference / status</small>' + action + '</div>' +
+        '</div>';
+    }
+
+    function openReconciliationPopup(encoded) {
+      const group = inputGroupByEncodedKey_(encoded);
+      if (!group) return;
+      window.nilavaramActiveInputGroup = group;
+      const sandbox = group.environment === 'sandbox';
+      const content = '<div class="modal-shell"><div class="modal-header"><h2>Reconciliation â€” ' +
+        escapeHtml(group.proofLabel) + '</h2><p>' + group.recordCount +
+        ' transactions. ' + (sandbox
+          ? 'Sandbox review starts from $0.00 and displays the calculated ending balance.'
+          : 'Yellow means the feed did not supply a transaction-level external balance.') + '</p></div>' +
+        '<div class="modal-body"><div class="form-grid">' +
+          '<div><label>' + (sandbox ? 'Sandbox starting balance' : 'External opening balance') + '</label><input id="batch-opening" type="number" step="0.01" ' +
+            (sandbox ? 'value="0.00" readonly' : '') + '></div>' +
+          '<div><label>' + (sandbox ? 'Calculated sandbox ending balance' : 'External ending balance') + '</label><input id="batch-ending" type="number" step="0.01" ' +
+            (sandbox ? 'readonly' : '') + '></div>' +
+        '</div><div id="recon-batch-summary" class="status-yellow">' +
+          (sandbox ? 'Calculating from $0.00...' : 'Enter both balances to calculate the system balance and difference.') + '</div>' +
+        '<div id="recon-rows">' + group.records.map(function(record, index) {
+          return renderDownloadedRow_(record, null, 'reconciliation', index);
+        }).join('') + '</div></div>' +
+        '<div class="modal-footer"><label><input id="recon-confirm-all" type="checkbox"> I reviewed every transaction in this account batch.</label>' +
+        '<div class="button-row"><button id="recon-save" class="primary-button" type="button" disabled>One-click reconcile batch</button>' +
+        '<button class="secondary-button" type="button" onclick="window.opener.closeTransactionPopup()">Close</button> <span id="recon-message"></span></div></div></div>';
+      if (!openDetachedReviewWindow_('Nilavaram Reconciliation', content)) return;
+      whenReviewWindowReady_([
+        'batch-opening', 'batch-ending', 'recon-confirm-all',
+        'recon-save', 'recon-rows'
+      ], function(review) {
+        review.getElementById('batch-opening').oninput = updateReconciliationPopup;
+        review.getElementById('batch-ending').oninput = updateReconciliationPopup;
+        review.getElementById('recon-confirm-all').onchange = updateReconciliationPopup;
+        review.getElementById('recon-save').onclick = saveReconciliationPopup;
+        updateReconciliationPopup();
+      });
+    }
+
+    function updateReconciliationPopup() {
+      const group = window.nilavaramActiveInputGroup;
+      const review = reviewDocument_();
+      if (!review) return;
+      const openingText = review.getElementById('batch-opening').value;
+      const endingText = review.getElementById('batch-ending').value;
+      const opening = openingText === '' ? null : Math.round(Number(openingText) * 100);
+      const ending = endingText === '' ? null : Math.round(Number(endingText) * 100);
+      let running = opening;
+      if (opening !== null && isFinite(opening)) {
+        review.getElementById('recon-rows').innerHTML = group.records.map(function(record, index) {
+          running += Number(record.receiptCents || 0) - Number(record.paymentCents || 0);
+          return renderDownloadedRow_(record, running, 'reconciliation', index);
+        }).join('');
+      }
+      const sandbox = group.environment === 'sandbox';
+      if (sandbox && running !== null && isFinite(running)) {
+        review.getElementById('batch-ending').value = (running / 100).toFixed(2);
+      }
+      const effectiveEnding = sandbox ? running : ending;
+      const difference = opening === null || effectiveEnding === null ? null : effectiveEnding - running;
+      const summary = review.getElementById('recon-batch-summary');
+      summary.className = difference === 0 ? 'status-green' : 'status-red';
+      summary.textContent = difference === null
+        ? 'Enter both balances to calculate the system balance and difference.'
+        : 'System ending ' + formatCentsInput_(running) + ' | External ending ' +
+          formatCentsInput_(effectiveEnding) + ' | Difference ' + formatCentsInput_(difference);
+      review.getElementById('recon-save').disabled = !(difference === 0 &&
+        review.getElementById('recon-confirm-all').checked);
+    }
+
+    function saveReconciliationPopup() {
+      const group = window.nilavaramActiveInputGroup;
+      const review = reviewDocument_();
+      if (!review) return;
+      review.getElementById('recon-message').textContent = ' Saving...';
+      google.script.run.withSuccessHandler(function(result) {
+        const activeReview = reviewDocument_();
+        if (!activeReview) return;
+        activeReview.getElementById('recon-message').innerHTML = result.success
+          ? '<span class="success">' + escapeHtml(result.message) + '</span>'
+          : '<span class="error">' + escapeHtml(result.message) + '</span>';
+        if (result.success) setTimeout(function() {
+          closeTransactionPopup();
+          showInputWorkspace('input-main');
+        }, 800);
+      }).withFailureHandler(function(error) {
+        const activeReview = reviewDocument_();
+        if (!activeReview) return;
+        activeReview.getElementById('recon-message').innerHTML = '<span class="error">' +
+          escapeHtml(error.message) + '</span>';
+      }).saveSourceBatchReconciliation({
+        sourceRecordIds: group.records.map(function(record) { return record.id; }),
+        openingBalance: review.getElementById('batch-opening').value,
+        externalEndingBalance: review.getElementById('batch-ending').value,
+        zeroBasedSandboxReview: group.environment === 'sandbox',
+        confirmAll: review.getElementById('recon-confirm-all').checked
+      });
+    }
+
+    function openAcodePopup(encoded) {
+      const group = inputGroupByEncodedKey_(encoded);
+      if (!group) return;
+      if (group.reconciliationStatus !== 'reconciled') {
+        alert('Complete reconciliation for this account batch before assigning ACODEs.');
+        return;
+      }
+      const baseUrl = String((CONNECTIONS_BOOTSTRAP.accessInfo || {}).appsScriptWebApp || '');
+      const reviewUrl = baseUrl + '?reviewWindow=acode&groupKey=' +
+        encodeURIComponent(group.key);
+      const popupWidth = Math.max(1200, Number(screen.availWidth || 1600) - 20);
+      const popupHeight = Math.max(760, Number(screen.availHeight || 950) - 60);
+      const popup = window.open(reviewUrl, 'NilavaramAcodeReview',
+        'popup=yes,left=0,top=0,width=' + popupWidth + ',height=' + popupHeight +
+        ',resizable=yes,scrollbars=yes');
+      if (!popup) {
+        alert('Allow pop-ups for the Nilavaram Apps Script address and try again.');
+        return;
+      }
+      popup.focus();
+    }
+
+    function currentAcodeRecords_() {
+      const group = window.nilavaramActiveInputGroup;
+      const review = reviewDocument_();
+      if (!review) return;
+      const start = (Number(window.nilavaramAcodePage || 1) - 1) * 25;
+      return group.records.slice(start, start + 25);
+    }
+
+    function renderAcodePopupPage() {
+      const group = window.nilavaramActiveInputGroup;
+      const pages = Math.max(1, Math.ceil(group.records.length / 25));
+      const page = Math.min(Math.max(1, Number(window.nilavaramAcodePage || 1)), pages);
+      window.nilavaramAcodePage = page;
+      review.getElementById('acode-page-nav').innerHTML =
+        '<div class="button-row"><button class="secondary-button" type="button" ' +
+        (page === 1 ? 'disabled ' : '') + 'onclick="window.opener.changeAcodePage(-1)">Previous 25</button>' +
+        '<b>Set ' + page + ' of ' + pages + '</b>' +
+        '<button class="secondary-button" type="button" ' +
+        (page === pages ? 'disabled ' : '') + 'onclick="window.opener.changeAcodePage(1)">Next 25</button></div>';
+      review.getElementById('acode-rows').innerHTML = currentAcodeRecords_()
+        .map(function(record, index) {
+          return renderDownloadedRow_(record, null, 'acode', index);
+        }).join('');
+      applyAcodeDrafts_();
+      review.getElementById('acode-confirm-all').checked = false;
+      review.getElementById('acode-complete').disabled = true;
+      review.getElementById('acode-message').textContent = '';
+    }
+
+    function changeAcodePage(change) {
+      captureAcodeDrafts_();
+      window.nilavaramAcodePage = Number(window.nilavaramAcodePage || 1) + change;
+      renderAcodePopupPage();
+    }
+
+    function captureAcodeDrafts_() {
+      const review = reviewDocument_();
+      if (!review) return;
+      currentAcodeRecords_().forEach(function(record) {
+        const select = review.querySelector('.batch-acode[data-id="' + record.id + '"]');
+        const rule = review.querySelector('.batch-rule[data-id="' + record.id + '"]');
+        const operator = review.querySelector('.batch-rule-operator[data-id="' + record.id + '"]');
+        const ruleText = review.querySelector('.batch-rule-text[data-id="' + record.id + '"]');
+        window.nilavaramAcodeDrafts[record.id] = {
+          counterAccountCode: select ? select.value : '',
+          createRule: !!(rule && rule.checked),
+          operator: operator ? operator.value : 'contains',
+          ruleText: ruleText ? ruleText.value : record.description
+        };
+      });
+    }
+
+    function applyAcodeDrafts_() {
+      const review = reviewDocument_();
+      if (!review) return;
+      currentAcodeRecords_().forEach(function(record) {
+        const draft = window.nilavaramAcodeDrafts[record.id];
+        if (!draft) return;
+        const select = review.querySelector('.batch-acode[data-id="' + record.id + '"]');
+        const rule = review.querySelector('.batch-rule[data-id="' + record.id + '"]');
+        const operator = review.querySelector('.batch-rule-operator[data-id="' + record.id + '"]');
+        const ruleText = review.querySelector('.batch-rule-text[data-id="' + record.id + '"]');
+        if (select) select.value = draft.counterAccountCode;
+        if (rule) rule.checked = draft.createRule;
+        if (operator) operator.value = draft.operator;
+        if (ruleText) ruleText.value = draft.ruleText;
+      });
+    }
+
+    function refreshAcodePopupData(savedMessage) {
+      captureAcodeDrafts_();
+      const key = window.nilavaramActiveInputGroup.key;
+      const review = reviewDocument_();
+      if (review) review.getElementById('acode-message').textContent = ' Refreshing ACODEs...';
+      google.script.run.withSuccessHandler(function(data) {
+        window.nilavaramInputWorkspace = data;
+        window.nilavaramActiveInputGroup = data.groups.find(function(group) {
+          return group.key === key;
+        });
+        renderAcodePopupPage();
+        const activeReview = reviewDocument_();
+        if (activeReview && savedMessage) {
+          activeReview.getElementById('acode-message').innerHTML =
+            '<span class="success">' + escapeHtml(savedMessage) + '</span>';
+        }
+      }).withFailureHandler(function(error) {
+        const activeReview = reviewDocument_();
+        if (activeReview) activeReview.getElementById('acode-message').innerHTML =
+          '<span class="error">' + escapeHtml(error.message) + '</span>';
+      }).getInputWorkspace();
+    }
+
+    function saveAcodePopup(completeSet) {
+      captureAcodeDrafts_();
+      const review = reviewDocument_();
+      if (!review) return;
+      const assignments = currentAcodeRecords_().map(function(record) {
+        const draft = window.nilavaramAcodeDrafts[record.id] || {};
+        return {sourceRecordId: record.id,
+          counterAccountCode: draft.counterAccountCode || '',
+          createRule: !!draft.createRule,
+          ruleText: draft.ruleText || record.description,
+          ruleName: 'Rule â€” ' + (draft.ruleText || record.description),
+          operator: draft.operator || 'contains',
+          priority: 50};
+      }).filter(function(assignment) {
+        return completeSet || !!assignment.counterAccountCode;
+      });
+      if (completeSet && assignments.some(function(item) { return !item.counterAccountCode; })) {
+        review.getElementById('acode-message').innerHTML = '<span class="error">Choose an ACODE for every displayed transaction before completing the set.</span>';
+        return;
+      }
+      if (!assignments.length) {
+        review.getElementById('acode-message').innerHTML = '<span class="error">Choose at least one ACODE before saving progress.</span>';
+        return;
+      }
+      review.getElementById('acode-message').textContent = ' Saving...';
+      google.script.run.withSuccessHandler(function(result) {
+        refreshAcodePopupData(result.message);
+        showInputWorkspace('input-main');
+      }).withFailureHandler(function(error) {
+        const activeReview = reviewDocument_();
+        if (!activeReview) return;
+        activeReview.getElementById('acode-message').innerHTML = '<span class="error">' +
+          escapeHtml(error.message) + '</span>';
+      }).saveSourceBatchAcodeAssignments({assignments: assignments,
+        confirmAll: completeSet && review.getElementById('acode-confirm-all').checked,
+        savePartial: !completeSet});
+    }
+
+    function closeTransactionPopup() {
+      const popup = window.nilavaramReviewWindow;
+      if (popup && !popup.closed) popup.close();
+      window.nilavaramReviewWindow = null;
+    }
+
+    function showTransactionWorkbench(view) {
+      document.getElementById('output').textContent =
+        'Preparing the Transaction Workbench...';
+      google.script.run
+        .withSuccessHandler(function(data) {
+          window.nilavaramWorkbench = data;
+          window.nilavaramWorkbenchView = view || 'transaction-workbench';
+          if (!window.nilavaramWorkbenchPage) window.nilavaramWorkbenchPage = 1;
+          renderTransactionWorkbench(data, window.nilavaramWorkbenchView);
+        })
+        .withFailureHandler(showError)
+        .getTransactionWorkbench();
+    }
+
+    function workbenchBadge(passed, passedText, reviewText) {
+      return passed
+        ? '<span class="success">âœ“ ' + escapeHtml(passedText) + '</span>'
+        : '<span class="error">â— ' + escapeHtml(reviewText) + '</span>';
+    }
+
+    function renderTransactionWorkbench(data, view) {
+      const output = document.getElementById('output');
+      let html =
+        '<h2>Transaction Workbench</h2>' +
+        '<p>External proof is registered first and remains outside the books ' +
+        'until it is matched or approved as a new accounting transaction.</p>' +
+        '<p class="error"><b>Posting safety hold:</b> Actual posting is disabled ' +
+        'until this complete workflow passes end-to-end verification.</p>' +
+        '<div class="button-row">' +
+          '<button type="button" onclick="showTransactionWorkbench(\'source-input\')">1. Source Input</button>' +
+          '<button type="button" onclick="showTransactionWorkbench(\'reconciliation-validation\')">2. Reconciliation</button>' +
+          '<button type="button" onclick="showTransactionWorkbench(\'account-rule-review\')">3. Account Rules</button>' +
+          '<button type="button" onclick="showTransactionWorkbench(\'manual-journal-entry\')">Manual / Correction JE</button>' +
+        '</div>' +
+        '<p><b>Locked policy:</b> ' + escapeHtml(data.policyVersion) +
+        ' &nbsp; <b>Registered:</b> ' + data.counts.total +
+        ' &nbsp; <b>Green suggestions:</b> ' + data.counts.greenSuggestions +
+        ' &nbsp; <b>Red review:</b> ' + data.counts.redReview + '</p>' +
+        '<details><summary>View locked workflow rules</summary><ol>' +
+        data.lockedRules.map(function(rule) {
+          return '<li>' + escapeHtml(rule) + '</li>';
+        }).join('') + '</ol></details>';
+      output.innerHTML = html + '<div id="workbench-view"></div>';
+      if (view === 'source-input') renderSourceInput(data);
+      else if (view === 'reconciliation-validation') renderReconciliation(data);
+      else if (view === 'account-rule-review') renderAccountRuleReview(data);
+      else if (view === 'manual-journal-entry') renderManualJournalEntry(data);
+      else renderWorkbenchSummary(data);
+    }
+
+    function workbenchPageRecords(data) {
+      const size = Number(data.reviewBatchSize || 25);
+      const totalPages = Math.max(1, Math.ceil(data.sourceRecords.length / size));
+      window.nilavaramWorkbenchPage = Math.min(
+        Math.max(1, Number(window.nilavaramWorkbenchPage || 1)),
+        totalPages
+      );
+      const start = (window.nilavaramWorkbenchPage - 1) * size;
+      return data.sourceRecords.slice(start, start + size);
+    }
+
+    function workbenchBatchNavigation(data) {
+      const size = Number(data.reviewBatchSize || 25);
+      const pages = Math.max(1, Math.ceil(data.sourceRecords.length / size));
+      const page = Number(window.nilavaramWorkbenchPage || 1);
+      return '<div class="button-row"><button type="button" ' +
+        (page <= 1 ? 'disabled ' : '') +
+        'onclick="changeWorkbenchBatch(-1)">Previous 25</button>' +
+        '<span><b>Batch ' + page + ' of ' + pages + '</b> (' +
+        data.sourceRecords.length + ' total records)</span>' +
+        '<button type="button" ' + (page >= pages ? 'disabled ' : '') +
+        'onclick="changeWorkbenchBatch(1)">Next 25</button></div>';
+    }
+
+    function changeWorkbenchBatch(change) {
+      window.nilavaramWorkbenchPage =
+        Math.max(1, Number(window.nilavaramWorkbenchPage || 1) + change);
+      renderTransactionWorkbench(
+        window.nilavaramWorkbench,
+        window.nilavaramWorkbenchView
+      );
+    }
+
+    function renderWorkbenchSummary(data) {
+      let html = '<h3>Current queue</h3>';
+      if (!data.sourceRecords.length) {
+        html += '<p>No source records have been registered.</p>';
+      } else {
+        html += workbenchBatchNavigation(data) +
+          '<table><thead><tr><th>Source</th><th>Date</th><th>Description</th>' +
+          '<th>Evidence</th><th>Reconciliation</th><th>Accounts</th><th>Books</th></tr></thead><tbody>';
+        workbenchPageRecords(data).forEach(function(record) {
+          html += '<tr><td>' + escapeHtml(record.sourceRecordNumber) + '</td>' +
+            '<td>' + escapeHtml(record.transactionDate) + '</td>' +
+            '<td>' + escapeHtml(record.description) + '</td>' +
+            '<td>' + workbenchBadge(record.controls.evidence === 'passed', 'Verified', 'Review') + '</td>' +
+            '<td>' + workbenchBadge(record.controls.reconciliation === 'passed', 'Agreed', 'Pending / difference') + '</td>' +
+            '<td>' + workbenchBadge(record.controls.accountAssignment === 'passed', 'Approved', 'Review') + '</td>' +
+            '<td>' + escapeHtml(record.booksStatus || 'outside-books') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+      }
+      document.getElementById('workbench-view').innerHTML = html;
+    }
+
+    function sourceRecordOptions(data) {
+      return data.sourceRecords.map(function(record) {
+        return '<option value="' + escapeHtml(record.id) + '">' +
+          escapeHtml(record.sourceRecordNumber + ' â€” ' + record.description) +
+          '</option>';
+      }).join('');
+    }
+
+    function renderSourceInput(data) {
+      const akoya = CONNECTIONS_BOOTSTRAP.akoyaStatus || {};
+      const access = CONNECTIONS_BOOTSTRAP.accessInfo || {};
+      const akoyaImport = akoya.connected
+        ? '<div class="notice"><p><b>Akoya Sandbox is connected.</b> ' +
+          'The download remains outside the books and is safe to repeat.</p>' +
+          '<a class="primary-button" href="' +
+          escapeHtml(access.appsScriptWebApp || '#') +
+          '?importAkoyaSandbox=1">Download sandbox checking transactions</a>' +
+          '</div>'
+        : '';
+      document.getElementById('workbench-view').innerHTML =
+        '<h3>Step 1 â€” Register source input and proof</h3>' +
+        akoyaImport +
+        '<p>Select a local CSV, PDF or image only to calculate its SHA-256 identity. ' +
+        'The browser does not upload the file; keep it under <code>E:\\nn\\Nilavaram Data</code> ' +
+        'and sync it to OneDrive separately.</p>' +
+        '<form id="source-input-form"><div class="form-grid">' +
+          '<div><label for="source-type">Input method</label><select id="source-type">' +
+            '<option value="bank-download">Automatic/bank download record</option>' +
+            '<option value="csv">CSV file</option><option value="pdf">PDF statement</option>' +
+            '<option value="image">Receipt/image</option></select></div>' +
+          '<div><label for="source-file">Supporting file</label><input id="source-file" type="file" required></div>' +
+          '<div><label for="source-date">Transaction date</label><input id="source-date" type="date" required></div>' +
+          '<div><label for="source-amount">Amount</label><input id="source-amount" type="number" min="0.01" step="0.01" required></div>' +
+          '<div><label for="source-description">Description/payee</label><input id="source-description" required></div>' +
+          '<div><label for="source-reference">External reference/check number</label><input id="source-reference"></div>' +
+          '<div><label for="source-storage">External HDD / OneDrive reference</label>' +
+            '<input id="source-storage" value="E:\\nn\\Nilavaram Data\\00 Inbox" required></div>' +
+        '</div><p id="source-hash-message" class="help-meta">The file hash will be calculated locally.</p>' +
+        '<button class="primary-button" type="submit">Register outside the books</button> ' +
+        '<span id="source-input-message"></span></form><hr>' +
+        '<div id="source-queue"></div>';
+      document.getElementById('source-input-form').onsubmit = saveSourceInputForm;
+      renderSourceQueue(data);
+    }
+
+    async function sha256File(file) {
+      const buffer = await file.arrayBuffer();
+      const digest = await crypto.subtle.digest('SHA-256', buffer);
+      return Array.from(new Uint8Array(digest))
+        .map(function(value) { return value.toString(16).padStart(2, '0'); })
+        .join('');
+    }
+
+    async function saveSourceInputForm(event) {
+      event.preventDefault();
+      const file = document.getElementById('source-file').files[0];
+      if (!file) return;
+      const message = document.getElementById('source-input-message');
+      message.textContent = ' Calculating file identity...';
+      try {
+        const hash = await sha256File(file);
+        document.getElementById('source-hash-message').textContent =
+          'SHA-256: ' + hash;
+        const input = {
+          sourceType: document.getElementById('source-type').value,
+          date: document.getElementById('source-date').value,
+          amount: document.getElementById('source-amount').value,
+          description: document.getElementById('source-description').value,
+          externalReference: document.getElementById('source-reference').value,
+          storageReference: document.getElementById('source-storage').value,
+          evidenceName: file.name,
+          fileHash: hash
+        };
+        message.textContent = ' Registering...';
+        google.script.run
+          .withSuccessHandler(function(result) {
+            message.innerHTML = ' <span class="success">' +
+              escapeHtml(result.message) + '</span>';
+            showTransactionWorkbench('source-input');
+          })
+          .withFailureHandler(function(error) {
+            message.innerHTML = ' <span class="error">' +
+              escapeHtml(error.message) + '</span>';
+          })
+          .registerSourceRecord(input);
+      } catch (error) {
+        message.innerHTML = ' <span class="error">' +
+          escapeHtml(error.message) + '</span>';
+      }
+    }
+
+    function renderSourceQueue(data) {
+      const container = document.getElementById('source-queue');
+      if (!container) return;
+      if (!data.sourceRecords.length) {
+        container.innerHTML = '<p>No source records yet.</p>';
+        return;
+      }
+      let html = '<h3>Registered source queue</h3>' +
+        workbenchBatchNavigation(data) +
+        '<table><thead><tr>' +
+        '<th>ID</th><th>Proof</th><th>Status</th><th>Alert</th></tr></thead><tbody>';
+      workbenchPageRecords(data).forEach(function(record) {
+        html += '<tr><td>' + escapeHtml(record.sourceRecordNumber) + '</td>' +
+          '<td>' + escapeHtml(record.evidenceName) + '</td>' +
+          '<td>Outside books</td><td><span class="error">' +
+          escapeHtml(record.alertMessage || 'Review required') +
+          '</span></td></tr>';
+      });
+      container.innerHTML = html + '</tbody></table>';
+    }
+
+    function renderReconciliation(data) {
+      document.getElementById('workbench-view').innerHTML =
+        '<h3>Step 2 â€” Reconciliation input validation</h3>' +
+        '<p>The system checks both statement arithmetic and the final formula: <b>' +
+        escapeHtml(data.formulas.reconciliation) + '</b></p>' +
+        '<form id="reconciliation-form"><div class="form-grid">' +
+          '<div><label>Source record</label><select id="recon-source">' + sourceRecordOptions(data) + '</select></div>' +
+          '<div><label>External beginning balance</label><input id="recon-ext-begin" type="number" step="0.01" required></div>' +
+          '<div><label>External activity (signed)</label><input id="recon-ext-activity" type="number" step="0.01" required></div>' +
+          '<div><label>External ending balance</label><input id="recon-ext-end" type="number" step="0.01" required></div>' +
+          '<div><label>Book beginning balance</label><input id="recon-book-begin" type="number" step="0.01" required></div>' +
+          '<div><label>Book activity (signed)</label><input id="recon-book-activity" type="number" step="0.01" required></div>' +
+          '<div><label>Outstanding items (signed)</label><input id="recon-outstanding" type="number" step="0.01" value="0" required></div>' +
+        '</div><button class="primary-button" type="submit">Run reconciliation check</button> ' +
+        '<span id="reconciliation-message"></span></form>' +
+        '<p class="error"><b>Red alert rule:</b> Never force a difference. Review missing, duplicate, cutoff or ' +
+        'classification issues. A material correction should be reviewed by a qualified CPA and entered as a separate correction Journal Entry.</p>';
+      document.getElementById('reconciliation-form').onsubmit = saveReconciliationForm;
+    }
+
+    function saveReconciliationForm(event) {
+      event.preventDefault();
+      const input = {
+        sourceRecordId: document.getElementById('recon-source').value,
+        externalBeginning: document.getElementById('recon-ext-begin').value,
+        externalActivity: document.getElementById('recon-ext-activity').value,
+        externalEnding: document.getElementById('recon-ext-end').value,
+        bookBeginning: document.getElementById('recon-book-begin').value,
+        bookActivity: document.getElementById('recon-book-activity').value,
+        outstanding: document.getElementById('recon-outstanding').value
+      };
+      document.getElementById('reconciliation-message').textContent = ' Checking...';
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('reconciliation-message').innerHTML =
+          result.success
+            ? ' <span class="success">' + escapeHtml(result.message) + '</span>'
+            : ' <span class="error">' + escapeHtml(result.message) + '</span>';
+      }).withFailureHandler(function(error) {
+        document.getElementById('reconciliation-message').innerHTML =
+          ' <span class="error">' + escapeHtml(error.message) + '</span>';
+      }).saveSourceReconciliation(input);
+    }
+
+    function renderAccountRuleReview(data) {
+      const accounts = (window.nilavaramTransactionSetup || {}).accounts || [];
+      let accountOptions = accounts.map(function(account) {
+        return '<option value="' + escapeHtml(account.code) + '">' +
+          escapeHtml(account.code + ' â€” ' + account.name) + '</option>';
+      }).join('');
+      let ruleOptions = '<option value="">No rule â€” user selection</option>' +
+        data.rules.map(function(rule) {
+          return '<option value="' + escapeHtml(rule.id) + '">' +
+            escapeHtml(rule.name + ' v' + (rule.version || 1) +
+              ' â€” confidence ' + (rule.confidence || 0) + '%') + '</option>';
+      }).join('');
+      document.getElementById('workbench-view').innerHTML =
+        '<h3>Step 3 â€” Account rule review and approval</h3>' +
+        '<p>The bank side comes from money-in or money-out. The rule suggests the opposite account. ' +
+        'Green means safe to confirm; red means review. Neither color posts automatically.</p>' +
+        renderAccountSuggestionQueue(data) +
+        '<h3>Confirm or change one suggestion</h3>' +
+        '<p>Every approval records the rule ID/version, match reason, suggestion, confidence, approver and any change reason.</p>' +
+        (accounts.length ? '' : '<p class="error">Loading the active Chart of Accounts...</p>') +
+        '<form id="rule-approval-form"><div class="form-grid">' +
+          '<div><label>Source record</label><select id="rule-source">' + sourceRecordOptions(data) + '</select></div>' +
+          '<div><label>Approved rule</label><select id="rule-id">' + ruleOptions + '</select></div>' +
+          '<div><label>Debit account</label><select id="rule-debit">' + accountOptions + '</select></div>' +
+          '<div><label>Credit account</label><select id="rule-credit">' + accountOptions + '</select></div>' +
+          '<div><label>Reason if suggestion changed</label><input id="rule-change-reason"></div>' +
+        '</div><button class="primary-button" type="submit">Approve account assignment</button> ' +
+        '<span id="rule-message"></span></form><hr>' +
+        '<h3>Create a description rule</h3>' +
+        '<p>Use a narrow, recognizable bank description. Exact rules receive 95% confidence; Contains rules receive 90%.</p>' +
+        '<form id="new-account-rule-form"><input id="edit-rule-id" type="hidden"><div class="form-grid">' +
+          '<div><label>Rule name</label><input id="new-rule-name" required></div>' +
+          '<div><label>Direction</label><select id="new-rule-direction">' +
+            '<option value="money-out">Money out / payment</option>' +
+            '<option value="money-in">Money in / receipt</option></select></div>' +
+          '<div><label>Bank description test</label><select id="new-rule-operator">' +
+            '<option value="contains">Contains</option>' +
+            '<option value="exactly">Is exactly</option></select></div>' +
+          '<div><label>Description text</label><input id="new-rule-text" required></div>' +
+          '<div><label>Calendar / tax year</label>' +
+            '<input id="new-rule-tax-year" type="number" min="2000" max="2100" value="' +
+            escapeHtml(String(new Date().getFullYear())) + '" required></div>' +
+          '<div><label>Opposite account</label><select id="new-rule-counter">' +
+            accountOptions + '</select></div>' +
+          '<div><label>Priority (higher runs first)</label>' +
+            '<input id="new-rule-priority" type="number" min="1" max="999" value="50" required></div>' +
+          '<div><label><input id="apply-rule-year" type="checkbox" checked> Apply the revised suggestion to all still-unapproved transactions in this tax year</label></div>' +
+        '</div><button id="save-rule-button" class="primary-button" type="submit">Save active suggestion rule</button> ' +
+        '<button id="cancel-rule-edit" type="button">Clear / cancel edit</button> ' +
+        '<span id="new-rule-message"></span></form><hr><h3>Visible active rules</h3>' +
+        renderRulesTable(data.rules);
+      if (!accounts.length) {
+        google.script.run.withSuccessHandler(function(setup) {
+          window.nilavaramTransactionSetup = setup;
+          renderAccountRuleReview(data);
+        }).withFailureHandler(showError).getSimpleTransactionSetup();
+        return;
+      }
+      document.getElementById('rule-id').onchange = applySelectedRule;
+      document.getElementById('rule-source').onchange = applySourceSuggestion;
+      document.getElementById('rule-approval-form').onsubmit = saveRuleApproval;
+      document.getElementById('new-account-rule-form').onsubmit =
+        saveNewAccountRule;
+      document.getElementById('cancel-rule-edit').onclick = function() {
+        document.getElementById('new-account-rule-form').reset();
+        document.getElementById('edit-rule-id').value = '';
+        document.getElementById('new-rule-tax-year').readOnly = false;
+        document.getElementById('new-rule-direction').disabled = false;
+        document.getElementById('save-rule-button').textContent = 'Save active suggestion rule';
+      };
+      applySourceSuggestion();
+    }
+
+    function renderAccountSuggestionQueue(data) {
+      if (!data.sourceRecords.length) return '<p>No source records yet.</p>';
+      let html = workbenchBatchNavigation(data) +
+        '<table><thead><tr><th>Date / description</th><th>Direction</th>' +
+        '<th>Suggested entry</th><th>Rule decision</th><th>Action</th>' +
+        '</tr></thead><tbody>';
+      workbenchPageRecords(data).forEach(function(record) {
+        const suggestion = record.accountSuggestion || {};
+        const green = suggestion.status === 'green-confirm';
+        html += '<tr><td>' + escapeHtml(record.transactionDate || '') +
+          '<br>' + escapeHtml(record.description || '') + '</td>' +
+          '<td>' + escapeHtml(suggestion.direction || 'unknown') + '</td>' +
+          '<td>Dr ' + escapeHtml(suggestion.debitAccountCode || 'Review') +
+          '<br>Cr ' + escapeHtml(suggestion.creditAccountCode || 'Review') +
+          '</td><td>' + workbenchBadge(
+            green,
+            'Confirm â€” ' + (suggestion.confidence || 0) + '%',
+            'Review required'
+          ) + '<br>' + escapeHtml(suggestion.reason || '') +
+          (suggestion.warning
+            ? '<br><span class="error">' + escapeHtml(suggestion.warning) + '</span>'
+            : '') +
+          '</td><td><button type="button" onclick="selectRuleRecord(\'' +
+          escapeHtml(record.id) + '\')">Review this line</button></td></tr>';
+      });
+      return html + '</tbody></table>';
+    }
+
+    function selectRuleRecord(id) {
+      document.getElementById('rule-source').value = id;
+      applySourceSuggestion();
+      document.getElementById('rule-approval-form').scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+
+    function applySourceSuggestion() {
+      const sourceElement = document.getElementById('rule-source');
+      if (!sourceElement) return;
+      const record = (window.nilavaramWorkbench.sourceRecords || [])
+        .find(function(item) { return item.id === sourceElement.value; });
+      if (!record || !record.accountSuggestion) return;
+      const suggestion = record.accountSuggestion;
+      document.getElementById('rule-id').value = suggestion.ruleId || '';
+      if (suggestion.debitAccountCode) {
+        document.getElementById('rule-debit').value =
+          suggestion.debitAccountCode;
+      }
+      if (suggestion.creditAccountCode) {
+        document.getElementById('rule-credit').value =
+          suggestion.creditAccountCode;
+      }
+    }
+
+    function renderRulesTable(rules) {
+      let html = '<table><thead><tr><th>Rule</th><th>Tax year</th><th>Version</th><th>Reason</th>' +
+        '<th>Suggestion</th><th>Confidence</th><th>Status</th><th></th></tr></thead><tbody>';
+      rules.forEach(function(rule) {
+        html += '<tr><td>' + escapeHtml(rule.ruleId || rule.id) + '</td>' +
+          '<td>' + escapeHtml(rule.taxYear || 'Unscoped â€” will not auto-apply') + '</td>' +
+          '<td>' + escapeHtml(rule.version || 1) + '</td>' +
+          '<td>' + escapeHtml(rule.matchReason || '') + '</td>' +
+          '<td>' + escapeHtml((rule.debitAccountCode || '') + ' / ' +
+            (rule.creditAccountCode || '')) + '</td>' +
+          '<td>' + escapeHtml(rule.confidence || 0) + '%</td>' +
+          '<td><span class="success">âœ“ Active</span></td>' +
+          '<td><button type="button" onclick="editTransactionRule(\'' +
+            escapeHtml(rule.id) + '\')">Review / change</button></td></tr>';
+      });
+      return html + '</tbody></table>';
+    }
+
+    function editTransactionRule(id) {
+      const rule = (window.nilavaramWorkbench.rules || []).find(function(item) {
+        return item.id === id;
+      });
+      if (!rule) return;
+      if (!rule.taxYear) {
+        alert('This is an older unscoped rule. Create a new tax-year rule instead; it will not auto-apply.');
+        return;
+      }
+      document.getElementById('edit-rule-id').value = rule.id;
+      document.getElementById('new-rule-name').value = rule.name || '';
+      document.getElementById('new-rule-direction').value = rule.direction || 'money-out';
+      document.getElementById('new-rule-operator').value = rule.matchOperator || 'contains';
+      document.getElementById('new-rule-text').value = Array.isArray(rule.matchText)
+        ? (rule.matchText[0] || '') : (rule.matchText || '');
+      document.getElementById('new-rule-tax-year').value = rule.taxYear;
+      document.getElementById('new-rule-tax-year').readOnly = true;
+      document.getElementById('new-rule-direction').disabled = true;
+      document.getElementById('new-rule-counter').value = rule.counterAccountCode || '';
+      document.getElementById('new-rule-priority').value = rule.priority || 50;
+      document.getElementById('save-rule-button').textContent = 'Update this tax-year rule';
+      document.getElementById('new-account-rule-form').scrollIntoView({behavior:'smooth'});
+    }
+
+    function applySelectedRule() {
+      const id = document.getElementById('rule-id').value;
+      const rule = (window.nilavaramWorkbench.rules || []).find(function(item) {
+        return item.id === id;
+      });
+      if (!rule) return;
+      document.getElementById('rule-debit').value = rule.debitAccountCode;
+      document.getElementById('rule-credit').value = rule.creditAccountCode;
+    }
+
+    function saveRuleApproval(event) {
+      event.preventDefault();
+      const input = {
+        sourceRecordId: document.getElementById('rule-source').value,
+        ruleId: document.getElementById('rule-id').value,
+        debitAccountCode: document.getElementById('rule-debit').value,
+        creditAccountCode: document.getElementById('rule-credit').value,
+        changedReason: document.getElementById('rule-change-reason').value
+      };
+      document.getElementById('rule-message').textContent = ' Approving...';
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('rule-message').innerHTML =
+          ' <span class="success">' + escapeHtml(result.message) + '</span>';
+      }).withFailureHandler(function(error) {
+        document.getElementById('rule-message').innerHTML =
+          ' <span class="error">' + escapeHtml(error.message) + '</span>';
+      }).approveSourceAccountAssignment(input);
+    }
+
+    function saveNewAccountRule(event) {
+      event.preventDefault();
+      const input = {
+        ruleId: document.getElementById('edit-rule-id').value,
+        name: document.getElementById('new-rule-name').value,
+        direction: document.getElementById('new-rule-direction').value,
+        operator: document.getElementById('new-rule-operator').value,
+        matchText: document.getElementById('new-rule-text').value,
+        taxYear: document.getElementById('new-rule-tax-year').value,
+        counterAccountCode: document.getElementById('new-rule-counter').value,
+        priority: document.getElementById('new-rule-priority').value,
+        applyToUnapprovedYear: document.getElementById('apply-rule-year').checked
+      };
+      document.getElementById('new-rule-message').textContent = ' Saving...';
+      const runner = google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('new-rule-message').innerHTML =
+          ' <span class="success">' + escapeHtml(result.message) + '</span>';
+        showTransactionWorkbench('account-rule-review');
+      }).withFailureHandler(function(error) {
+        document.getElementById('new-rule-message').innerHTML =
+          ' <span class="error">' + escapeHtml(error.message) + '</span>';
+      });
+      if (input.ruleId) runner.updateTransactionAccountRuleForYear(input);
+      else runner.saveTransactionAccountRule(input);
+    }
+
+    function renderManualJournalEntry(data) {
+      const setup = window.nilavaramTransactionSetup;
+      if (!setup) {
+        google.script.run.withSuccessHandler(function(result) {
+          window.nilavaramTransactionSetup = result;
+          renderManualJournalEntry(data);
+        }).withFailureHandler(showError).getSimpleTransactionSetup();
+        return;
+      }
+      const entities = setup.entities.map(function(entity) {
+        return '<option value="' + escapeHtml(entity.id) + '">' +
+          escapeHtml(entity.name) + '</option>';
+      }).join('');
+      const accounts = setup.accounts.map(function(account) {
+        return '<option value="' + escapeHtml(account.code) + '">' +
+          escapeHtml(account.code + ' â€” ' + account.name) + '</option>';
+      }).join('');
+      document.getElementById('workbench-view').innerHTML =
+        '<h3>Manual / Correction Journal Entry</h3>' +
+        '<p class="error">Manual entries require evidence and audit notes. Material or uncertain corrections should be reviewed by a qualified CPA.</p>' +
+        '<form id="journal-entry-form"><div class="form-grid">' +
+          '<div><label>Purpose</label><select id="je-purpose"><option value="manual">Manual Journal Entry</option><option value="correction">Correction Journal Entry</option></select></div>' +
+          '<div><label>Entity</label><select id="je-entity">' + entities + '</select></div>' +
+          '<div><label>Date</label><input id="je-date" type="date" required></div>' +
+          '<div><label>Description</label><input id="je-description" required></div>' +
+          '<div><label>Amount</label><input id="je-amount" type="number" min="0.01" step="0.01" required></div>' +
+          '<div><label>Debit account</label><select id="je-debit">' + accounts + '</select></div>' +
+          '<div><label>Credit account</label><select id="je-credit">' + accounts + '</select></div>' +
+          '<div><label>Evidence file</label><input id="je-file" type="file" required></div>' +
+          '<div><label>Storage reference</label><input id="je-storage" value="E:\\nn\\Nilavaram Data\\01 Source Documents" required></div>' +
+          '<div><label>Audit explanation</label><textarea id="je-note" required></textarea></div>' +
+        '</div><button class="primary-button" type="submit">Save JE on verification hold</button> ' +
+        '<span id="je-message"></span></form>';
+      document.getElementById('journal-entry-form').onsubmit = saveJournalEntryForm;
+    }
+
+    async function saveJournalEntryForm(event) {
+      event.preventDefault();
+      const file = document.getElementById('je-file').files[0];
+      if (!file) return;
+      const message = document.getElementById('je-message');
+      message.textContent = ' Calculating file identity...';
+      try {
+        const input = {
+          entryPurpose: document.getElementById('je-purpose').value,
+          entityId: document.getElementById('je-entity').value,
+          date: document.getElementById('je-date').value,
+          description: document.getElementById('je-description').value,
+          amount: document.getElementById('je-amount').value,
+          debitAccountCode: document.getElementById('je-debit').value,
+          creditAccountCode: document.getElementById('je-credit').value,
+          evidenceName: file.name,
+          fileHash: await sha256File(file),
+          storageReference: document.getElementById('je-storage').value,
+          auditNote: document.getElementById('je-note').value
+        };
+        message.textContent = ' Saving controlled draft...';
+        google.script.run.withSuccessHandler(function(result) {
+          message.innerHTML = ' <span class="success">' +
+            escapeHtml(result.message) + '</span>';
+        }).withFailureHandler(function(error) {
+          message.innerHTML = ' <span class="error">' +
+            escapeHtml(error.message) + '</span>';
+        }).saveEvidenceBackedJournalEntry(input);
+      } catch (error) {
+        message.innerHTML = ' <span class="error">' +
+          escapeHtml(error.message) + '</span>';
+      }
+    }
+
+    function showSimpleTransaction() {
+      document.getElementById('output').textContent =
+        'Preparing New Transaction...';
+      google.script.run
+        .withSuccessHandler(renderSimpleTransaction)
+        .withFailureHandler(showError)
+        .getSimpleTransactionSetup();
+    }
+
+    function renderSimpleTransaction(data) {
+      window.nilavaramTransactionSetup = data;
+      let entities = '';
+      data.entities.forEach(function(entity) {
+        entities += '<option value="' + escapeHtml(entity.id) + '">' +
+          escapeHtml(entity.name) + '</option>';
+      });
+      let accounts = '';
+      data.accounts.forEach(function(account) {
+        accounts += '<option value="' + escapeHtml(account.code) + '">' +
+          escapeHtml(account.code + ' â€” ' + account.name) + '</option>';
+      });
+
+      document.getElementById('output').innerHTML =
+        '<h2>New Transaction</h2>' +
+        '<p>Describe what happened. Nilavaram can reuse a previously approved pattern and prepares both accounting sides.</p>' +
+        '<form id="transaction-form">' +
+          '<div class="form-grid">' +
+            '<div><label for="transaction-kind">What happened?</label>' +
+              '<select id="transaction-kind">' +
+                '<option value="paycheck">Paycheck received</option>' +
+                '<option value="bill">Bill paid</option>' +
+                '<option value="purchase">Purchase made</option>' +
+                '<option value="transfer">Money transferred</option>' +
+                '<option value="receipt">Money received</option>' +
+                '<option value="loan">Loan payment</option>' +
+                '<option value="other">Something else</option>' +
+              '</select></div>' +
+            '<div><label for="transaction-entity">Who or which organization?</label>' +
+              '<select id="transaction-entity">' + entities + '</select></div>' +
+            '<div><label for="transaction-description">Description from bank, CSV or PDF</label>' +
+              '<input id="transaction-description" placeholder="Example: CTU PAYROLL" required></div>' +
+            '<div><label for="transaction-amount">Amount</label>' +
+              '<input id="transaction-amount" type="number" min="0.01" step="0.01" required></div>' +
+            '<div><label for="transaction-date">Date</label>' +
+              '<input id="transaction-date" type="date" required></div>' +
+            '<div><label for="transaction-document">Document or PDF name, if available</label>' +
+              '<input id="transaction-document"></div>' +
+          '</div>' +
+          '<button class="secondary-button" id="find-pattern" type="button">Find previous pattern</button>' +
+          '<p id="pattern-message" class="help-meta"></p>' +
+          '<details id="transaction-accounting"><summary>View or change accounting entry</summary>' +
+            '<div class="form-grid">' +
+              '<div><label for="transaction-debit">Money received into / Debit</label>' +
+                '<select id="transaction-debit">' + accounts + '</select></div>' +
+              '<div><label for="transaction-credit">Source or ownership / Credit</label>' +
+                '<select id="transaction-credit">' + accounts + '</select></div>' +
+            '</div>' +
+          '</details>' +
+          '<div class="button-row">' +
+            '<button class="primary-button" type="submit">Save and post transaction</button>' +
+            '<span id="transaction-message"></span>' +
+          '</div>' +
+        '</form>';
+
+      document.getElementById('find-pattern').onclick = findPreviousPattern;
+      document.getElementById('transaction-description').onblur =
+        findPreviousPattern;
+      document.getElementById('transaction-form').onsubmit =
+        saveSimpleTransactionForm;
+    }
+
+    function findPreviousPattern() {
+      const description =
+        document.getElementById('transaction-description').value;
+      if (!description.trim()) return;
+      document.getElementById('pattern-message').textContent =
+        'Looking for a previous pattern...';
+      google.script.run
+        .withSuccessHandler(function(suggestion) {
+          if (!suggestion) {
+            document.getElementById('pattern-message').textContent =
+              'No approved pattern was found. Open the accounting details and select the accounts.';
+            document.getElementById('transaction-accounting').open = true;
+            return;
+          }
+          document.getElementById('transaction-kind').value =
+            suggestion.transactionType;
+          document.getElementById('transaction-entity').value =
+            suggestion.memberEntityId;
+          document.getElementById('transaction-debit').value =
+            suggestion.debitAccountCode;
+          document.getElementById('transaction-credit').value =
+            suggestion.creditAccountCode;
+          document.getElementById('pattern-message').textContent =
+            suggestion.explanation;
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('pattern-message').innerHTML =
+            '<span class="error">' + escapeHtml(error.message) + '</span>';
+        })
+        .findTransactionSuggestion(description);
+    }
+
+    function saveSimpleTransactionForm(event) {
+      event.preventDefault();
+      const input = {
+        entityId: document.getElementById('transaction-entity').value,
+        description: document.getElementById('transaction-description').value,
+        amount: document.getElementById('transaction-amount').value,
+        date: document.getElementById('transaction-date').value,
+        sourceDocumentName: document.getElementById('transaction-document').value,
+        debitAccountCode: document.getElementById('transaction-debit').value,
+        creditAccountCode: document.getElementById('transaction-credit').value
+      };
+      document.getElementById('transaction-message').textContent =
+        ' Saving and posting...';
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            document.getElementById('transaction-message').innerHTML =
+              ' <span class="success">' +
+              escapeHtml(result.message) + '</span>';
+            document.getElementById('transaction-form').reset();
+            return;
+          }
+          window.nilavaramPostingRetryId = result.transactionId;
+          document.getElementById('transaction-message').innerHTML =
+            ' <span class="error">' + escapeHtml(result.message) + '</span>' +
+            ' <button class="secondary-button" type="button" ' +
+            'onclick="retryPosting()">Retry posting saved draft</button>';
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('transaction-message').innerHTML =
+            ' <span class="error">' + escapeHtml(error.message) + '</span>';
+        })
+        .saveAndPostSimpleTransaction(input);
+    }
+
+    function retryPosting() {
+      const transactionId = window.nilavaramPostingRetryId;
+      if (!transactionId) return;
+      document.getElementById('transaction-message').textContent =
+        ' Retrying posting...';
+      google.script.run
+        .withSuccessHandler(function(result) {
+          document.getElementById('transaction-message').innerHTML =
+            ' <span class="success">' + escapeHtml(result.message) + '</span>';
+          document.getElementById('transaction-form').reset();
+          window.nilavaramPostingRetryId = '';
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('transaction-message').innerHTML =
+            ' <span class="error">' + escapeHtml(error.message) + '</span>' +
+            ' <button class="secondary-button" type="button" ' +
+            'onclick="retryPosting()">Retry posting saved draft</button>';
+        })
+        .postTransaction(transactionId);
+    }
+    </script>

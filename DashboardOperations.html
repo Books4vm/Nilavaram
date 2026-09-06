@@ -1,0 +1,1408 @@
+  <script>
+    function showConnections() {
+      window.nilavaramAdminAccessInfo =
+        CONNECTIONS_BOOTSTRAP.accessInfo || {};
+      renderMicrosoftConnection(
+        CONNECTIONS_BOOTSTRAP.microsoftStatus || {}
+      );
+      const output = document.getElementById('output');
+      output.insertAdjacentHTML(
+        'afterbegin',
+        '<p><b>Connection diagnostic build ' +
+        escapeHtml(CONNECTIONS_BOOTSTRAP.build || '') +
+        ' â€” server-rendered</b></p>'
+      );
+    }
+
+    function showRestrictedOneDriveRecovery(originalMessage) {
+      const status = CONNECTIONS_BOOTSTRAP.microsoftStatus || {};
+      const output = document.getElementById('output');
+      let html = '<h2>Restricted OneDrive Recovery</h2>' +
+        '<p class="error"><b>Firestore is temporarily unavailable.</b> ' +
+        'This one-purpose screen is available only to a configured administrator.</p>' +
+        '<p>The normal menus, transactions, accounts, reports, Akoya controls and user ' +
+        'administration are disabled here.</p>' +
+        '<p><b>Primary repository:</b> ' +
+        escapeHtml(status.expectedAccount || 'vmurugan@hotmail.com') + '</p>' +
+        '<p><b>Microsoft authorization:</b> ' +
+        (status.connected ? '<span class="success">Saved</span>' :
+          '<span class="error">Not available</span>') + '</p>' +
+        '<p class="help-meta">Startup error: ' + escapeHtml(originalMessage) + '</p>';
+      if (status.connected) {
+        const recoveryUrl = String(
+          (CONNECTIONS_BOOTSTRAP.accessInfo || {}).appsScriptWebApp || ''
+        ) + '?migrateOneDriveSource=1';
+        html += '<div class="button-row">' +
+          '<a class="primary-button" href="' + escapeHtml(recoveryUrl) +
+          '" target="_top">Copy and verify source data in OneDrive</a>' +
+          '<button class="secondary-button" type="button" ' +
+          'onclick="showOneDriveSourceStorageStatus()">Check recovery status</button>' +
+          '</div>' +
+          '<p>After a successful verified copy, this recovery screen disables itself. ' +
+          'The Firestore copies are retained and are not deleted.</p>';
+      }
+      output.innerHTML = html;
+    }
+
+    function renderMicrosoftConnection(status) {
+      const output = document.getElementById('output');
+      const access = window.nilavaramAdminAccessInfo || {};
+      const akoya = CONNECTIONS_BOOTSTRAP.akoyaStatus || {};
+      let html = '<h2>Connections</h2>' +
+        '<h3>Storage and Developer Access</h3>' +
+        '<p><b>VS Code project folder:</b><br><code>' +
+        escapeHtml(access.vscodeFolder || '') + '</code></p>' +
+        '<p><b>GitHub:</b> <a target="_blank" rel="noopener noreferrer" href="' +
+        escapeHtml(access.githubRepository || '#') + '">' +
+        escapeHtml(access.githubRepository || '') + '</a>' +
+        '<br><b>Branch:</b> ' + escapeHtml(access.githubBranch || '') + '</p>' +
+        '<p><b>Apps Script web application:</b> ' +
+        '<a target="_blank" rel="noopener noreferrer" href="' +
+        escapeHtml(access.appsScriptWebApp || '#') +
+        '">Open Nilavaram</a></p>' +
+        '<h3>Evidence Storage and Optional Local Backup</h3>' +
+        '<p><b>Primary Cloud Evidence Storage:</b> OneDrive â€” ' +
+        escapeHtml(access.primaryOneDriveAccount || '') + '</p>' +
+        '<p><b>Optional Local Backup / Intake:</b> ' +
+        escapeHtml(access.externalDriveLabel || '') + ' <code>' +
+        escapeHtml(access.externalDrive || '') + '</code>' +
+        ' â€” approximately ' +
+        escapeHtml(access.externalDriveFreeGb || '') + ' GB free.</p>' +
+        '<p><b>External code backup:</b><br><code>' +
+        escapeHtml(access.externalCodeBackup || '') + '</code><br>' +
+        'This is a backup copy; continue editing the authoritative VS Code ' +
+        'project on C:.</p>' +
+        '<p><b>External data root:</b><br><code>' +
+        escapeHtml(access.dataRoot || '') + '</code></p>' +
+        '<p><b>OneDrive sync source:</b><br><code>' +
+        escapeHtml(access.oneDriveSyncSource || '') + '</code></p>' +
+        '<p><b>External archive folder:</b><br><code>' +
+        escapeHtml(access.recommendedArchiveFolder || '') + '</code></p>' +
+        '<p><b>Local OneDrive view:</b><br><code>' +
+        escapeHtml(access.localOneDrive || '') + '</code></p>' +
+        '<p>The external HDD is optional. Place files approved for manual ' +
+        'cloud upload in the OneDrive sync source. ' +
+        'Your selected file-sync application may copy that folder to OneDrive. ' +
+        'Keep the external HDD source or archive copy and verify cloud uploads. ' +
+        'Do not require the full cloud archive on the laptop.</p>' +
+        '<p class="error"><b>Credential rule:</b> ' +
+        escapeHtml(access.credentialNotice || '') + '</p>' +
+        '<h3>Microsoft OneDrive</h3>' +
+        '<p><b>Approved repository:</b> ' +
+        escapeHtml(status.expectedAccount || 'vmurugan@hotmail.com') + '</p>';
+
+      if (!status.configured) {
+        html += '<p class="error"><b>Configuration required.</b> ' +
+          'The Microsoft application must be registered before sign-in.</p>' +
+          '<p>Missing secure settings: ' +
+          escapeHtml((status.missingProperties || []).join(', ')) + '</p>';
+      } else if (!status.connected) {
+        html += '<p class="error"><b>Not connected.</b></p>' +
+          '<div class="button-row">' +
+          '<button class="primary-button" type="button" ' +
+          'onclick="connectMicrosoftOneDrive()">Connect OneDrive</button>' +
+          '</div>';
+      } else {
+        html += '<p class="success"><b>Connected.</b></p>' +
+          '<p><b>Account:</b> ' + escapeHtml(status.account) + '</p>' +
+          '<p><b>Drive type:</b> ' + escapeHtml(status.driveType) + '</p>' +
+          '<p><b>Total space:</b> ' + escapeHtml(status.totalGb) + ' GB</p>' +
+          '<p><b>Used:</b> ' + escapeHtml(status.usedGb) + ' GB</p>' +
+          '<p><b>Available:</b> ' +
+          escapeHtml(status.remainingGb) + ' GB</p>' +
+          '<p><b>Storage status:</b> ' +
+          escapeHtml(status.quotaState) + '</p>' +
+          '<div class="button-row">' +
+            '<a class="secondary-button" ' +
+            'href="' + escapeHtml(access.appsScriptWebApp || '#') +
+            '?validateOneDrive=1">Validate live OneDrive quota</a>' +
+            '<button id="migrate-onedrive-source" class="primary-button" type="button" ' +
+            'onclick="migrateSourceDataToOneDrive()">Initialize OneDrive data storage and copy existing source records</button>' +
+            '<button class="secondary-button" type="button" ' +
+            'onclick="showOneDriveSourceStorageStatus()">Check OneDrive data-file status</button>' +
+          '</div>';
+      }
+
+      html += '<h3>Akoya Bank Feed</h3>' +
+        '<p><b>Purpose:</b> Secure, consumer-permissioned bank transaction ' +
+        'downloads for validation before accounting entries are posted.</p>' +
+        '<p><b>Environment:</b> ' +
+        escapeHtml(akoya.environment || 'sandbox') + '</p>';
+      if (!akoya.configured) {
+        html += '<p class="error"><b>Configuration required.</b></p>' +
+          '<p>Missing secure settings: ' +
+          escapeHtml((akoya.missingProperties || []).join(', ')) + '</p>';
+      } else if (!akoya.connected) {
+        html += '<p><b>Status:</b> Ready for sandbox authorization.</p>' +
+          '<div class="button-row">' +
+          '<a class="primary-button" ' +
+          'href="' + escapeHtml(access.appsScriptWebApp || '#') +
+          '?startAkoya=1">Connect Akoya Sandbox</a>' +
+          '</div>' +
+          '<p>Use Akoya sandbox test credentials only. Real Bank of America ' +
+          'credentials are not used during this test.</p>';
+      } else {
+        html += '<p class="success"><b>Connected.</b></p>' +
+          '<p><b>Sandbox provider:</b> ' +
+          escapeHtml(akoya.provider || '') + '</p>' +
+          '<p><b>Connection status:</b> ' +
+          escapeHtml(akoya.validationState || '') + '</p>' +
+          '<p><b>Sandbox accounts available:</b> ' +
+          escapeHtml(akoya.accountCount == null ? '' : akoya.accountCount) +
+          '</p>' +
+          '<div class="button-row">' +
+          '<a class="secondary-button" ' +
+          'href="' + escapeHtml(access.appsScriptWebApp || '#') +
+          '?validateAkoya=1">Validate live Akoya Sandbox connection</a>' +
+          '<a class="primary-button" ' +
+          'href="' + escapeHtml(access.appsScriptWebApp || '#') +
+          '?importAkoyaSandbox=1">Download sandbox checking transactions</a>' +
+          '</div>';
+      }
+      output.innerHTML = html;
+      if (CONNECTIONS_BOOTSTRAP.liveValidationPassed) {
+        output.insertAdjacentHTML(
+          'afterbegin',
+          '<p class="success"><b>Live Microsoft Graph validation passed.</b></p>'
+        );
+      } else if (CONNECTIONS_BOOTSTRAP.liveValidationError) {
+        output.insertAdjacentHTML(
+          'afterbegin',
+          '<p class="error"><b>Live Microsoft Graph validation failed:</b> ' +
+          escapeHtml(CONNECTIONS_BOOTSTRAP.liveValidationError) + '</p>'
+        );
+      }
+      if (CONNECTIONS_BOOTSTRAP.akoyaValidationPassed) {
+        output.insertAdjacentHTML(
+          'afterbegin',
+          '<p class="success"><b>Live Akoya Sandbox validation passed.</b></p>'
+        );
+      } else if (CONNECTIONS_BOOTSTRAP.akoyaValidationError) {
+        output.insertAdjacentHTML(
+          'afterbegin',
+          '<p class="error"><b>Live Akoya Sandbox validation failed:</b> ' +
+          escapeHtml(CONNECTIONS_BOOTSTRAP.akoyaValidationError) + '</p>'
+        );
+      }
+    }
+
+    function validateMicrosoftOneDrive() {
+      const output = document.getElementById('output');
+      output.insertAdjacentHTML(
+        'afterbegin',
+        '<p id="microsoft-live-check"><b>Contacting Microsoft Graph...</b></p>'
+      );
+      const timeoutId = window.setTimeout(function() {
+        const message = document.getElementById('microsoft-live-check');
+        if (message) {
+          message.innerHTML =
+            '<span class="error"><b>The live Microsoft check did not ' +
+            'return within 30 seconds.</b></span>';
+        }
+      }, 30000);
+      google.script.run
+        .withSuccessHandler(function(status) {
+          window.clearTimeout(timeoutId);
+          renderMicrosoftConnection(status);
+          document.getElementById('output').insertAdjacentHTML(
+            'afterbegin',
+            '<p class="success"><b>Live Microsoft Graph validation passed.</b></p>'
+          );
+        })
+        .withFailureHandler(function(error) {
+          window.clearTimeout(timeoutId);
+          showError(error);
+        })
+        .validateMicrosoftConnectionForUi();
+    }
+
+    function migrateSourceDataToOneDrive() {
+      const button = document.getElementById('migrate-onedrive-source');
+      if (button) button.disabled = true;
+      const output = document.getElementById('output');
+      output.insertAdjacentHTML('afterbegin',
+        '<p id="onedrive-migration-status"><b>Copying source records to annual OneDrive files and verifying hashesâ€¦</b></p>');
+      google.script.run.withSuccessHandler(function(result) {
+        if (button) button.disabled = false;
+        document.getElementById('onedrive-migration-status').innerHTML =
+          '<span class="success"><b>' + escapeHtml(result.message) + '</b> ' +
+          'Recovery mode is now disabled. Refresh Nilavaram to return to normal startup.</span>';
+      }).withFailureHandler(function(error) {
+        if (button) button.disabled = false;
+        document.getElementById('onedrive-migration-status').innerHTML =
+          '<span class="error"><b>OneDrive migration did not complete:</b> ' +
+          escapeHtml(error.message) + '</span>';
+      }).migrateFirestoreSourceRecordsToOneDrive();
+    }
+
+    function showOneDriveSourceStorageStatus() {
+      const output = document.getElementById('output');
+      output.insertAdjacentHTML('afterbegin',
+        '<p id="onedrive-storage-status"><b>Reading the OneDrive data-file indexâ€¦</b></p>');
+      google.script.run.withSuccessHandler(function(status) {
+        document.getElementById('onedrive-storage-status').innerHTML = status.ready
+          ? '<span class="success"><b>OneDrive source storage is active.</b> ' +
+            escapeHtml(status.recordCount) + ' records in ' +
+            escapeHtml(status.fileCount) + ' verified annual file(s). Last index update: ' +
+            escapeHtml(status.updatedAt) + '.</span>'
+          : '<span class="error"><b>OneDrive source storage is not initialized.</b></span>';
+      }).withFailureHandler(function(error) {
+        document.getElementById('onedrive-storage-status').innerHTML =
+          '<span class="error">Status check failed: ' + escapeHtml(error.message) + '</span>';
+      }).getOneDriveSourceStorageStatus();
+    }
+
+    function connectMicrosoftOneDrive() {
+      document.getElementById('output').innerHTML =
+        '<h2>Connections</h2><p>Preparing Microsoft sign-in...</p>';
+      google.script.run
+        .withSuccessHandler(function(result) {
+          const signInWindow = window.open(
+            result.authorizationUrl,
+            '_blank',
+            'noopener'
+          );
+          if (!signInWindow) {
+            showError({
+              message: 'Allow pop-ups for Nilavaram, then select Connect again.'
+            });
+          } else {
+            document.getElementById('output').innerHTML =
+              '<h2>Connections</h2>' +
+              '<p>Complete Microsoft sign-in in the new window as <b>' +
+              escapeHtml(result.expectedAccount) + '</b>.</p>' +
+              '<button class="secondary-button" type="button" ' +
+              'onclick="showConnections()">I completed sign-in â€” refresh</button>';
+          }
+        })
+        .withFailureHandler(showError)
+        .getMicrosoftAuthorizationUrl();
+    }
+
+    function showHelpArticle(articleId, label) {
+      document.getElementById('output').textContent =
+        'Loading ' + (label || 'Help article') + '...';
+      google.script.run
+        .withSuccessHandler(renderHelpArticle)
+        .withFailureHandler(showError)
+        .getHelpArticle(articleId);
+    }
+
+    function showCodeChangeHistory() {
+      document.getElementById('output').textContent =
+        'Loading code change history from GitHub...';
+      google.script.run
+        .withSuccessHandler(renderCodeChangeHistory)
+        .withFailureHandler(showError)
+        .getCodeChangeHistory();
+    }
+
+    function renderCodeChangeHistory(data) {
+      const output = document.getElementById('output');
+      output.innerHTML =
+        '<h2>About and Version History</h2>' +
+        '<p>This page lists code commits that were successfully pushed to the GitHub <b>main</b> branch. A local-only commit does not appear here.</p>';
+
+      if (!data.commits.length) {
+        output.innerHTML += '<p>No pushed commits were found.</p>';
+        return;
+      }
+
+      const table = document.createElement('table');
+      const head = document.createElement('thead');
+      head.innerHTML =
+        '<tr><th>Date and time</th><th>Change</th><th>Commit</th><th>Author</th></tr>';
+      table.appendChild(head);
+      const body = document.createElement('tbody');
+
+      data.commits.forEach(function(commit) {
+        const row = document.createElement('tr');
+        const dateCell = document.createElement('td');
+        const pacific = getPacificViewTime(new Date(commit.committedAt));
+        dateCell.textContent =
+          pacific.date + ' ' + pacific.weekday + ' ' +
+          pacific.time + ' Pacific Time';
+
+        const messageCell = document.createElement('td');
+        messageCell.textContent = commit.message;
+
+        const commitCell = document.createElement('td');
+        const link = document.createElement('a');
+        link.href = commit.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = commit.shortSha;
+        commitCell.appendChild(link);
+
+        const authorCell = document.createElement('td');
+        authorCell.textContent = commit.authorName;
+
+        row.appendChild(dateCell);
+        row.appendChild(messageCell);
+        row.appendChild(commitCell);
+        row.appendChild(authorCell);
+        body.appendChild(row);
+      });
+      table.appendChild(body);
+      output.appendChild(table);
+    }
+
+    function renderHelpArticle(article) {
+      window.nilavaramHelpArticle = article;
+      const output = document.getElementById('output');
+      output.textContent = '';
+
+      const heading = document.createElement('h2');
+      heading.textContent = article.title;
+      output.appendChild(heading);
+
+      const meta = document.createElement('p');
+      meta.className = 'help-meta';
+      meta.textContent =
+        'Version ' + article.version + ' Â· Updated by ' + article.updatedBy;
+      output.appendChild(meta);
+
+      const content = document.createElement('div');
+      content.className = 'help-content';
+      renderMarkdown(content, article.content);
+      output.appendChild(content);
+
+      if (article.canEdit) {
+        const buttons = document.createElement('div');
+        buttons.className = 'button-row';
+        const editButton = document.createElement('button');
+        editButton.type = 'button';
+        editButton.className = 'primary-button';
+        editButton.textContent = 'Edit Help Content';
+        editButton.onclick = showHelpEditor;
+        buttons.appendChild(editButton);
+        output.appendChild(buttons);
+      }
+    }
+
+    function appendMarkdownText(element, text) {
+      String(text).split(/(\*\*[^*]+\*\*)/).forEach(function(part) {
+        if (
+          part.indexOf('**') === 0 &&
+          part.lastIndexOf('**') === part.length - 2
+        ) {
+          const strong = document.createElement('strong');
+          strong.textContent = part.slice(2, -2);
+          element.appendChild(strong);
+        } else {
+          element.appendChild(document.createTextNode(part));
+        }
+      });
+    }
+
+    function renderMarkdown(container, markdown) {
+      container.textContent = '';
+      let list = null;
+      let codeBlock = null;
+
+      String(markdown || '').split(/\r?\n/).forEach(function(line) {
+        if (line.trim() === '```') {
+          if (codeBlock) {
+            container.appendChild(codeBlock);
+            codeBlock = null;
+          } else {
+            codeBlock = document.createElement('pre');
+            codeBlock.appendChild(document.createElement('code'));
+          }
+          return;
+        }
+        if (codeBlock) {
+          codeBlock.firstChild.textContent +=
+            (codeBlock.firstChild.textContent ? '\n' : '') + line;
+          return;
+        }
+
+        const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+        if (headingMatch) {
+          list = null;
+          const heading = document.createElement('h' + headingMatch[1].length);
+          appendMarkdownText(heading, headingMatch[2]);
+          container.appendChild(heading);
+          return;
+        }
+
+        const listMatch = line.match(/^\s*-\s+(.+)$/);
+        if (listMatch) {
+          if (!list) {
+            list = document.createElement('ul');
+            container.appendChild(list);
+          }
+          const item = document.createElement('li');
+          appendMarkdownText(item, listMatch[1]);
+          list.appendChild(item);
+          return;
+        }
+
+        list = null;
+        if (!line.trim()) return;
+        const paragraph = document.createElement('p');
+        appendMarkdownText(paragraph, line);
+        container.appendChild(paragraph);
+      });
+
+      if (codeBlock) container.appendChild(codeBlock);
+    }
+
+    function showHelpEditor() {
+      const article = window.nilavaramHelpArticle;
+      if (!article) return;
+
+      document.getElementById('output').innerHTML =
+        '<h2>Edit Help Content</h2>' +
+        '<form id="help-form">' +
+          '<label for="help-title">Title</label>' +
+          '<input id="help-title" required>' +
+          '<label for="help-content">Content</label>' +
+          '<textarea id="help-content" required></textarea>' +
+          '<label for="help-reason">Reason for correction (optional)</label>' +
+          '<input id="help-reason" placeholder="You may leave this blank">' +
+          '<div class="button-row">' +
+            '<button class="primary-button" type="submit">Save Changes</button>' +
+            '<button class="secondary-button" id="cancel-help" type="button">Cancel</button>' +
+          '</div>' +
+          '<p id="help-message"></p>' +
+        '</form>';
+
+      document.getElementById('help-title').value = article.title;
+      document.getElementById('help-content').value = article.content;
+      document.getElementById('help-form').onsubmit = saveHelpForm;
+      document.getElementById('cancel-help').onclick = function() {
+        renderHelpArticle(article);
+      };
+    }
+
+    function saveHelpForm(event) {
+      event.preventDefault();
+      document.getElementById('help-message').textContent = 'Saving...';
+      google.script.run
+        .withSuccessHandler(function() {
+          showHelpArticle(window.nilavaramHelpArticle.articleId);
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('help-message').innerHTML =
+            '<span class="error">' + escapeHtml(error.message) + '</span>';
+        })
+        .saveHelpArticle({
+          articleId: window.nilavaramHelpArticle.articleId,
+          title: document.getElementById('help-title').value,
+          content: document.getElementById('help-content').value,
+          reason: document.getElementById('help-reason').value
+        });
+    }
+
+    function showPendingFeatures() {
+      document.getElementById('output').textContent =
+        'Loading pending features...';
+      google.script.run
+        .withSuccessHandler(renderDevelopmentTasks)
+        .withFailureHandler(showError)
+        .getDevelopmentTasks();
+    }
+
+    function renderDevelopmentTasks(tasks) {
+      const output = document.getElementById('output');
+      output.innerHTML = '<h2>Pending Features</h2>';
+      tasks.forEach(function(task) {
+        const article = document.createElement('article');
+        article.className = 'alert-item';
+        const heading = document.createElement('h3');
+        heading.textContent = task.title;
+        article.appendChild(heading);
+
+        const details = document.createElement('p');
+        details.textContent =
+          'Assigned to: ' + task.assignedTo +
+          ' \u00B7 Due: ' + formatStoredDate(task.dueDate) +
+          ' \u00B7 Status: ' + task.status;
+        article.appendChild(details);
+
+        const list = document.createElement('ul');
+        (task.requirements || []).forEach(function(requirement) {
+          const item = document.createElement('li');
+          item.textContent = requirement;
+          list.appendChild(item);
+        });
+        article.appendChild(list);
+        output.appendChild(article);
+      });
+    }
+
+    function formatStoredDate(value) {
+      const parts = String(value || '').split('-');
+      if (parts.length !== 3) return String(value || '');
+      const months = [
+        'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+        'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'
+      ];
+      return parts[2] + '-' + months[Number(parts[1]) - 1] + '-' + parts[0];
+    }
+
+    function showAlerts() {
+      document.getElementById('output').textContent = 'Loading alerts...';
+      google.script.run
+        .withSuccessHandler(renderAlerts)
+        .withFailureHandler(showError)
+        .getMyAlerts();
+    }
+
+    function showReminders() {
+      document.getElementById('output').textContent = 'Loading reminders...';
+      google.script.run
+        .withSuccessHandler(renderReminders)
+        .withFailureHandler(showError)
+        .getMyReminders();
+    }
+
+    function showBackupStatus() {
+      document.getElementById('output').textContent = 'Loading backup status...';
+      google.script.run
+        .withSuccessHandler(renderBackupStatus)
+        .withFailureHandler(showError)
+        .getBackupStatus();
+    }
+
+    function showDocumentArchive() {
+      document.getElementById('output').textContent = 'Loading document archive...';
+      google.script.run
+        .withSuccessHandler(renderDocumentArchive)
+        .withFailureHandler(showError)
+        .getDocumentArchiveStatus();
+    }
+
+    function renderBackupStatus(status) {
+      const output = document.getElementById('output');
+      const backupFiles = status.oneDriveBackups || [];
+      const backupFileHtml = backupFiles.length
+        ? '<article class="alert-item">' +
+            '<h3>OneDrive backup files</h3>' +
+            '<ul>' +
+              backupFiles.map(function(file) {
+                const fileLabel = escapeHtml(file.name || 'backup file');
+                const link = file.webUrl ? '<a href="' + escapeHtml(file.webUrl) + '" target="_blank" rel="noopener noreferrer">Open in OneDrive</a>' : 'No link available';
+                const preview = file.value ? '<pre>' + escapeHtml(JSON.stringify(file.value, null, 2)) + '</pre>' : (file.content ? '<pre>' + escapeHtml(file.content) + '</pre>' : '<p class="help-meta">No readable content available.</p>');
+                return '<li><p><b>' + fileLabel + '</b></p><p>' + link + '</p>' + preview + '</li>';
+              }).join('') +
+            '</ul>' +
+          '</article>'
+        : '<article class="alert-item"><h3>OneDrive backup files</h3><p>No backup files were found in the Nilavaram/Backups folder yet.</p></article>';
+
+      output.innerHTML = '<h2>Backup Status</h2>' +
+        '<p>' + escapeHtml(status.summary || '') + '</p>' +
+        '<article class="alert-item">' +
+          '<h3>Primary source and code repository</h3>' +
+          '<p><b>Authoritative code folder:</b> ' + escapeHtml(status.project.authoritativeCodeFolder || '') + '</p>' +
+          '<p><b>GitHub repo:</b> ' + escapeHtml(status.project.githubRepository || '') + '</p>' +
+          '<p><b>Branch:</b> ' + escapeHtml(status.project.githubBranch || '') + '</p>' +
+          '<p><b>Apps Script web app:</b> ' + escapeHtml(status.project.appsScriptWebApp || '') + '</p>' +
+        '</article>' +
+        '<article class="alert-item">' +
+          '<h3>External backup and sync locations</h3>' +
+          '<p><b>External code backup:</b> ' + escapeHtml(status.externalCopies.externalCodeBackup || '') + '</p>' +
+          '<p><b>Data root:</b> ' + escapeHtml(status.externalCopies.dataRoot || '') + '</p>' +
+          '<p><b>OneDrive sync source:</b> ' + escapeHtml(status.externalCopies.oneDriveSyncSource || '') + '</p>' +
+          '<p><b>Archive folder:</b> ' + escapeHtml(status.externalCopies.archiveFolder || '') + '</p>' +
+        '</article>' +
+        '<article class="alert-item">' +
+          '<h3>File storage and Firestore separation</h3>' +
+          '<p><b>Local OneDrive:</b> ' + escapeHtml(status.fileStorage.localOneDrive || '') + '</p>' +
+          '<p><b>Primary OneDrive account:</b> ' + escapeHtml(status.fileStorage.primaryOneDriveAccount || '') + '</p>' +
+          '<p><b>External drive:</b> ' + escapeHtml(status.fileStorage.externalDrive || '') + ' (' + escapeHtml(status.fileStorage.externalDriveLabel || '') + ')</p>' +
+          '<p><b>Firestore role:</b> ' + escapeHtml(status.firestore.purpose || '') + '</p>' +
+          '<p><b>Secret rule:</b> ' + escapeHtml(status.firestore.notForSecrets || '') + '</p>' +
+        '</article>' +
+        '<article class="alert-item">' +
+          '<h3>Backup routine</h3>' +
+          '<ul>' +
+            (status.backupRoutine || []).map(function(item) {
+              return '<li>' + escapeHtml(item) + '</li>';
+            }).join('') +
+          '</ul>' +
+          '<p><b>Next action:</b> ' + escapeHtml(status.nextAction || '') + '</p>' +
+          '<p class="help-meta"><b>Last checked:</b> ' + escapeHtml(status.updatedAt || '') + '</p>' +
+        '</article>' +
+        backupFileHtml +
+        '<button class="primary-button" type="button" id="safe-backup-button">Create safe backup package</button>';
+      document.getElementById('safe-backup-button').onclick = function() {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            const message = document.createElement('p');
+            message.className = 'help-meta';
+            message.textContent = result.message;
+            output.appendChild(message);
+          })
+          .withFailureHandler(showError)
+          .createSafeBackupPackage();
+      };
+    }
+
+    function renderDocumentArchive(documentArchive) {
+      const output = document.getElementById('output');
+      output.innerHTML = '<h2>Document Archive</h2>' +
+        '<p>' + escapeHtml(documentArchive.summary || '') + '</p>' +
+        '<article class="alert-item">' +
+          '<h3>Storage model</h3>' +
+          '<p><b>OneDrive root:</b> ' + escapeHtml(documentArchive.storage.oneDriveRoot || '') + '</p>' +
+          '<p><b>External sync source:</b> ' + escapeHtml(documentArchive.storage.syncSource || '') + '</p>' +
+          '<p><b>Archive folder:</b> ' + escapeHtml(documentArchive.storage.archiveFolder || '') + '</p>' +
+          '<p><b>External drive:</b> ' + escapeHtml(documentArchive.storage.externalDrive || '') + ' (' + escapeHtml(documentArchive.storage.externalDriveLabel || '') + ')</p>' +
+        '</article>' +
+        '<article class="alert-item">' +
+          '<h3>Archive rules</h3>' +
+          '<ul>' +
+            (documentArchive.rules || []).map(function(item) {
+              return '<li>' + escapeHtml(item) + '</li>';
+            }).join('') +
+          '</ul>' +
+        '</article>' +
+        '<article class="alert-item">' +
+          '<h3>Document groups</h3>' +
+          '<ul>' +
+            (documentArchive.categories || []).map(function(category) {
+              return '<li><b>' + escapeHtml(category.title) + ':</b> ' + escapeHtml(category.description) + ' <span class="help-meta">(' + escapeHtml(category.status) + ')</span></li>';
+            }).join('') +
+          '</ul>' +
+          '<p class="help-meta"><b>Last checked:</b> ' + escapeHtml(documentArchive.updatedAt || '') + '</p>' +
+        '</article>';
+    }
+
+    function renderReminders(reminders) {
+      const output = document.getElementById('output');
+      output.innerHTML = '<h2>Reminders</h2>' +
+        '<p>Only reminders you own or that have been specifically shared with you are shown.</p>';
+
+      if (!reminders.length) {
+        output.innerHTML += '<p>No reminders.</p>';
+        return;
+      }
+
+      reminders.forEach(function(reminder) {
+        const article = document.createElement('article');
+        article.className = 'alert-item';
+
+        const heading = document.createElement('h3');
+        heading.textContent = reminder.title;
+        article.appendChild(heading);
+
+        const details = document.createElement('p');
+        details.textContent =
+          'Status: ' + reminder.status +
+          ' \u00B7 Visibility: ' + reminder.visibility +
+          ' \u00B7 Assigned to: ' + reminder.assignedTo;
+        article.appendChild(details);
+
+        const dates = document.createElement('p');
+        dates.textContent =
+          'Preparation due: ' + formatStoredDate(reminder.preparationDueDate) +
+          ' \u00B7 Filing deadline: ' +
+          (reminder.filingDueDate
+            ? formatStoredDate(reminder.filingDueDate)
+            : 'Needs confirmation');
+        article.appendChild(dates);
+
+        const schedule = document.createElement('p');
+        schedule.textContent =
+          'Planned email reminders: ' +
+          (reminder.emailReminderOffsetsDays || []).map(function(days) {
+            return days + ' day' + (days === 1 ? '' : 's') + ' before';
+          }).join(', ') +
+          '. Email delivery is ' +
+          (reminder.emailEnabled ? 'enabled.' : 'not yet enabled.');
+        article.appendChild(schedule);
+
+        const notes = document.createElement('p');
+        notes.textContent = reminder.notes || '';
+        article.appendChild(notes);
+        output.appendChild(article);
+      });
+    }
+
+    function renderAlerts(alerts) {
+      const output = document.getElementById('output');
+      output.innerHTML = '<h2>Alerts</h2>';
+      if (!alerts.length) {
+        output.innerHTML += '<p>No alerts.</p>';
+        return;
+      }
+
+      alerts.forEach(function(alert) {
+        const item = document.createElement('article');
+        item.className = 'alert-item';
+        const heading = document.createElement('h3');
+        heading.textContent =
+          (alert.status === 'unread' ? 'Unread â€” ' : '') + alert.title;
+        const message = document.createElement('p');
+        message.textContent = alert.message;
+        const pacific = getPacificViewTime(new Date(alert.createdAt));
+        const created = document.createElement('p');
+        created.className = 'help-meta';
+        created.textContent =
+          pacific.date + ' ' + pacific.weekday + ' Â· ' +
+          pacific.time + ' Pacific Time';
+        const reason = document.createElement('p');
+        reason.textContent = 'Reason: ' + (alert.reason || 'No reason provided');
+        item.appendChild(heading);
+        item.appendChild(message);
+        item.appendChild(created);
+        item.appendChild(reason);
+
+        if (alert.status === 'unread') {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'secondary-button';
+          button.textContent = 'Mark as read';
+          button.onclick = function() {
+            google.script.run
+              .withSuccessHandler(showAlerts)
+              .withFailureHandler(showError)
+              .markAlertRead(alert.id);
+          };
+          item.appendChild(button);
+        }
+        output.appendChild(item);
+      });
+    }
+
+    function showUsers() {
+      document.getElementById('output').innerHTML =
+        '<h2>Users</h2>' +
+        '<p>Invite one Google account and assign its access.</p>' +
+        '<form id="user-form">' +
+          '<div class="form-grid">' +
+            '<div><label for="email">Gmail address</label>' +
+              '<input id="email" type="email" required></div>' +
+            '<div><label for="displayName">Name</label>' +
+              '<input id="displayName" type="text"></div>' +
+            '<div><label for="role">Role</label>' +
+              '<select id="role">' +
+                '<option value="editor">Editor</option>' +
+                '<option value="reader">Reader</option>' +
+                '<option value="ltd">Ltd</option>' +
+                '<option value="admin">Admin</option>' +
+                '<option value="disabled">Disabled</option>' +
+              '</select></div>' +
+            '<div><label for="allowedModules">Ltd modules</label>' +
+              '<input id="allowedModules" placeholder="Example: files, reports"></div>' +
+          '</div>' +
+          '<button class="primary-button" type="submit">Save user</button>' +
+          '<span id="user-message"></span>' +
+        '</form>' +
+        '<div id="users-list">Loading users...</div>';
+
+      document.getElementById('user-form').onsubmit = saveUserForm;
+      loadUsers();
+    }
+
+    function showChartOfAccounts(mode) {
+      window.nilavaramChartMode = mode || 'list';
+      document.getElementById('output').textContent =
+        'Loading Chart of Accounts...';
+      google.script.run
+        .withSuccessHandler(renderChartOfAccounts)
+        .withFailureHandler(showError)
+        .getChartOfAccountsData();
+    }
+
+    function renderChartOfAccounts(data) {
+      window.nilavaramChartData = data;
+      const output = document.getElementById('output');
+      output.innerHTML =
+        '<h2>Chart of Accounts</h2>' +
+        '<p>The five-character account master is stored in Firestore. ' +
+        'Existing transactions will refer to the account record, so its name ' +
+        'may be corrected without losing history.</p>' +
+        '<article class="alert-item">' +
+          '<h3>' + escapeHtml(data.foundation.title) + '</h3>' +
+          '<p><b>Family Head:</b> ' + escapeHtml(data.foundation.familyHead) +
+            ' â€” ' + escapeHtml(data.foundation.familyHeadBasis) + '</p>' +
+          '<p><b>Accounting model:</b> ' +
+            escapeHtml(data.foundation.accountingModel) + '</p>' +
+          '<ul>' +
+            (data.foundation.policyStatements || []).map(function(statement) {
+              return '<li>' + escapeHtml(statement) + '</li>';
+            }).join('') +
+          '</ul>' +
+          '<p class="help-meta">' +
+            escapeHtml(data.foundation.clarification) + '</p>' +
+        '</article>' +
+        '<article class="alert-item">' +
+          '<h3>How to read this Chart</h3>' +
+          '<p><b>Main group</b> is a large heading. <b>Subgroup</b> organizes related accounts. Only an <b>Entry account</b> may be selected for a transaction.</p>' +
+          '<p>The same final digits have the same meaning for each member. Example: <b>20</b> means Meals and restaurants.</p>' +
+          '<pre>M: 7M020   A: 7A020   S: 7S020   R: 7R020</pre>' +
+          '<h3>Illustrated entry</h3>' +
+          '<p>If M pays $60 at a restaurant from BOA Ch * 0137, Nilavaram prepares:</p>' +
+          '<pre>Debit   7M020  M â€” Meals and restaurants   $60\\n' +
+          'Credit  11110  BOA Ch * 0137               $60</pre>' +
+          '<p>This reduces Mâ€™s recorded net-worth position. The category name alone does not make a payment tax-deductible; purpose and evidence must be reviewed separately.</p>' +
+        '</article>';
+
+      if (data.canEdit) {
+        let entityOptions = '';
+        data.entities.forEach(function(entity) {
+          entityOptions += '<option value="' + escapeHtml(entity.id) + '">' +
+            escapeHtml(entity.name) + '</option>';
+        });
+        output.innerHTML +=
+          '<form id="account-form">' +
+            '<input id="account-id" type="hidden">' +
+            '<div class="form-grid">' +
+              '<div><label for="account-entity">Who or which organization?</label>' +
+                '<select id="account-entity">' + entityOptions + '</select></div>' +
+              '<div><label for="account-purpose">What are you adding?</label>' +
+                '<select id="account-purpose">' +
+                  '<option value="bank">Bank account</option>' +
+                  '<option value="credit-card">Credit card</option>' +
+                  '<option value="loan">Loan</option>' +
+                  '<option value="paycheck">Paycheck source</option>' +
+                  '<option value="property">Property</option>' +
+                  '<option value="investment">Investment</option>' +
+                  '<option value="expense">Expense category</option>' +
+                  '<option value="equity">Trust or member net worth</option>' +
+                  '<option value="other">Something else</option>' +
+                '</select></div>' +
+              '<div><label for="account-name">Plain account name</label>' +
+                '<input id="account-name" required placeholder="Example: Internet"></div>' +
+              '<div><label for="account-last-four">Last four digits, if applicable</label>' +
+                '<input id="account-last-four" inputmode="numeric" maxlength="4"></div>' +
+              '<div><label for="account-near-code">Place near ACODE, if desired</label>' +
+                '<input id="account-near-code" maxlength="5" placeholder="Example: 7R020">' +
+                '<span class="help-meta">Optional. Nilavaram will choose the next unused ACODE.</span></div>' +
+            '</div>' +
+            '<button class="secondary-button" id="account-suggest" type="button" ' +
+              'onclick="suggestAccountDetails(); return false;">' +
+              'Suggest accounting details</button>' +
+            '<p id="account-suggestion" class="help-meta" role="status" aria-live="polite"></p>' +
+            '<details id="account-advanced" open><summary>Accounting details â€” filled automatically; you may change them</summary>' +
+            '<div class="form-grid">' +
+              '<div><label for="account-code">ACODE</label>' +
+                '<input id="account-code" maxlength="5" placeholder="Prepared when you suggest or save">' +
+                '<span class="help-meta">Required. If blank, Save account will prepare it for you.</span></div>' +
+              '<div><label for="account-type">Account type</label>' +
+                '<select id="account-type">' +
+                  '<option value="group">Group / heading</option>' +
+                  '<option value="asset">Asset</option>' +
+                  '<option value="liability">External liability</option>' +
+                  '<option value="net-worth">Core-member net worth</option>' +
+                  '<option value="income">Income</option>' +
+                  '<option value="expense">Expense</option>' +
+                  '<option value="clearing">Clearing</option>' +
+                '</select></div>' +
+              '<div><label for="account-parent">Parent code</label>' +
+                '<input id="account-parent" maxlength="5"></div>' +
+              '<div><label for="account-status">Status</label>' +
+                '<select id="account-status">' +
+                  '<option value="active">Active</option>' +
+                  '<option value="inactive">Inactive</option>' +
+                '</select></div>' +
+            '</div>' +
+            '</details>' +
+            '<label for="account-notes">Notes</label>' +
+            '<textarea id="account-notes" style="min-height:100px"></textarea>' +
+            '<div class="button-row">' +
+              '<button class="primary-button" type="submit">Save account</button>' +
+              '<button class="secondary-button" id="account-cancel" type="button">Clear</button>' +
+              '<span id="account-message"></span>' +
+            '</div>' +
+          '</form>';
+      }
+
+      output.innerHTML +=
+        '<div id="chart-account-search-panel"><label for="chart-account-search"><b>Search Chart of Accounts</b></label>' +
+          '<input id="chart-account-search" type="search" ' +
+          'placeholder="Type a few letters from the account name or ACODE">' +
+          '<p id="chart-account-search-count" class="help-meta"></p></div>' +
+        '<div class="button-row">' +
+          '<label><input id="show-hidden-accounts" type="checkbox"> ' +
+          'Show hidden accounts</label>' +
+        '</div>' +
+        '<div id="account-deletion-review"></div>' +
+        '<div id="accounts-list"></div>';
+      if (data.canEdit) {
+        document.getElementById('account-form').onsubmit = saveAccountForm;
+        document.getElementById('account-cancel').onclick = clearAccountForm;
+        // Bind the essential form controls before rendering the long account
+        // table. A problem in one table row must never disable this form.
+        document.getElementById('account-suggest').onclick = function(event) {
+          event.preventDefault();
+          suggestAccountDetails();
+        };
+      }
+      document.getElementById('show-hidden-accounts').onchange = function() {
+        renderAccountsTable(window.nilavaramChartData);
+      };
+      document.getElementById('chart-account-search').oninput = function() {
+        renderAccountsTable(window.nilavaramChartData);
+      };
+      try {
+        if (window.nilavaramChartMode === 'batch') {
+          renderAccountsBatchEdit(data);
+          document.getElementById('account-form').style.display = 'none';
+          document.getElementById('chart-account-search-panel').style.display = 'none';
+        } else {
+          renderAccountsTable(data);
+          if (window.nilavaramChartMode === 'list') {
+            document.getElementById('account-form').style.display = 'none';
+          } else {
+            document.getElementById('account-name').focus();
+          }
+        }
+      } catch (error) {
+        document.getElementById('accounts-list').innerHTML =
+          '<p class="error">The account list could not be displayed, but the ' +
+          'account form above remains available. ' +
+          escapeHtml(error && error.message ? error.message : String(error)) +
+          '</p>';
+      }
+    }
+
+    function renderAccountsTable(data) {
+      const entityNames = {};
+      data.entities.forEach(function(entity) {
+        entityNames[entity.id] = entity.name;
+      });
+      let html = '<table><thead><tr><th>Code</th><th>Account</th>' +
+        '<th>Entity</th><th>Visible mark</th><th>Parent</th><th>Explanation</th>';
+      if (data.canEdit) html += '<th></th>';
+      html += '</tr></thead><tbody>';
+
+      const showHidden = Boolean(document.getElementById('show-hidden-accounts') &&
+        document.getElementById('show-hidden-accounts').checked);
+      const query = String(document.getElementById('chart-account-search') &&
+        document.getElementById('chart-account-search').value || '')
+        .trim().toLowerCase();
+      let displayed = 0;
+      data.accounts.forEach(function(account, index) {
+        if (account.isHidden && !showHidden) return;
+        if (query &&
+            String(account.code || '').toLowerCase().indexOf(query) === -1 &&
+            String(account.name || '').toLowerCase().indexOf(query) === -1) return;
+        displayed += 1;
+        html += '<tr><td>' + escapeHtml(account.code) + '</td>' +
+          '<td>' + escapeHtml(account.name) +
+          (account.isHidden ? ' <span class="help-meta">(hidden)</span>' : '') + '</td>' +
+          '<td>' + escapeHtml(entityNames[account.entityId] || account.entityId) + '</td>' +
+          '<td><b>' + escapeHtml(account.displayMark) + '</b></td>' +
+          '<td>' + escapeHtml(account.parentCode || '') + '</td>' +
+          '<td>' + escapeHtml(account.displayExplanation) + '</td>';
+        if (data.canEdit) {
+          html += '<td><button type="button" onclick="editChartAccount(' +
+            index + ')">Edit</button></td>';
+        }
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      if (!displayed) {
+        html = '<p>No accounts match the current visibility selection.</p>';
+      }
+      document.getElementById('accounts-list').innerHTML = html;
+      const count = document.getElementById('chart-account-search-count');
+      if (count) {
+        count.textContent = displayed + ' matching account(s).';
+      }
+    }
+
+    function renderAccountsBatchEdit(data) {
+      let html = '<h3>Batch Edit</h3>' +
+        '<p>Select accounts to hide, restore, or clean up. Deletion is allowed only when no transactions, journal lines, source inputs, rules or child accounts use the ACODE.</p>' +
+        '<div class="button-row"><button type="button" onclick="saveAccountBatchVisibility(false)">Hide selected</button>' +
+        '<button type="button" onclick="saveAccountBatchVisibility(true)">Restore selected</button>' +
+        '<button type="button" onclick="reviewDeleteAccountBatch()">Review / delete selected</button>' +
+        '<span id="account-batch-message"></span></div>' +
+        '<div id="account-batch-results"></div>' +
+        '<table><thead><tr><th>Select</th><th>ACODE</th><th>Account</th><th>Status</th></tr></thead><tbody>';
+      data.accounts.forEach(function(account) {
+        html += '<tr><td><input class="account-batch-check" type="checkbox" value="' +
+          escapeHtml(account.id) + '"></td><td>' + escapeHtml(account.code) +
+          '</td><td>' + escapeHtml(account.name) + '</td><td>' +
+          (account.isHidden ? 'Hidden' : 'Active') + '</td></tr>';
+      });
+      document.getElementById('accounts-list').innerHTML = html + '</tbody></table>';
+    }
+
+    function saveAccountBatchVisibility(makeVisible) {
+      const ids = Array.prototype.map.call(
+        document.querySelectorAll('.account-batch-check:checked'),
+        function(box) { return box.value; }
+      );
+      const message = document.getElementById('account-batch-message');
+      if (!ids.length) {
+        message.innerHTML = '<span class="error"> Select at least one account.</span>';
+        return;
+      }
+      message.textContent = ' Updatingâ€¦';
+      google.script.run.withSuccessHandler(function(result) {
+        message.innerHTML = '<span class="success"> ' + escapeHtml(result.message) + '</span>';
+        showChartOfAccounts('batch');
+      }).withFailureHandler(function(error) {
+        message.innerHTML = '<span class="error"> ' + escapeHtml(error.message) + '</span>';
+      }).setChartAccountsVisibilityBatch(ids, makeVisible);
+    }
+
+    function selectedBatchAccountIds() {
+      return Array.prototype.map.call(
+        document.querySelectorAll('.account-batch-check:checked'),
+        function(box) { return box.value; }
+      );
+    }
+
+    function reviewDeleteAccountBatch() {
+      const ids = selectedBatchAccountIds();
+      const message = document.getElementById('account-batch-message');
+      const results = document.getElementById('account-batch-results');
+      if (!ids.length) {
+        message.innerHTML = '<span class="error"> Select at least one account.</span>';
+        return;
+      }
+      if (!window.confirm(
+        'Review ' + ids.length + ' selected account(s) and permanently delete only those with no references? Protected accounts will be retained.'
+      )) return;
+      message.textContent = ' Reviewing references and deleting only unused accountsâ€¦';
+      results.innerHTML = '';
+      google.script.run.withSuccessHandler(function(result) {
+        message.innerHTML = '<span class="success"> ' + escapeHtml(result.message) + '</span>';
+        let html = '';
+        if ((result.deleted || []).length) {
+          html += '<article class="alert-item"><h3>Deleted unused accounts</h3><ul>' +
+            result.deleted.map(function(account) {
+              return '<li>' + escapeHtml(account.code + ' â€” ' + account.name) + '</li>';
+            }).join('') + '</ul></article>';
+        }
+        if ((result.blocked || []).length) {
+          html += '<article class="alert-item"><h3 class="error">Protected â€” action required</h3>' +
+            '<p class="error"><b>These accounts were not deleted.</b> Reassign their references, then run Review / delete selected again.</p>' +
+            result.blocked.map(function(account) {
+              return '<section><p class="error"><b>' +
+                escapeHtml(account.code + ' â€” ' + account.name) + '</b>: ' +
+                escapeHtml(account.referenceCount) + ' reference(s). ' +
+                escapeHtml(account.reason) + '</p>' +
+                ((account.references || []).length
+                  ? '<ul>' + account.references.map(function(ref) {
+                      return '<li>' + escapeHtml(ref.collection + ': ' +
+                        (ref.date || '') + ' ' + (ref.description || ref.id)) + '</li>';
+                    }).join('') + '</ul>' : '') +
+                (account.referencesTruncated
+                  ? '<p class="error">Only the first 25 references are shown.</p>' : '') +
+                '</section>';
+            }).join('') +
+            '<div class="button-row"><button type="button" onclick="showChartOfAccounts(\'batch\')">Continue Batch Edit</button>' +
+            '<button type="button" onclick="showInputWorkspace(\'input-main\')">Go to Input / ACODE work</button></div></article>';
+        }
+        results.innerHTML = html || '<p>No accounts were changed.</p>';
+        document.querySelectorAll('.account-batch-check:checked').forEach(function(box) {
+          if ((result.deleted || []).some(function(item) { return item.id === box.value; })) {
+            box.closest('tr').remove();
+          } else {
+            box.checked = false;
+          }
+        });
+        results.scrollIntoView({behavior: 'smooth', block: 'start'});
+      }).withFailureHandler(function(error) {
+        message.innerHTML = '<span class="error"> ' + escapeHtml(error.message) + '</span>';
+      }).reviewAndDeleteUnusedChartAccountsBatch(ids);
+    }
+
+    function changeChartAccountVisibility(index, makeVisible) {
+      const account = window.nilavaramChartData.accounts[index];
+      if (!account) return;
+      const message = makeVisible
+        ? 'Restore ' + account.code + ' for future account selection?'
+        : 'Hide ' + account.code + '? Historical references will remain, but it will not be available for new entries.';
+      if (!window.confirm(message)) return;
+      document.getElementById('account-deletion-review').innerHTML = '<p>Updating visibilityâ€¦</p>';
+      google.script.run.withSuccessHandler(function(result) {
+        document.getElementById('account-deletion-review').innerHTML =
+          '<p class="success">' + escapeHtml(result.message) + '</p>';
+        showChartOfAccounts();
+      }).withFailureHandler(function(error) {
+        document.getElementById('account-deletion-review').innerHTML =
+          '<p class="error">' + escapeHtml(error.message) + '</p>';
+      }).setChartAccountVisibility(account.id, makeVisible);
+    }
+
+    function reviewChartAccountDeletion(index) {
+      const account = window.nilavaramChartData.accounts[index];
+      if (!account) return;
+      const target = document.getElementById('account-deletion-review');
+      target.innerHTML = '<p>Checking every reference to ' + escapeHtml(account.code) + 'â€¦</p>';
+      google.script.run.withSuccessHandler(renderChartAccountDeletionReview)
+        .withFailureHandler(function(error) {
+          target.innerHTML = '<p class="error">' + escapeHtml(error.message) + '</p>';
+        }).getChartAccountDeletionReview(account.id);
+    }
+
+    function renderChartAccountDeletionReview(review) {
+      const target = document.getElementById('account-deletion-review');
+      let html = '<article class="alert-item"><h3>Deletion review â€” ' +
+        escapeHtml(review.account.code) + ' Â· ' + escapeHtml(review.account.name) + '</h3>';
+      if (review.canDelete) {
+        html += '<p class="success"><b>No references were found.</b> This account may be deleted.</p>' +
+          '<button class="primary-button" type="button" onclick="deleteReviewedChartAccount(\'' +
+          escapeHtml(review.account.id) + '\', \'' + escapeHtml(review.account.code) +
+          '\')">Permanently delete unused account</button>';
+      } else {
+        html += '<p class="error"><b>Deletion blocked:</b> ' +
+          escapeHtml(review.referenceCount) +
+          ' reference(s) must be reassigned first.</p>' +
+          '<table><thead><tr><th>Where used</th><th>Date</th><th>Description</th>' +
+          '<th>Status</th><th>ID</th></tr></thead><tbody>' +
+          (review.references || []).map(function(item) {
+            return '<tr><td>' + escapeHtml(item.collection) + '</td><td>' +
+              escapeHtml(item.date) + '</td><td>' + escapeHtml(item.description) +
+              '</td><td>' + escapeHtml(item.status) + '</td><td><code>' +
+              escapeHtml(item.id) + '</code></td></tr>';
+          }).join('') + '</tbody></table>' +
+          (review.referencesTruncated
+            ? '<p class="error">Only the first 200 references are displayed.</p>' : '') +
+          '</article>';
+      }
+      target.innerHTML = html + '</article>';
+      target.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
+
+    function deleteReviewedChartAccount(accountId, accountCode) {
+      if (!window.confirm(
+        'Permanently delete unused account ' + accountCode +
+        '? This action removes it from the Chart of Accounts. An audit-history copy will remain.'
+      )) return;
+      google.script.run.withSuccessHandler(function(result) {
+        window.alert(result.message);
+        showChartOfAccounts();
+      }).withFailureHandler(function(error) {
+        document.getElementById('account-deletion-review').innerHTML =
+          '<p class="error">' + escapeHtml(error.message) + '</p>';
+      }).deleteUnusedChartAccount(accountId);
+    }
+
+    function editChartAccount(index) {
+      const account = window.nilavaramChartData.accounts[index];
+      if (!account) return;
+      document.getElementById('account-id').value = account.id || '';
+      document.getElementById('account-entity').value = account.entityId || '';
+      document.getElementById('account-code').value = account.code || '';
+      document.getElementById('account-name').value = account.name || '';
+      document.getElementById('account-type').value = account.accountType || 'group';
+      document.getElementById('account-parent').value = account.parentCode || '';
+      document.getElementById('account-status').value = account.status || 'active';
+      document.getElementById('account-notes').value = account.notes || '';
+      document.getElementById('account-advanced').open = true;
+      document.getElementById('account-form').style.display = '';
+      let actions = document.getElementById('account-edit-actions');
+      if (!actions) {
+        actions = document.createElement('div');
+        actions.id = 'account-edit-actions';
+        actions.className = 'button-row';
+        document.getElementById('account-form').appendChild(actions);
+      }
+      actions.innerHTML = '<button type="button" onclick="changeChartAccountVisibility(' +
+        index + ', ' + (account.isHidden ? 'true' : 'false') + ')">' +
+        (account.isHidden ? 'Restore account' : 'Hide account') + '</button>' +
+        '<button type="button" onclick="reviewChartAccountDeletion(' + index +
+        ')">Review / delete account</button>';
+      document.getElementById('account-code').focus();
+    }
+
+    function clearAccountForm() {
+      document.getElementById('account-form').reset();
+      document.getElementById('account-id').value = '';
+      document.getElementById('account-message').textContent = '';
+      document.getElementById('account-suggestion').textContent = '';
+      window.nilavaramAccountSuggestions = [];
+    }
+
+    function suggestAccountDetails() {
+      const status = document.getElementById('account-suggestion');
+      const button = document.getElementById('account-suggest');
+      status.innerHTML = '<b>Preparing a suggestionâ€¦</b>';
+      button.disabled = true;
+      // Yield once so the status is painted before the server request begins.
+      window.setTimeout(function() {
+        try {
+          const input = {
+            entityId: document.getElementById('account-entity').value,
+            purpose: document.getElementById('account-purpose').value,
+            name: document.getElementById('account-name').value,
+            lastFour: document.getElementById('account-last-four').value,
+            nearCode: document.getElementById('account-near-code').value
+          };
+          google.script.run
+        .withSuccessHandler(function(suggestion) {
+          button.disabled = false;
+          window.nilavaramAccountSuggestions = suggestion.choices || [suggestion];
+          applyAccountSuggestion(0);
+          let choiceHtml = '<b>Suggested:</b> ' + escapeHtml(suggestion.explanation);
+          if (window.nilavaramAccountSuggestions.length > 1) {
+            choiceHtml += '<br><label for="account-suggestion-choice">Choose a suggestion: </label>' +
+              '<select id="account-suggestion-choice" onchange="applyAccountSuggestion(this.selectedIndex)">';
+            window.nilavaramAccountSuggestions.forEach(function(choice) {
+              choiceHtml += '<option>' + escapeHtml(choice.label ||
+                (choice.code + ' â€” ' + choice.name)) + '</option>';
+            });
+            choiceHtml += '</select>';
+          }
+          choiceHtml += '<br><b>You remain in control:</b> open â€œReview accounting detailsâ€ ' +
+            'and replace the suggested code, type or parent before saving.';
+          choiceHtml += '<br><button type="button" class="primary-button" ' +
+            'id="account-save-suggestion">Use this suggestion and save account</button>';
+          document.getElementById('account-suggestion').innerHTML = choiceHtml;
+          document.getElementById('account-advanced').open = true;
+          document.getElementById('account-save-suggestion').onclick = function() {
+            const form = document.getElementById('account-form');
+            if (typeof form.requestSubmit === 'function') {
+              form.requestSubmit();
+            } else {
+              saveAccountForm({ preventDefault: function() {} });
+            }
+          };
+        })
+        .withFailureHandler(function(error) {
+          button.disabled = false;
+          document.getElementById('account-suggestion').innerHTML =
+            '<span class="error">Suggestion failed: ' +
+            escapeHtml(error && error.message ? error.message : String(error)) +
+            '</span>';
+        })
+        .suggestChartAccount(input);
+        } catch (error) {
+          button.disabled = false;
+          status.innerHTML = '<span class="error">Suggestion could not start: ' +
+            escapeHtml(error && error.message ? error.message : String(error)) +
+            '</span>';
+        }
+      }, 0);
+    }
+
+    function applyAccountSuggestion(index) {
+      const suggestion = (window.nilavaramAccountSuggestions || [])[index];
+      if (!suggestion) return;
+      document.getElementById('account-code').value = suggestion.code;
+      document.getElementById('account-name').value = suggestion.name;
+      document.getElementById('account-type').value = suggestion.accountType;
+      document.getElementById('account-parent').value = suggestion.parentCode;
+    }
+
+    function saveAccountForm(event) {
+      event.preventDefault();
+      const name = document.getElementById('account-name').value.trim();
+      if (!name) {
+        document.getElementById('account-message').innerHTML =
+          ' <span class="error">Enter the plain account name.</span>';
+        document.getElementById('account-name').focus();
+        return;
+      }
+      if (!document.getElementById('account-code').value.trim()) {
+        document.getElementById('account-message').textContent =
+          ' Preparing the missing ACODE and accounting detailsâ€¦';
+        google.script.run.withSuccessHandler(function(suggestion) {
+          window.nilavaramAccountSuggestions = suggestion.choices || [suggestion];
+          applyAccountSuggestion(0);
+          document.getElementById('account-suggestion').innerHTML =
+            '<span class="success"><b>Prepared:</b> ' +
+            escapeHtml(document.getElementById('account-code').value) + ' â€” ' +
+            escapeHtml(document.getElementById('account-name').value) + '</span>';
+          persistAccountForm();
+        }).withFailureHandler(function(error) {
+          document.getElementById('account-message').innerHTML =
+            ' <span class="error">Please correct this: ' +
+            escapeHtml(error.message) + '</span>';
+        }).suggestChartAccount({
+          entityId: document.getElementById('account-entity').value,
+          purpose: document.getElementById('account-purpose').value,
+          name: name,
+          lastFour: document.getElementById('account-last-four').value,
+          nearCode: document.getElementById('account-near-code').value
+        });
+        return;
+      }
+      persistAccountForm();
+    }
+
+    function persistAccountForm() {
+      const input = {
+        id: document.getElementById('account-id').value,
+        entityId: document.getElementById('account-entity').value,
+        code: document.getElementById('account-code').value,
+        name: document.getElementById('account-name').value,
+        accountType: document.getElementById('account-type').value,
+        parentCode: document.getElementById('account-parent').value,
+        status: document.getElementById('account-status').value,
+        notes: document.getElementById('account-notes').value
+      };
+      document.getElementById('account-message').textContent = ' Saving...';
+      google.script.run
+        .withSuccessHandler(function(result) {
+          document.getElementById('account-message').innerHTML =
+            ' <span class="success">' + escapeHtml(result.message) + '</span>';
+          showChartOfAccounts();
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('account-message').innerHTML =
+            ' <span class="error">' + escapeHtml(error.message) + '</span>';
+        })
+        .saveChartAccount(input);
+    }
+
+    function saveUserForm(event) {
+      event.preventDefault();
+      const modules = document.getElementById('allowedModules').value
+        .split(',')
+        .map(function(value) { return value.trim(); })
+        .filter(Boolean);
+      const input = {
+        email: document.getElementById('email').value,
+        displayName: document.getElementById('displayName').value,
+        role: document.getElementById('role').value,
+        allowedModules: modules
+      };
+      document.getElementById('user-message').textContent = ' Saving...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          document.getElementById('user-message').innerHTML =
+            ' <span class="success">' + escapeHtml(result.message) + '</span>';
+          document.getElementById('user-form').reset();
+          loadUsers();
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('user-message').innerHTML =
+            ' <span class="error">' + escapeHtml(error.message) + '</span>';
+        })
+        .saveUser(input);
+    }
+
+    function loadUsers() {
+      google.script.run
+        .withSuccessHandler(function(users) {
+          window.nilavaramUsers = users;
+          let html = '<table><thead><tr><th>Email</th><th>Name</th>' +
+            '<th>Role</th><th>Status</th><th>Ltd modules</th><th></th></tr></thead><tbody>';
+          users.forEach(function(user, index) {
+            html += '<tr><td>' + escapeHtml(user.email) + '</td>' +
+              '<td>' + escapeHtml(user.displayName) + '</td>' +
+              '<td>' + escapeHtml(user.role) + '</td>' +
+              '<td>' + escapeHtml(user.status) + '</td>' +
+              '<td>' + escapeHtml((user.allowedModules || []).join(', ')) + '</td>' +
+              '<td><button type="button" onclick="editUser(' + index + ')">Edit</button></td></tr>';
+          });
+          html += '</tbody></table>';
+          document.getElementById('users-list').innerHTML = html;
+        })
+        .withFailureHandler(showError)
+        .getUsers();
+    }
+
+    function editUser(index) {
+      const user = (window.nilavaramUsers || [])[index];
+      if (!user) return;
+      document.getElementById('email').value = user.email || '';
+      document.getElementById('displayName').value = user.displayName || '';
+      document.getElementById('role').value = user.role || 'reader';
+      document.getElementById('allowedModules').value =
+        (user.allowedModules || []).join(', ');
+      document.getElementById('email').focus();
+    }
+</script>

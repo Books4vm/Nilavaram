@@ -8,7 +8,7 @@ const NILAVARAM_INITIAL_ADMIN_EMAILS = [
   'mangai8100@gmail.com',
   'vm8100@gmail.com'
 ];
-const NILAVARAM_NAVIGATION_VERSION = 20;
+const NILAVARAM_NAVIGATION_VERSION = 21;
 
 /**
  * Creates or refreshes the Firestore-driven navigation.
@@ -249,7 +249,9 @@ function setupNavigation_() {
   return {
     menus: menus.length,
     menuItems: menuItems.length,
-    navigationVersion: NILAVARAM_NAVIGATION_VERSION
+    navigationVersion: NILAVARAM_NAVIGATION_VERSION,
+    menuDefinitions: menus,
+    menuItemDefinitions: menuItems
   };
 }
 

@@ -1,0 +1,114 @@
+**   GitHub Account is Books4vm which is logged in using vm8100@gmail.com
+## VS Code + GitHub Copilot Free for Google Apps Script — Quick Reference
+
+* **Apps Script = JavaScript + Google services**
+
+  * `SpreadsheetApp`
+  * `DriveApp`
+  * `GmailApp`
+  * `DocumentApp`
+  * Triggers
+  * Custom functions
+
+### Use Copilot Free this way
+
+* **Inline Code Completion — use frequently**
+
+  * Write functions and JavaScript.
+  * Complete repetitive code.
+  * Create Apps Script functions.
+  * Write Google Sheets formulas.
+  * Write regular expressions.
+  * This is the most efficient use of the Free plan.
+
+* **Copilot Chat — use for understanding and debugging**
+
+  * Explain existing code.
+  * Find bugs.
+  * Review a function.
+  * Explain why an Apps Script error occurs.
+  * Ask for a solution **before** allowing code changes.
+
+* **Agent Mode — save for major tasks**
+
+  * Multi-file debugging.
+  * Tracing how data moves through the application.
+  * Large refactoring.
+  * Adding a significant new feature.
+  * Creating tests across multiple files.
+  * Avoid using Agent for small/simple edits.
+
+### Recommended Apps Script project structure
+
+```text
+MyAppsScript/
+├── Code.gs
+├── Invoice.gs
+├── Customer.gs
+├── Reports.gs
+├── Email.gs
+├── Utilities.gs
+└── appsscript.json
+```
+
+* Keep the Apps Script project files in your **VS Code workspace**.
+* Copilot works better when it can see the relevant `.gs` files and project structure.
+
+### Recommended development workflow
+
+```text
+Google Apps Script
+        ↓
+      clasp
+        ↓
+      VS Code
+        ↓
+     Copilot
+        ↓
+ Edit / Debug / Refactor
+        ↓
+    clasp push
+        ↓
+Google Apps Script
+```
+
+* **clasp** = Command Line Apps Script Projects.
+* It synchronizes your Google Apps Script project with VS Code.
+
+### Free Plan strategy
+
+* **Stay on Free initially.**
+* Don't upgrade simply because Pro is available.
+* Use **Inline Completion** for routine coding.
+* Use **Chat** for questions, explanations, and small debugging.
+* Use **Agent** only for complex, multi-file work.
+* Give Copilot only the files/context it needs.
+* Avoid asking Agent to analyze the entire project for simple changes.
+* Save your limited Chat/Agent usage for tasks where AI provides substantial value.
+
+### Good prompts for Copilot Chat
+
+```text
+Review this Apps Script function.
+Find the error and explain the problem.
+Do not modify the code yet.
+```
+
+```text
+Explain how this function reads data from Google Sheets
+and creates the output. Do not change anything.
+```
+
+```text
+Trace the invoice calculation across these files.
+Identify where the incorrect value is introduced.
+Do not modify the files yet.
+```
+
+### Golden rule
+
+**Completion → routine coding**
+**Chat → understand, explain, debug**
+**Agent → complex multi-file work**
+
+**For your Apps Script project, start with Free + VS Code + clasp + Copilot. Upgrade to Pro only when the Free limits actually interfere with your work.**

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nilavaram - Loading Menu</title>
+  <style>
+    :root {
+      --background: #0b1628;
+      --header: #16243a;
+      --border: #52647d;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent: #38bdf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--background);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      font-family: Georgia, "Times New Roman", serif;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+    }
+    header {
+      background: var(--header);
+      border-bottom: 1px solid var(--border);
+      flex: 0 0 auto;
+      padding: 20px 26px;
+    }
+    .brand {
+      align-items: center;
+      display: flex;
+      gap: 12px;
+    }
+    .brand-mark {
+      color: var(--accent);
+      height: 32px;
+      width: 32px;
+    }
+    h1 {
+      font-size: 1.8rem;
+      margin: 0;
+    }
+    .user-info {
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 24px;
+      margin-top: 14px;
+    }
+    .user-info span { white-space: nowrap; }
+    .workspace {
+      display: grid;
+      flex: 1 1 auto;
+      grid-template-columns: minmax(250px, 330px) 1fr;
+      min-height: 0;
+    }
+    .left-menu-space,
+    .right-window-space {
+      min-height: 0;
+    }
+    .left-menu-space {
+      border-right: 1px solid var(--border);
+    }
+    .right-window-space {
+      overflow: auto;
+      padding: 24px;
+    }
+    .loading-status {
+      color: var(--muted);
+      font-size: 1rem;
+      margin: 0;
+    }
+    .error { color: #fca5a5; }
+    @media (max-width: 700px) {
+      body { height: auto; min-height: 100vh; overflow: auto; }
+      .workspace { grid-template-columns: 1fr; }
+      .left-menu-space {
+        border-bottom: 1px solid var(--border);
+        border-right: 0;
+        min-height: 180px;
+      }
+      .right-window-space { min-height: 260px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5z"/>
+        <path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z"/>
+      </svg>
+      <h1>Nilavaram</h1>
+    </div>
+    <div id="user-info" class="user-info">
+      <span class="loading-status">Loading user details...</span>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="left-menu-space" aria-label="Menu space"></aside>
+    <main class="right-window-space" aria-label="Right window">
+      <p class="loading-status">The right window is reserved for the next step.</p>
+    </main>
+  </div>
+
+  <script>
+    function escapeHtml(value) {
+      const element = document.createElement('div');
+      element.textContent = String(value == null ? '' : value);
+      return element.innerHTML;
+    }
+
+    function renderUserInfo(data) {
+      document.getElementById('user-info').innerHTML =
+        '<span><b>User:</b> ' + escapeHtml(data.user) + '</span>' +
+        '<span><b>Role:</b> ' + escapeHtml(data.role) + '</span>' +
+        '<span><b>Access:</b> ' + escapeHtml(data.accessStatus) + '</span>';
+    }
+
+    google.script.run
+      .withSuccessHandler(renderUserInfo)
+      .withFailureHandler(function(error) {
+        document.getElementById('user-info').innerHTML =
+          '<span class="error">User details could not be loaded: ' +
+          escapeHtml(error && error.message || error) + '</span>';
+      })
+      .getDashboardInfo();
+  </script>
+</body>
+</html>

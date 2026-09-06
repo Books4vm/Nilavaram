@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nilavaram Standalone Menu Test</title>
+  <style>
+    :root {
+      --background: #0b1628;
+      --sidebar: #111f34;
+      --panel: #18263d;
+      --border: #52647d;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent: #38bdf8;
+      --accent-text: #06111d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--background);
+      color: var(--text);
+      display: grid;
+      grid-template-columns: 330px 1fr;
+      height: 100vh;
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 18px;
+    }
+    aside {
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 22px;
+    }
+    main {
+      overflow-y: auto;
+      padding: 30px;
+    }
+    h1, h2, h3 { margin-top: 0; }
+    h1 { font-size: 1.55rem; }
+    h2 { font-size: 2rem; }
+    label { display: block; font-weight: bold; margin-bottom: 8px; }
+    select, button {
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font: inherit;
+      min-height: 48px;
+      padding: 9px 12px;
+      width: 100%;
+    }
+    select {
+      background: var(--panel);
+      color: var(--text);
+    }
+    button {
+      background: var(--accent);
+      color: var(--accent-text);
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 12px;
+    }
+    .status {
+      color: var(--muted);
+      font-size: .9rem;
+      margin-top: 10px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      min-height: 260px;
+      padding: 28px;
+    }
+    .tree {
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      margin-top: 24px;
+      max-height: 48vh;
+      overflow-y: auto;
+      padding: 18px 0 0 22px;
+    }
+    .tree li { margin: 6px 0; }
+    .module-code {
+      color: var(--accent);
+      font-family: Consolas, monospace;
+      font-size: .9rem;
+    }
+    @media (max-width: 700px) {
+      body { display: block; height: auto; min-height: 100vh; }
+      aside { border-bottom: 1px solid var(--border); border-right: 0; }
+      main { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <aside>
+    <h1>Nilavaram</h1>
+    <label for="menu-select">Select menu item</label>
+    <select id="menu-select">
+      <option value="">Loading menu items...</option>
+    </select>
+    <p id="menu-status" class="status">Loading the embedded menu...</p>
+    <div id="menu-tree" class="tree"></div>
+  </aside>
+
+  <main>
+    <section id="output" class="panel">
+      <h2>Loading the menu items</h2>
+      <p>Wait until the menu items are loaded into the dropdown on the left side. Then choose the menu item you want to work with.</p>
+      <p id="output-status" class="status">Connecting securely and loading the menu...</p>
+    </section>
+  </main>
+
+  <script>
+    const MENU_ITEMS = [
+      { group: 'Personal & Life', items: [
+        ['Life Timeline', 'life-timeline'],
+        ['Identity & Immigration', 'identity-immigration'],
+        ['Education', 'education'],
+        ['Employment', 'employment'],
+        ['Business Milestones', 'business-milestones'],
+        ['Renewals', 'renewals']
+      ]},
+      { group: 'Businesses', items: [
+        ['All Businesses', 'all-businesses']
+      ]},
+      { group: 'Assets & Estate', items: [
+        ['Properties', 'properties'],
+        ['Financial Accounts', 'financial-accounts'],
+        ['Trusts & Entities', 'trusts-entities'],
+        ['Trust-Owned Assets', 'trust-owned-assets'],
+        ['Estate Documents', 'estate-documents']
+      ]},
+      { group: 'Input', items: [
+        ['Main Menu', 'input-main'],
+        ['Receipt', 'input-receipt'],
+        ['Payment', 'input-payment'],
+        ['Journal', 'input-journal'],
+        ['CSV', 'input-upload-csv'],
+        ['PDF', 'input-upload-pdf'],
+        ['Image', 'input-upload-image'],
+        ['Text Template', 'input-upload-txt'],
+        ['Workbench', 'input-workbench'],
+        ['ACODE Map', 'input-acode-map']
+      ]},
+      { group: 'Accounting', items: [
+        ['Chart of Accounts', 'chart-of-accounts'],
+        ['Add New Account', 'account-add-new'],
+        ['Batch Edit Accounts', 'account-batch-edit']
+      ]},
+      { group: 'Documents & Archive', items: [
+        ['Archive Library', 'archive-library'],
+        ['Upload Documents', 'upload-documents'],
+        ['Missing / To Retrieve', 'missing-documents'],
+        ['Expiring Documents', 'expiring-documents'],
+        ['Archived Documents', 'archived-documents'],
+        ['Backup Status', 'backup-status']
+      ]},
+      { group: 'Tasks', items: [
+        ['Alerts', 'alerts'],
+        ['Reminders', 'reminders']
+      ]},
+      { group: 'Help', items: [
+        ['Navigation Guide', 'navigation-guide'],
+        ['Getting Started', 'getting-started'],
+        ['Accounting Guide', 'accounting-guide'],
+        ['Accounting Operating Rules', 'accounting-operating-rules'],
+        ['Documents and Imports', 'documents-imports-guide'],
+        ['Project Architecture', 'project-architecture'],
+        ['Frequently Asked Questions', 'faq'],
+        ['About and Version History', 'about-version-history']
+      ]},
+      { group: 'System', items: [
+        ['System Status', 'system-status'],
+        ['Firestore', 'firestore'],
+        ['Connections', 'connections'],
+        ['Pending Features', 'pending-features']
+      ]}
+    ];
+
+    function flattenMenuItems() {
+      return MENU_ITEMS.reduce(function(items, group) {
+        return items.concat(group.items.map(function(item) {
+          return { label: item[0], moduleId: item[1], group: group.group };
+        }));
+      }, []);
+    }
+
+    function renderTree() {
+      document.getElementById('menu-tree').innerHTML =
+        '<h3>Available menu items (' + flattenMenuItems().length + ')</h3>' +
+        '<ul>' + MENU_ITEMS.map(function(group) {
+          return '<li><strong>' + escapeHtml(group.group) + '</strong><ul>' +
+            group.items.map(function(item) {
+              return '<li>' + escapeHtml(item[0]) +
+                ' <span class="module-code">' + escapeHtml(item[1]) + '</span></li>';
+            }).join('') + '</ul></li>';
+        }).join('') + '</ul>';
+    }
+
+    function escapeHtml(value) {
+      const element = document.createElement('div');
+      element.textContent = String(value == null ? '' : value);
+      return element.innerHTML;
+    }
+
+    function renderMenu() {
+      const select = document.getElementById('menu-select');
+      const items = flattenMenuItems();
+      select.textContent = '';
+      select.appendChild(new Option('Choose a menu item...', ''));
+      items.forEach(function(item) {
+        const option = new Option(item.label, item.moduleId);
+        option.dataset.label = item.label;
+        option.dataset.group = item.group;
+        select.appendChild(option);
+      });
+      document.getElementById('menu-status').textContent =
+        items.length + ' menu item(s) loaded from this standalone HTML file.';
+      document.getElementById('output-status').textContent =
+        'Menu items are loaded and you can choose from the drop down box on the left side.';
+      renderTree();
+    }
+
+    function openModule(item) {
+      const output = document.getElementById('output');
+      output.innerHTML =
+        '<h2>' + escapeHtml(item.label) + '</h2>' +
+        '<p>Selected module: <span class="module-code">' +
+        escapeHtml(item.moduleId) + '</span></p>' +
+        '<p>This independent window is ready for the ' +
+        escapeHtml(item.label) + ' workflow.</p>';
+    }
+
+    document.getElementById('menu-select').addEventListener('change', function(event) {
+      const option = event.target.options[event.target.selectedIndex];
+      if (!option || !option.value) return;
+      openModule({
+        label: option.dataset.label,
+        moduleId: option.value
+      });
+    });
+
+    renderMenu();
+  </script>
+</body>
+</html>

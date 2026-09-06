@@ -28,6 +28,16 @@ function include(filename) {
  */
 function doGet(e) {
   const parameters = e && e.parameter || {};
+  if (parameters.loadingMenu === '1') {
+    return HtmlService
+      .createHtmlOutputFromFile('LoadingMenu')
+      .setTitle('Nilavaram - Loading Menu');
+  }
+  if (parameters.standalone === '1') {
+    return HtmlService
+      .createHtmlOutputFromFile('StandaloneMenuTest')
+      .setTitle('Nilavaram Standalone Menu');
+  }
   if (parameters.accountWindow === 'new') {
     const accountTemplate = HtmlService.createTemplateFromFile('AccountWindow');
     accountTemplate.ownerJson = JSON.stringify(String(parameters.owner || 'all'));
@@ -217,6 +227,8 @@ function doGet(e) {
   const template = HtmlService.createTemplateFromFile('Dashboard');
   const validateOneDrive = parameters.validateOneDrive === '1';
   const validateAkoya = parameters.validateAkoya === '1';
+  const openModuleId = String(parameters.moduleId || '');
+  const openModuleLabel = String(parameters.moduleLabel || '');
   let connectionsBootstrap = buildConnectionsBootstrap_();
   if (validateOneDrive) {
     try {
@@ -244,6 +256,10 @@ function doGet(e) {
   template.openConnectionsOnLoadJson = JSON.stringify(
     validateOneDrive || validateAkoya
   );
+  template.openModuleIdJson = JSON.stringify(openModuleId)
+    .replace(/</g, '\\u003c');
+  template.openModuleLabelJson = JSON.stringify(openModuleLabel)
+    .replace(/</g, '\\u003c');
   return template.evaluate().setTitle('Nilavaram');
 }
 

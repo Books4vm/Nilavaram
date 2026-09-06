@@ -304,7 +304,7 @@ function getDashboardShell() {
   const info = getDashboardInfo();
   return {
     info: info,
-    navigation: info.accessStatus === 'active' ? getNavigation() : []
+    navigation: []
   };
 }
 

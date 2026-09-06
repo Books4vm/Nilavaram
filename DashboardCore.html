@@ -1,0 +1,234 @@
+  <script>
+    let startupTimerId = null;
+
+    window.onload = function() {
+      initializeDisplayPreferences();
+      if (OPEN_CONNECTIONS_ON_LOAD) {
+        showConnections();
+      } else {
+        showDefaultDashboard();
+      }
+      buildMenu(readMenuCatalog());
+      loadStartup();
+    };
+
+    function showDefaultDashboard() {
+      document.getElementById('output').innerHTML =
+        '<h2>Loading the menu items</h2>' +
+        '<p>Wait until the menu items are loaded into the dropdown on the left side. Then choose the menu item you want to work with. The contents will open in a separate window.</p>' +
+        '<p id="dashboard-loading" class="help-meta">Connecting securely and loading the menu...</p>';
+    }
+
+    function moveContentToTop() {
+      const content = document.querySelector('.content');
+      if (content) content.scrollTop = 0;
+      window.scrollTo(0, 0);
+    }
+
+    function readPreference(key, fallback) {
+      try {
+        return window.localStorage.getItem(key) || fallback;
+      } catch (error) {
+        return fallback;
+      }
+    }
+
+    function savePreference(key, value) {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch (error) {
+        // The selected preference still applies for this page session.
+      }
+    }
+
+    function applyDisplayPreferences(theme, fontSize) {
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.dataset.fontSize = fontSize;
+      document.getElementById('theme-choice').value = theme;
+      document.getElementById('font-choice').value = fontSize;
+    }
+
+    function initializeDisplayPreferences() {
+      const theme = readPreference('nilavaram-theme', 'sky');
+      const fontSize = readPreference('nilavaram-font-size', 'large');
+      applyDisplayPreferences(theme, fontSize);
+
+      document.getElementById('theme-choice').addEventListener('change', function(event) {
+        document.documentElement.dataset.theme = event.target.value;
+        savePreference('nilavaram-theme', event.target.value);
+      });
+      document.getElementById('font-choice').addEventListener('change', function(event) {
+        document.documentElement.dataset.fontSize = event.target.value;
+        savePreference('nilavaram-font-size', event.target.value);
+      });
+    }
+
+    function escapeHtml(value) {
+      const element = document.createElement('div');
+      element.textContent = String(value == null ? '' : value);
+      return element.innerHTML;
+    }
+
+    function showError(error) {
+      const message = error && error.message ? error.message : String(error);
+      document.getElementById('output').innerHTML =
+        '<p class="error">' + escapeHtml(message) + '</p>';
+    }
+
+    function getPacificViewTime(date) {
+      const dateParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        weekday: 'long'
+      }).formatToParts(date);
+      const timeParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }).formatToParts(date);
+      const part = function(parts, type) {
+        const found = parts.find(function(item) { return item.type === type; });
+        return found ? found.value : '';
+      };
+
+      return {
+        date:
+          part(dateParts, 'day') + '-' +
+          part(dateParts, 'month').toUpperCase() + '-' +
+          part(dateParts, 'year'),
+        weekday: part(dateParts, 'weekday'),
+        time:
+          part(timeParts, 'hour') + ':' +
+          part(timeParts, 'minute') + ' ' +
+          part(timeParts, 'dayPeriod')
+      };
+    }
+
+    function renderStartupInfo(data) {
+      const started = getPacificViewTime(PAGE_VIEW_STARTED_AT);
+      const current = getPacificViewTime(new Date());
+
+      document.getElementById('startup').innerHTML =
+        '<div class="startup-line">' +
+          '<span><b>User:</b> ' + escapeHtml(data.user) + '</span>' +
+          '<span><b>Role:</b> ' + escapeHtml(data.role) + '</span>' +
+          '<span>' + escapeHtml(started.date) + ' ' +
+            escapeHtml(started.weekday) + '</span>' +
+        '</div>' +
+        '<div class="startup-time-line">' +
+          '<span><b>Started viewing:</b> ' + escapeHtml(started.time) +
+            ' PACIFIC TIME</span>' +
+          '<span><b>Current time:</b> ' + escapeHtml(current.time) +
+            ' PACIFIC TIME</span>' +
+          '<button class="secondary-button" type="button" ' +
+            'onclick="copySessionDetails()">Copy session details</button>' +
+          '<span id="copy-session-result" aria-live="polite"></span>' +
+        '</div>';
+    }
+
+    function getSessionDetailsText() {
+      const data = window.nilavaramDashboardInfo;
+      const started = getPacificViewTime(PAGE_VIEW_STARTED_AT);
+      const current = getPacificViewTime(new Date());
+      return [
+        'User: ' + data.user,
+        'Role: ' + data.role,
+        started.date + ' ' + started.weekday,
+        'Started viewing: ' + started.time + ' PACIFIC TIME',
+        'Current time: ' + current.time + ' PACIFIC TIME'
+      ].join('\n');
+    }
+
+    function copySessionDetails() {
+      const text = getSessionDetailsText();
+      const showCopied = function() {
+        const result = document.getElementById('copy-session-result');
+        if (result) result.textContent = 'Copied.';
+      };
+      const fallbackCopy = function() {
+        const field = document.createElement('textarea');
+        field.value = text;
+        field.setAttribute('readonly', '');
+        field.style.position = 'absolute';
+        field.style.left = '-9999px';
+        document.body.appendChild(field);
+        field.select();
+        document.execCommand('copy');
+        document.body.removeChild(field);
+        showCopied();
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(showCopied).catch(fallbackCopy);
+      } else {
+        fallbackCopy();
+      }
+    }
+
+    function loadStartup() {
+      const activateShell = function(shell, recoveryMessage) {
+          const data = shell.info;
+          window.nilavaramDashboardInfo = data;
+          renderStartupInfo(data);
+          if (startupTimerId !== null) {
+            window.clearInterval(startupTimerId);
+          }
+          startupTimerId = window.setInterval(function() {
+            renderStartupInfo(data);
+          }, 1000);
+
+          if (data.accessStatus === 'invited') {
+            document.getElementById('menu').textContent = '';
+            document.getElementById('output').innerHTML =
+              '<h2>Invitation found</h2>' +
+              '<p>Your Google account has been invited to Nilavaram as ' +
+              escapeHtml(data.role) + '.</p>' +
+              '<button class="primary-button" type="button" ' +
+              'onclick="acceptInvitation()">Accept invitation</button>';
+            return;
+          }
+          if (data.accessStatus !== 'active') {
+            document.getElementById('menu').textContent = '';
+            document.getElementById('output').innerHTML =
+              '<h2>Access unavailable</h2>' +
+              '<p class="error">This Google account has not been invited.</p>';
+            return;
+          }
+          if (OPEN_MODULE_ID) {
+            openModule(OPEN_MODULE_ID, OPEN_MODULE_LABEL || OPEN_MODULE_ID, false);
+          }
+          if (recoveryMessage) {
+            showRestrictedOneDriveRecovery(recoveryMessage);
+          } else {
+            const loading = document.getElementById('dashboard-loading');
+            if (loading) {
+              loading.textContent =
+                'Menu items are loaded and you can choose from the drop down box on the left side.';
+            }
+          }
+      };
+      google.script.run
+        .withSuccessHandler(function(shell) { activateShell(shell, ''); })
+        .withFailureHandler(function(error) {
+          const originalMessage = error && error.message
+            ? error.message : String(error);
+          google.script.run
+            .withSuccessHandler(function(shell) {
+              activateShell(shell, originalMessage);
+            })
+            .withFailureHandler(showError)
+            .getPrimaryAdminRecoveryShell();
+        })
+        .getDashboardShell();
+    }
+
+    function acceptInvitation() {
+      google.script.run
+        .withSuccessHandler(function() { window.location.reload(); })
+        .withFailureHandler(showError)
+        .acceptMyInvitation();
+    }
+</script>
