@@ -1,0 +1,16 @@
+{
+  "name": "nilavaram",
+  "version": "1.0.0",
+  "description": "Invitation-only, Firestore-driven administration application built with Google Apps Script.",
+  "private": true,
+  "scripts": {
+    "validate": "for f in *.js; do node --check \"$f\" || exit 1; done && node -e \"JSON.parse(require('fs').readFileSync('appsscript.json','utf8'))\" && echo 'All Apps Script sources parse and appsscript.json is valid'",
+    "push": "clasp push",
+    "pull": "clasp pull",
+    "status": "clasp status",
+    "login": "clasp login"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.4.1"
+  }
+}
