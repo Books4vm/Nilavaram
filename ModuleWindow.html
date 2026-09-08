@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('DashboardStyles') ?>
+  <style>
+    body.module-window-body { height: auto; min-height: 100vh; overflow: auto; }
+    .module-window-header { position: sticky; top: 0; z-index: 20; }
+    .module-content { margin: 0; max-width: none; min-height: calc(100vh - 120px); }
+    .module-meta-line { color: var(--muted-text); font-size: .9em; }
+  </style>
+</head>
+<body class="module-window-body">
+  <header class="header module-window-header">
+    <div class="header-top">
+      <div class="brand">
+        <h1 id="module-title">Nilavaram Module</h1>
+      </div>
+      <div id="module-meta" class="module-meta-line"></div>
+    </div>
+  </header>
+  <main id="output" class="content panel module-content" tabindex="-1">
+    <p>Loading module...</p>
+  </main>
+  <script>
+    const MODULE_ID = <?!= moduleIdJson ?>;
+    const MODULE_LABEL = <?!= moduleLabelJson ?>;
+    const ENTITY_ID = <?!= entityIdJson ?>;
+    const ENTITY_NAME = <?!= entityNameJson ?>;
+    const SESSION_ID = <?!= sessionIdJson ?>;
+    const IS_MODULE_WINDOW = true;
+  </script>
+  <?!= include('ModuleWindowCore') ?>
+  <?!= include('DashboardOperations') ?>
+  <?!= include('DashboardTransactions') ?>
+  <?!= include('DashboardNavigation') ?>
+</body>
+</html>

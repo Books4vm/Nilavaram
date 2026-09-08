@@ -1,0 +1,511 @@
+<script>
+  window.nilavaramModuleSessions = window.nilavaramModuleSessions || {};
+  window.nilavaramClosedSessions = window.nilavaramClosedSessions || [];
+  window.nilavaramLastActivityAt = Date.now();
+  window.nilavaramMainStartLogged = false;
+  window.nilavaramExtendPromptVisible = false;
+  let sessionPanelTimerId = null;
+  let inactivityWarningShown = false;
+  let shellInactivityTimerId = null;
+
+  const NILAVARAM_MAX_CLOSED_ROWS = 20;
+  const MAIN_WORKSPACE_SESSION_ID = 'main-workspace';
+
+  function markUserActivity() {
+    window.nilavaramLastActivityAt = Date.now();
+    inactivityWarningShown = false;
+    window.nilavaramExtendPromptVisible = false;
+    hideInactivityExtendPrompt();
+  }
+
+  function getIdleMinutes() {
+    return Math.max(
+      0,
+      Math.round((Date.now() - window.nilavaramLastActivityAt) / 60000)
+    );
+  }
+
+  function startActivityTracking() {
+    const events = ['mousemove', 'mousedown', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(function(name) {
+      document.addEventListener(name, markUserActivity, { passive: true });
+    });
+  }
+
+  function getSelectedClientGroupName() {
+    return (window.nilavaramSelectedClient && window.nilavaramSelectedClient.name) ||
+      'VAV Group';
+  }
+
+  function getFriendlyWindowName(session) {
+    if (!session) return 'Module window';
+    if (
+      session.sessionId === MAIN_WORKSPACE_SESSION_ID ||
+      session.moduleId === MAIN_WORKSPACE_SESSION_ID
+    ) {
+      return 'Main workspace';
+    }
+    return session.windowName || session.moduleLabel || 'Module window';
+  }
+
+  function getSessionEventLabel(session) {
+    if (!session) return '';
+    if (session.lastEvent === 'Resumed') return 'Resumed';
+    if (session.status === 'inactive') return 'Inactive';
+    if (session.status === 'open') return 'Start';
+    if (session.closeReason === 'timeout') return 'Timeout';
+    if (session.status === 'blocked') return 'Blocked';
+    return 'Closed';
+  }
+
+  function formatSessionDateTime(value) {
+    const date = value ? new Date(value) : new Date();
+    return new Intl.DateTimeFormat(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZoneName: 'short'
+    }).format(date);
+  }
+
+  function getSessionIpAddress(session) {
+    return (session && session.ipAddress) ||
+      window.nilavaramClientIp ||
+      'Pending';
+  }
+
+  function getSessionIpDisplay(session) {
+    const role = window.nilavaramDashboardInfo &&
+      window.nilavaramDashboardInfo.role;
+    if (role === 'admin') {
+      return getSessionIpAddress(session);
+    }
+    return 'Contact Admin';
+  }
+
+  function buildSessionLogPayload(session, eventType) {
+    return {
+      sessionId: session.sessionId,
+      eventType: eventType,
+      moduleId: session.moduleId,
+      moduleLabel: session.moduleLabel,
+      windowName: getFriendlyWindowName(session),
+      clientGroup: getSelectedClientGroupName(),
+      clientIp: getSessionIpAddress(session),
+      entityId: session.entityId,
+      entityName: session.entityName,
+      openedAt: session.openedAt,
+      lastActiveAt: session.lastActiveAt,
+      closedAt: session.closedAt || null,
+      durationMinutes: session.durationMinutes == null
+        ? null
+        : session.durationMinutes,
+      closeReason: session.closeReason || session.status || ''
+    };
+  }
+
+  function persistModuleSessionStart(session) {
+    google.script.run
+      .withFailureHandler(function() {
+        // UI still works if OneDrive logging fails.
+      })
+      .recordModuleSessionEvent(buildSessionLogPayload(session, 'start'));
+  }
+
+  function persistModuleSessionEvent(session) {
+    const eventType = session.status === 'blocked'
+      ? 'blocked'
+      : (session.closeReason === 'timeout' ? 'timeout' : 'close');
+    google.script.run
+      .withFailureHandler(function(error) {
+        const panel = document.getElementById('workspace-sessions');
+        if (!panel) return;
+        const note = document.createElement('p');
+        note.className = 'error';
+        note.textContent = 'Billing log could not be saved: ' +
+          (error && error.message ? error.message : String(error));
+        panel.insertBefore(note, panel.firstChild);
+      })
+      .recordModuleSessionEvent(buildSessionLogPayload(session, eventType));
+  }
+
+  function persistModuleSessionInactive(session) {
+    google.script.run
+      .withFailureHandler(function() {})
+      .recordModuleSessionEvent(buildSessionLogPayload(session, 'inactive'));
+  }
+
+  function persistModuleSessionResumed(session) {
+    google.script.run
+      .withFailureHandler(function() {})
+      .recordModuleSessionEvent(buildSessionLogPayload(session, 'resumed'));
+  }
+
+  function updateMainWorkspaceIp(ipAddress) {
+    const session = window.nilavaramModuleSessions[MAIN_WORKSPACE_SESSION_ID];
+    if (!session) return;
+    session.ipAddress = ipAddress;
+    renderWorkspaceSessions();
+    if (!window.nilavaramMainStartLogged) {
+      window.nilavaramMainStartLogged = true;
+      persistModuleSessionStart(session);
+    }
+  }
+
+  function ensureMainWorkspaceSession() {
+    if (window.nilavaramModuleSessions[MAIN_WORKSPACE_SESSION_ID]) {
+      return;
+    }
+    registerModuleSession({
+      sessionId: MAIN_WORKSPACE_SESSION_ID,
+      moduleId: MAIN_WORKSPACE_SESSION_ID,
+      moduleLabel: 'Main workspace',
+      windowName: 'Main workspace',
+      entityId: '',
+      entityName: '',
+      status: 'open',
+      lastEvent: 'Start',
+      ipAddress: window.nilavaramClientIp || 'Pending',
+      openedAt: PAGE_VIEW_STARTED_AT.toISOString()
+    });
+    if (window.nilavaramClientIp && !window.nilavaramMainStartLogged) {
+      window.nilavaramMainStartLogged = true;
+      persistModuleSessionStart(
+        window.nilavaramModuleSessions[MAIN_WORKSPACE_SESSION_ID]
+      );
+    }
+  }
+
+  function resumeMainWorkspaceIfInactive() {
+    const session = window.nilavaramModuleSessions[MAIN_WORKSPACE_SESSION_ID];
+    if (!session || session.status !== 'inactive') return;
+    session.status = 'open';
+    session.lastEvent = 'Resumed';
+    session.lastActiveAt = new Date().toISOString();
+    markUserActivity();
+    persistModuleSessionResumed(session);
+    renderWorkspaceSessions();
+    showWorkspaceNotice('Session resumed.');
+  }
+
+  function showDefaultWorkspace() {
+    document.getElementById('output').innerHTML =
+      '<h2>Workspace</h2>' +
+      '<div class="workspace-intro">' +
+        '<p>This is your main workspace window.</p>' +
+        '<p>First, choose a client, then select a business on the left panel.</p>' +
+        '<p>After you choose a business, the menu will load automatically.</p>' +
+        '<p>A new window will open for the module you choose.</p>' +
+      '</div>' +
+      '<section id="workspace-selection" class="workspace-selection">' +
+        '<h3>Current selection</h3>' +
+        '<p><b>Client:</b> <span id="workspace-client-name">Not selected</span></p>' +
+        '<p><b>Business:</b> <span id="workspace-business-name">Not selected</span></p>' +
+      '</section>' +
+      '<div id="workspace-load-status" class="workspace-load-status">' +
+        '<p id="workspace-loading" class="help-meta">Connecting securely...</p>' +
+        '<div id="workspace-progress-wrap" hidden>' +
+          '<progress id="workspace-progress" max="100"></progress>' +
+          '<p id="workspace-progress-label" class="help-meta"></p>' +
+        '</div>' +
+        '<p id="workspace-error" class="error" hidden></p>' +
+      '</div>' +
+      '<div id="inactivity-extend-panel" class="inactivity-extend-panel" hidden>' +
+        '<p>You have been inactive for 9 minutes. Still working?</p>' +
+        '<button id="inactivity-extend-yes" class="primary-button" type="button">YES — extend session</button>' +
+      '</div>' +
+      '<section id="workspace-sessions" class="workspace-sessions" aria-live="polite"></section>';
+    const yesButton = document.getElementById('inactivity-extend-yes');
+    if (yesButton) {
+      yesButton.onclick = function() {
+        markUserActivity();
+        showWorkspaceNotice('Session extended.');
+      };
+    }
+    startActivityTracking();
+    ensureMainWorkspaceSession();
+    renderWorkspaceSessions();
+    startWorkspaceSessionPanel();
+    startShellInactivityWatch();
+    showWorkspaceNotice('Main workspace session started.');
+  }
+
+  function showInactivityExtendPrompt() {
+    const panel = document.getElementById('inactivity-extend-panel');
+    if (!panel) return;
+    panel.hidden = false;
+    window.nilavaramExtendPromptVisible = true;
+    showWorkspaceNotice('Inactive for 9 minutes. Click YES to extend.');
+  }
+
+  function updateWorkspaceSelectionDisplay() {
+    const clientEl = document.getElementById('workspace-client-name');
+    const businessEl = document.getElementById('workspace-business-name');
+    if (clientEl) {
+      clientEl.textContent = window.nilavaramSelectedClient
+        ? window.nilavaramSelectedClient.name
+        : 'Not selected';
+    }
+    if (businessEl) {
+      businessEl.textContent = window.nilavaramSelectedEntity
+        ? window.nilavaramSelectedEntity.name
+        : 'Not selected';
+    }
+  }
+
+  function clearWorkspaceError() {
+    const err = document.getElementById('workspace-error');
+    if (!err) return;
+    err.hidden = true;
+    err.textContent = '';
+  }
+
+  function showWorkspaceProgress(label, percent) {
+    const wrap = document.getElementById('workspace-progress-wrap');
+    const bar = document.getElementById('workspace-progress');
+    const labelEl = document.getElementById('workspace-progress-label');
+    clearWorkspaceError();
+    if (wrap) wrap.hidden = false;
+    if (bar) {
+      if (percent == null) {
+        bar.removeAttribute('value');
+      } else {
+        bar.value = percent;
+      }
+    }
+    if (labelEl) labelEl.textContent = label || '';
+    showWorkspaceNotice(label || '');
+  }
+
+  function hideWorkspaceProgress() {
+    const wrap = document.getElementById('workspace-progress-wrap');
+    if (wrap) wrap.hidden = true;
+  }
+
+  function showWorkspaceError(message, detail) {
+    hideWorkspaceProgress();
+    const err = document.getElementById('workspace-error');
+    if (err) {
+      err.hidden = false;
+      err.textContent = detail
+        ? message + '\n\nDetails: ' + detail
+        : message;
+    }
+    showWorkspaceNotice(message);
+  }
+  function hideInactivityExtendPrompt() {
+    const panel = document.getElementById('inactivity-extend-panel');
+    if (panel) panel.hidden = true;
+    window.nilavaramExtendPromptVisible = false;
+  }
+
+  function showWorkspaceNotice(message) {
+    const loading = document.getElementById('workspace-loading');
+    if (loading) loading.textContent = message;
+  }
+
+  function formatDurationMinutes(startedAt, endedAt) {
+    const start = new Date(startedAt).getTime();
+    const end = endedAt ? new Date(endedAt).getTime() : Date.now();
+    if (!start || end < start) return 0;
+    return Math.max(0, Math.round((end - start) / 60000));
+  }
+
+  function registerModuleSession(record) {
+    const now = new Date().toISOString();
+    const session = Object.assign({
+      sessionId: '',
+      moduleId: '',
+      moduleLabel: '',
+      windowName: '',
+      entityId: '',
+      entityName: '',
+      status: 'open',
+      lastEvent: 'Start',
+      ipAddress: window.nilavaramClientIp || 'Pending',
+      openedAt: now,
+      lastActiveAt: now,
+      closedAt: '',
+      closeReason: '',
+      popup: null
+    }, record || {});
+
+    session.windowName = getFriendlyWindowName(session);
+    session.ipAddress = getSessionIpAddress(session);
+
+    if (session.status === 'closed' || session.status === 'blocked') {
+      session.lastEvent = session.closeReason === 'timeout'
+        ? 'Timeout'
+        : (session.status === 'blocked' ? 'Blocked' : 'Closed');
+      session.closedAt = session.closedAt || now;
+      session.durationMinutes = formatDurationMinutes(session.openedAt, session.closedAt);
+      window.nilavaramClosedSessions.unshift(session);
+      window.nilavaramClosedSessions = window.nilavaramClosedSessions
+        .slice(0, NILAVARAM_MAX_CLOSED_ROWS);
+      delete window.nilavaramModuleSessions[session.sessionId];
+      persistModuleSessionEvent(session);
+    } else {
+      window.nilavaramModuleSessions[session.sessionId] = session;
+    }
+
+    renderWorkspaceSessions();
+  }
+
+  function closeModuleSession(sessionId, closeReason) {
+    const session = window.nilavaramModuleSessions[sessionId];
+    if (!session) return;
+    registerModuleSession(Object.assign({}, session, {
+      status: 'closed',
+      closeReason: closeReason || 'user-closed',
+      popup: null
+    }));
+  }
+
+  function markMainWorkspaceInactive() {
+    const session = window.nilavaramModuleSessions[MAIN_WORKSPACE_SESSION_ID];
+    if (!session || session.status === 'inactive') return;
+    session.status = 'inactive';
+    session.lastEvent = 'Inactive';
+    session.lastActiveAt = new Date().toISOString();
+    persistModuleSessionInactive(session);
+    renderWorkspaceSessions();
+  }
+
+  function monitorModulePopup(sessionId, popup) {
+    const timerId = window.setInterval(function() {
+      const session = window.nilavaramModuleSessions[sessionId];
+      if (!session) {
+        window.clearInterval(timerId);
+        return;
+      }
+      if (!popup || popup.closed) {
+        window.clearInterval(timerId);
+        closeModuleSession(sessionId, popup ? 'browser-closed' : 'popup-blocked');
+        return;
+      }
+      session.lastActiveAt = new Date().toISOString();
+      renderWorkspaceSessions();
+    }, 1000);
+  }
+
+  function renderOpenSessionTable(openSessions) {
+    let html = '<table class="session-table"><thead><tr>' +
+      '<th>Event</th><th>Date / time / time zone</th>' +
+      '<th>IP address</th><th>Window</th>' +
+      '</tr></thead><tbody>';
+    openSessions.forEach(function(session) {
+      html += '<tr>' +
+        '<td>' + escapeHtml(getSessionEventLabel(session)) + '</td>' +
+        '<td>' + escapeHtml(formatSessionDateTime(session.openedAt)) + '</td>' +
+        '<td>' + escapeHtml(getSessionIpDisplay(session)) + '</td>' +
+        '<td>' + escapeHtml(getFriendlyWindowName(session)) + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+
+  function renderClosedSessionTable(closedSessions) {
+    let html = '<table class="session-table"><thead><tr>' +
+      '<th>Event</th><th>Date / time / time zone</th>' +
+      '<th>IP address</th><th>Window</th>' +
+      '</tr></thead><tbody>';
+    closedSessions.forEach(function(session) {
+      html += '<tr>' +
+        '<td>' + escapeHtml(getSessionEventLabel(session)) + '</td>' +
+        '<td>' + escapeHtml(formatSessionDateTime(session.closedAt || session.openedAt)) + '</td>' +
+        '<td>' + escapeHtml(getSessionIpDisplay(session)) + '</td>' +
+        '<td>' + escapeHtml(getFriendlyWindowName(session)) + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+
+  function renderWorkspaceSessions() {
+    const panel = document.getElementById('workspace-sessions');
+    if (!panel) return;
+
+    const openSessions = Object.keys(window.nilavaramModuleSessions).map(function(key) {
+      return window.nilavaramModuleSessions[key];
+    });
+    const closedSessions = window.nilavaramClosedSessions || [];
+    const policy = window.nilavaramSessionPolicy || {
+      warningMinutes: 9,
+      timeoutMinutes: 10
+    };
+    const idleMinutes = getIdleMinutes();
+    const remainingMinutes = Math.max(0, policy.timeoutMinutes - idleMinutes);
+
+    let html =
+      '<h3>Open module windows (' + openSessions.length + ')</h3>';
+    if (!openSessions.length) {
+      html += '<p class="help-meta">No module windows are open.</p>';
+    } else {
+      html += renderOpenSessionTable(openSessions);
+    }
+
+    html += '<h3>Closed today (' + closedSessions.length + ')</h3>';
+    if (!closedSessions.length) {
+      html += '<p class="help-meta">Closed module windows will appear here.</p>';
+    } else {
+      html += renderClosedSessionTable(closedSessions);
+    }
+
+    html += '<p class="help-meta">Inactive for ' + idleMinutes +
+      ' minute(s). Timeout in ' + remainingMinutes +
+      ' minute(s) unless you click YES. Times shown in your local time zone.</p>';
+
+    if (window.nilavaramDashboardInfo &&
+        window.nilavaramDashboardInfo.role !== 'admin') {
+      html += '<p class="help-meta">Full session logs including IP are available to Admin only. Contact your Admin.</p>';
+    }
+
+    panel.innerHTML = html;
+  }
+
+  function startWorkspaceSessionPanel() {
+    if (sessionPanelTimerId !== null) {
+      window.clearInterval(sessionPanelTimerId);
+    }
+    sessionPanelTimerId = window.setInterval(renderWorkspaceSessions, 1000);
+  }
+
+  function startShellInactivityWatch() {
+    const policy = window.nilavaramSessionPolicy || {
+      warningMinutes: 9,
+      timeoutMinutes: 10
+    };
+    if (shellInactivityTimerId !== null) {
+      window.clearInterval(shellInactivityTimerId);
+    }
+    shellInactivityTimerId = window.setInterval(function() {
+      const idleMinutes = getIdleMinutes();
+
+      if (!inactivityWarningShown && idleMinutes >= policy.warningMinutes) {
+        inactivityWarningShown = true;
+        showInactivityExtendPrompt();
+      }
+
+      if (idleMinutes >= policy.timeoutMinutes) {
+        Object.keys(window.nilavaramModuleSessions).forEach(function(sessionId) {
+          if (sessionId !== MAIN_WORKSPACE_SESSION_ID) {
+            const session = window.nilavaramModuleSessions[sessionId];
+            if (session && session.popup && !session.popup.closed) {
+              try { session.popup.close(); } catch (error) {}
+            }
+            closeModuleSession(sessionId, 'timeout');
+          }
+        });
+        markMainWorkspaceInactive();
+        hideInactivityExtendPrompt();
+        showWorkspaceNotice(
+          'Inactive for 10 minutes. Module windows were closed. Main workspace remains open. Open a module to resume.'
+        );
+      }
+    }, 15000);
+  }
+</script>

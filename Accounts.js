@@ -54,7 +54,7 @@ function setupAccountingFoundation_() {
     ['member-a', 'A', 'core-member'],
     ['member-s', 'S', 'core-member'],
     ['member-r', 'R', 'core-member'],
-    ['trust-vav', 'VAV Tr', 'irrevocable-trust'],
+    ['trust-vav', 'VAV Trust', 'irrevocable-trust'],
     ['trust-om-nama-sivaya', 'OM NAMA SIVAYA Tr', 'irrevocable-trust'],
     ['trust-vm', 'VM Tr', 'irrevocable-trust']
   ].forEach(function(item) {
@@ -82,7 +82,7 @@ function setupAccountingFoundation_() {
     ['family-72000', '72000', 'A — Net Worth', 'net-worth', '70000', 'nilavaram'],
     ['family-73000', '73000', 'S — Net Worth', 'net-worth', '70000', 'nilavaram'],
     ['family-74000', '74000', 'R — Net Worth', 'net-worth', '70000', 'nilavaram']
-    ,['family-75000', '75000', 'VAV Tr — Net Worth', 'net-worth', '70000', 'trust-vav']
+    ,['family-75000', '75000', 'VAV Trust — Net Worth', 'net-worth', '70000', 'trust-vav']
     ,['family-76000', '76000', 'OM NAMA SIVAYA Tr — Net Worth', 'net-worth', '70000', 'trust-om-nama-sivaya']
     ,['family-77000', '77000', 'VM Tr — Net Worth', 'net-worth', '70000', 'trust-vm']
     ,['family-80000', '80000', 'RESERVED', 'group', '', 'nilavaram']
@@ -362,7 +362,7 @@ function setupApprovedMemberUseAccounts_() {
 
   addAccount(
     '75100',
-    'VAV Tr — Property',
+    'VAV Trust — Property',
     'group',
     '75000',
     'trust-vav',
@@ -378,7 +378,7 @@ function setupApprovedMemberUseAccounts_() {
   ].forEach(function(item) {
     addAccount(
       item[0],
-      'VAV Tr — ' + item[1],
+      'VAV Trust — ' + item[1],
       'net-worth',
       '75100',
       'trust-vav',

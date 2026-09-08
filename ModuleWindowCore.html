@@ -1,0 +1,33 @@
+  <script>
+    function escapeHtml(value) {
+      const element = document.createElement('div');
+      element.textContent = String(value == null ? '' : value);
+      return element.innerHTML;
+    }
+
+    function showError(error) {
+      const message = error && error.message ? error.message : String(error);
+      document.getElementById('output').innerHTML =
+        '<p class="error">' + escapeHtml(message) + '</p>';
+    }
+
+    function moveContentToTop() {
+      window.scrollTo(0, 0);
+      const output = document.getElementById('output');
+      if (output) output.scrollTop = 0;
+    }
+
+    window.onload = function() {
+      document.getElementById('module-title').textContent =
+        MODULE_LABEL || MODULE_ID || 'Module';
+      document.getElementById('module-meta').innerHTML =
+        '<span><b>Business:</b> ' + escapeHtml(ENTITY_NAME || ENTITY_ID) + '</span>';
+
+      google.script.run
+        .withSuccessHandler(function() {
+          openModule(MODULE_ID, MODULE_LABEL, false);
+        })
+        .withFailureHandler(showError)
+        .authorizeModuleAccess(MODULE_ID, ENTITY_ID);
+    };
+  </script>

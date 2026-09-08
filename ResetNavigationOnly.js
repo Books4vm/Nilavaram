@@ -47,3 +47,37 @@ function resetNavigationOnly() {
     message: 'Navigation reset only. Admin records were not changed.'
   };
 }
+
+/**
+ * NavigationRewrite.js
+ * Overwrites menus + menuItems from Setup.js. Does NOT delete collections.
+ */
+
+function rewriteNavigationInFirestore() {
+  requirePrimaryDeveloper_();
+  const result = setupNavigation_();
+  writeAudit_('navigation-rewrite', NILAVARAM_PRIMARY_ADMIN_EMAIL, {
+    menus: result.menus,
+    menuItems: result.menuItems,
+    version: result.navigationVersion
+  });
+  return {
+    success: true,
+    message: 'Navigation rewritten in Firestore.',
+    menusWritten: result.menus,
+    menuItemsWritten: result.menuItems,
+    version: result.navigationVersion,
+    moduleCountForVmTr: getNavigationForShell('vav-group', 'vm-tr').moduleCount
+  };
+}
+
+function renameVavTrustAccountingEntity() {
+  requirePrimaryDeveloper_();
+  firestoreSetDocument_('entities', 'trust-vav', toFirestoreFields_({
+    name: 'VAV Trust',
+    entityType: 'irrevocable-trust',
+    status: 'active',
+    updatedAt: new Date()
+  }));
+  return { success: true, name: 'VAV Trust' };
+}

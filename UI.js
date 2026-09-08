@@ -297,18 +297,6 @@ function getConnectionsPageData() {
 }
 
 /**
- * Returns the startup identity and navigation in one browser-to-server call.
- * This reduces the time spent waiting between separate startup requests.
- */
-function getDashboardShell() {
-  const info = getDashboardInfo();
-  return {
-    info: info,
-    navigation: []
-  };
-}
-
-/**
  * Narrow emergency shell used only when Firestore is unavailable. It is
  * limited to the configured initial Admins and exposes only the OneDrive
  * evacuation/verification controls without weakening normal team access.

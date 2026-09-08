@@ -1,505 +1,837 @@
-  <script>
-    function loadMenu() {
-      google.script.run
-        .withSuccessHandler(buildMenu)
-        .withFailureHandler(showError)
-          .getNavigation();
-    }
-    function readMenuCatalog() {
-      const element = document.getElementById('nilavaram-menu-catalog');
-      if (!element) {
-        throw new Error('MenuCatalog.html is not included in Dashboard.html.');
-      }
-      const catalog = JSON.parse(element.textContent || '[]');
-      return Array.isArray(catalog) ? catalog : [];
-    }
+<script>
+  window.nilavaramShellEntities = window.nilavaramShellEntities || [];
 
-    function buildMenuLegacy(data) {
-      const menu = document.getElementById('menu');
-      menu.textContent = '';
-      window.nilavaramNavigation = data;
+  function showClientSection(show) {
+    const section = document.getElementById('client-section');
+    if (section) section.hidden = !show;
+  }
 
-      data.forEach(function(section) {
-        if (section.type === 'link') {
-          const directButton = document.createElement('button');
-          directButton.type = 'button';
-          directButton.className = 'menu-button';
-          directButton.textContent = section.label;
-          directButton.onclick = function() {
-            openModule(section.moduleId, section.label);
-          };
-          menu.appendChild(directButton);
-          return;
-        }
+  function showClientLoadingMessage(show, text) {
+    const message = document.getElementById('client-loading-msg');
+    if (!message) return;
+    message.hidden = !show;
+    if (text) message.textContent = text;
+  }
 
-        const wrapper = document.createElement('section');
-        wrapper.className = 'menu-section';
-        const groupButton = document.createElement('button');
-        groupButton.type = 'button';
-        groupButton.className = 'menu-group-button';
-        groupButton.setAttribute('aria-expanded', 'false');
+  function showEntityLoadingMessage(show, text) {
+    const message = document.getElementById('entity-loading-msg');
+    if (message) message.hidden = !show;
+    if (text) message.textContent = text || message.textContent;
+  }
 
-        const label = document.createElement('span');
-        label.textContent = section.label;
-        const arrow = document.createElement('span');
-        arrow.className = 'menu-arrow';
-        arrow.textContent = 'â†“';
-        arrow.setAttribute('aria-hidden', 'true');
-        groupButton.appendChild(label);
-        groupButton.appendChild(arrow);
+  function showEntitySection(show) {
+    const section = document.getElementById('entity-section');
+    if (section) section.hidden = !show;
+  }
 
-        const submenu = document.createElement('div');
-        submenu.className = 'submenu';
+  function showMenuSection(show) {
+    const section = document.getElementById('menu-section');
+    if (section) section.hidden = !show;
+  }
 
-        section.buttons.forEach(function(item) {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = 'menu-button';
-          button.textContent = item.label;
-          button.onclick = function() { openModule(item.moduleId, item.label); };
-          submenu.appendChild(button);
-        });
+  function saveSelectedClient(clientId, clientName) {
+    window.nilavaramSelectedClient = { id: clientId, name: clientName };
+    try {
+      sessionStorage.setItem('nilavaramSelectedClientId', clientId);
+      sessionStorage.setItem('nilavaramSelectedClientName', clientName);
+    } catch (error) {}
+  }
 
-        if (section.buttons.length === 0) {
-          const empty = document.createElement('div');
-          empty.className = 'submenu-empty';
-          empty.textContent = 'Modules will be added next.';
-          submenu.appendChild(empty);
-        }
+  function saveSelectedBusiness(entityId, entityName) {
+    window.nilavaramSelectedEntity = { id: entityId, name: entityName };
+    try {
+      sessionStorage.setItem('nilavaramSelectedEntityId', entityId);
+      sessionStorage.setItem('nilavaramSelectedEntityName', entityName);
+    } catch (error) {}
+  }
 
-        groupButton.onclick = function() {
-          const isOpen = submenu.classList.toggle('is-open');
-          groupButton.setAttribute('aria-expanded', String(isOpen));
-          arrow.textContent = isOpen ? 'â†‘' : 'â†“';
-        };
+  function countNavigationModules(node) {
+    if (!node) return 0;
+    let count = node.moduleId ? 1 : 0;
+    (node.children || []).forEach(function(child) {
+      count += countNavigationModules(child);
+    });
+    return count;
+  }
 
-        wrapper.appendChild(groupButton);
-        wrapper.appendChild(submenu);
-        menu.appendChild(wrapper);
-      });
-    }
+  function buildShellSkeleton() {
+    const menu = document.getElementById('menu');
+    menu.textContent = '';
 
-    function buildMenu(data) {
-      const menu = document.getElementById('menu');
-      menu.textContent = '';
-      const navigation = (data || []).filter(function(section) {
-        return section.id !== 'dashboard' && section.moduleId !== 'dashboard';
-      });
-      window.nilavaramNavigation = navigation;
+    const tools = document.createElement('div');
+    tools.className = 'sidebar-tools';
+    tools.innerHTML =
+      '<p id="client-loading-msg" class="help-meta">Connecting securely...</p>' +
+      '<div id="client-section" hidden>' +
+        '<label class="sidebar-search-label" for="client-select">1. Select client</label>' +
+        '<select id="client-select"></select>' +
+      '</div>' +
+      '<p id="entity-loading-msg" class="help-meta" hidden>Loading business names...</p>' +
+      '<div id="entity-section" hidden>' +
+        '<label class="sidebar-search-label" for="entity-select">2. Select business</label>' +
+        '<select id="entity-select"></select>' +
+        '<div id="entity-reference" class="entity-reference"></div>' +
+        '<div id="entity-add-panel" class="entity-add-panel" hidden></div>' +
+      '</div>' +
+      '<div id="menu-section" hidden>' +
+        '<label class="sidebar-search-label" for="menu-select">3. Select menu item</label>' +
+        '<select id="menu-select" disabled>' +
+          '<option value="">Choose a business first...</option>' +
+        '</select>' +
+      '</div>' +
+      '<span class="sidebar-search-count" id="menu-item-count"></span>';
+    menu.appendChild(tools);
 
-      const tools = document.createElement('div');
-      tools.className = 'sidebar-tools';
-      tools.innerHTML =
-        '<label class="sidebar-search-label" for="menu-select">Select menu item</label>' +
-        '<select id="menu-select">' +
-        '<option value="">Choose a menu item...</option>' +
-        '</select>';
-      menu.appendChild(tools);
+    const reference = document.createElement('div');
+    reference.id = 'menu-reference';
+    reference.className = 'navigation-reference';
+    menu.appendChild(reference);
 
-      const menuSelect = document.getElementById('menu-select');
+    const clientSelect = document.getElementById('client-select');
+    if (clientSelect) clientSelect.onchange = onClientSelected;
+
+    const entitySelect = document.getElementById('entity-select');
+    if (entitySelect) entitySelect.onchange = updateMenuSelectorState;
+
+    const menuSelect = document.getElementById('menu-select');
+    if (menuSelect) {
       menuSelect.onchange = function(event) {
         const option = event.target.options[event.target.selectedIndex];
         if (!option || !option.dataset.moduleId) return;
         openModule(option.dataset.moduleId, option.dataset.label, true);
         event.target.value = '';
       };
+    }
+  }
 
-      const dashboardOption = document.createElement('option');
-      dashboardOption.value = 'dashboard';
-      dashboardOption.dataset.moduleId = 'dashboard';
-      dashboardOption.dataset.label = 'Dashboard';
-      dashboardOption.textContent = 'Dashboard';
-      menuSelect.appendChild(dashboardOption);
-      renderMenuOptions(navigation, menuSelect);
-      const moduleCount = navigation.reduce(function(total, section) {
-        return total + countNavigationModules(section);
-      }, 0);
-      const count = document.createElement('span');
-      count.className = 'sidebar-search-count';
-      count.textContent = moduleCount + ' menu item(s) loaded.';
-      tools.appendChild(count);
-      if (menuSelect.options.length === 1) {
-        const notice = document.createElement('p');
-        notice.className = 'error';
-        notice.textContent = 'No Firestore menu items were returned for this user.';
-        menu.appendChild(notice);
-      }
-      renderNavigationReference(navigation, moduleCount);
-      const loading = document.getElementById('dashboard-loading');
-      if (loading) {
-        loading.textContent = moduleCount
-          ? 'Menu items are loaded and you can choose from the drop down box on the left side.'
-          : 'No menu items were returned. Please check the navigation source.';
-      }
+  function applyShellFromEngine(shell) {
+    const data = shell.info || {};
+    window.nilavaramDashboardInfo = data;
+    window.nilavaramSessionPolicy = shell.sessionPolicy || {
+      warningMinutes: 9,
+      timeoutMinutes: 10
+    };
+    renderStartupInfo(data);
+
+    if (typeof blockInactiveShellAccess === 'function' &&
+        blockInactiveShellAccess(data)) {
+      return;
     }
 
-    function countNavigationModules(node) {
-      return (node.moduleId ? 1 : 0) +
-        (node.children || []).reduce(function(total, child) {
-          return total + countNavigationModules(child);
-        }, 0);
+    if (shell.shellError) {
+      showClientLoadingMessage(true, shell.shellError);
+      showClientSection(true);
+      showWorkspaceNotice(shell.shellError);
+      return;
     }
 
-    function renderNavigationReference(navigation, moduleCount) {
-      const output = document.getElementById('output');
-      if (!output || moduleCount === 0) return;
-      const list = document.createElement('div');
-      list.className = 'navigation-reference';
-      const heading = document.createElement('h3');
-      heading.textContent = 'Available menu items (' + moduleCount + ')';
-      list.appendChild(heading);
-      const tree = document.createElement('ul');
-      navigation.forEach(function(section) {
-        appendNavigationReferenceNode(tree, section, 0);
-      });
-      list.appendChild(tree);
-      output.appendChild(list);
+    populateClientSelector(shell.clients || []);
+
+    showWorkspaceNotice(
+      'Choose a client, then a business, then a menu item.'
+    );
+  }
+
+  function populateClientSelector(clients) {
+    const select = document.getElementById('client-select');
+    if (!select) return;
+
+    select.textContent = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = clients.length ? 'Choose a client...' : 'No clients available';
+    select.appendChild(placeholder);
+
+    clients.forEach(function(client) {
+      const option = document.createElement('option');
+      option.value = client.id;
+      option.textContent = client.name;
+      select.appendChild(option);
+      showClientSection(true);
+      showClientLoadingMessage(false);
+    });
+
+    let savedClientId = '';
+    try {
+      savedClientId = sessionStorage.getItem('nilavaramSelectedClientId') || '';
+    } catch (error) {
+      savedClientId = '';
     }
 
-    function appendNavigationReferenceNode(parent, node, level) {
+    if (savedClientId && select.querySelector('option[value="' + savedClientId + '"]')) {
+      select.value = savedClientId;
+      onClientSelected();
+    } else {
+      showEntitySection(false);
+      showMenuSection(false);
+      showEntityLoadingMessage(true, 'Choose a client first...');
+    }
+  }
+
+  function onClientSelected() {
+    const select = document.getElementById('client-select');
+    if (!select || !select.value) {
+      showEntitySection(false);
+      showMenuSection(false);
+      showEntityLoadingMessage(true, 'Choose a client first...');
+      return;
+    }
+
+    saveSelectedClient(
+      select.value,
+      select.options[select.selectedIndex].text
+    );
+
+    clearWorkspaceError();
+    updateWorkspaceSelectionDisplay();
+    showWorkspaceProgress(
+      'Step 2: Loading businesses for ' +
+        select.options[select.selectedIndex].text + '…',
+      30
+    );
+    showEntityLoadingMessage(true, 'Loading business names...');
+    showEntitySection(false);
+    showMenuSection(false);
+
+    google.script.run
+      .withSuccessHandler(function(entities) {
+        hideWorkspaceProgress();
+        showWorkspaceNotice(
+          'Loaded ' + (entities || []).length +
+          ' business(es). Choose one, then the menu will load.'
+        );
+        populateBusinessSelector(entities || []);
+      })
+      .withFailureHandler(function(error) {
+        showWorkspaceError(
+          'Could not load businesses.',
+          error && error.message ? error.message : String(error)
+        );
+        showEntityLoadingMessage(
+          true,
+          error && error.message ? error.message : String(error)
+        );
+      })
+      .getBusinessEntitiesForClient(select.value);
+  }
+    
+  function applyNavigationToMenu(navigation) {
+    const filtered = (navigation || []).filter(function(section) {
+      return section.id !== 'dashboard' && section.moduleId !== 'dashboard';
+    });
+    window.nilavaramNavigation = filtered;
+
+    const menuSelect = document.getElementById('menu-select');
+    if (!menuSelect) return;
+
+    menuSelect.textContent = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Choose a menu item...';
+    menuSelect.appendChild(placeholder);
+    renderMenuOptions(filtered, menuSelect);
+
+    const moduleCount = filtered.reduce(function(total, section) {
+      return total + countNavigationModules(section);
+    }, 0);
+
+    const count = document.getElementById('menu-item-count');
+    if (count) {
+      count.textContent = moduleCount + ' menu item(s) available.';
+    }
+
+    renderSidebarNavigationReference(filtered, moduleCount);
+    updateMenuSelectorState(true);
+  }
+
+  function renderEntityReference(entities) {
+    const panel = document.getElementById('entity-reference');
+    if (!panel) return;
+
+    if (!entities.length) {
+      panel.innerHTML =
+        '<p class="help-meta">No business names are recorded yet for ' +
+        'this client. Enter the first name below.</p>';
+      return;
+    }
+
+    const list = document.createElement('ul');
+    entities.forEach(function(entity) {
       const item = document.createElement('li');
-      item.textContent = (level ? '  '.repeat(level) : '') + node.label;
-      parent.appendChild(item);
-      (node.children || []).forEach(function(child) {
-        appendNavigationReferenceNode(parent, child, level + 1);
-      });
+      item.textContent = entity.name;
+      list.appendChild(item);
+    });
+    panel.innerHTML = '<h3>Business entities (' + entities.length + ')</h3>';
+    panel.appendChild(list);
+  }
+
+  function renderEntityAddPanel(canEdit) {
+    const panel = document.getElementById('entity-add-panel');
+    if (!panel) return;
+    if (!canEdit) {
+      panel.hidden = true;
+      panel.textContent = '';
+      return;
+    }
+    panel.hidden = false;
+    panel.innerHTML =
+      '<label class="sidebar-search-label" for="entity-add-input">Add business name</label>' +
+      '<div class="entity-add-row">' +
+      '<input id="entity-add-input" type="text" placeholder="Enter business name">' +
+      '<button id="entity-add-button" class="secondary-button" type="button">Add</button>' +
+      '</div>' +
+      '<p id="entity-add-result" class="help-meta" aria-live="polite"></p>';
+
+    document.getElementById('entity-add-button').onclick = function() {
+      const input = document.getElementById('entity-add-input');
+      const result = document.getElementById('entity-add-result');
+      result.textContent = 'Saving...';
+      google.script.run
+        .withSuccessHandler(function(response) {
+          input.value = '';
+          result.textContent = 'Added ' + response.entity.name + '.';
+          onClientSelected();
+        })
+        .withFailureHandler(function(error) {
+          result.textContent = error && error.message ? error.message : String(error);
+        })
+        .addClientBusinessEntity(
+          input.value,
+          window.nilavaramSelectedClient && window.nilavaramSelectedClient.name
+        );
+    };
+  }
+
+  function populateBusinessSelector(entities) {
+    window.nilavaramShellEntities = entities || [];
+    const select = document.getElementById('entity-select');
+    if (!select) return;
+
+    select.textContent = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = entities.length
+      ? 'Choose a business...'
+      : 'No businesses yet — add one below';
+    select.appendChild(placeholder);
+
+    entities.forEach(function(entity) {
+      const option = document.createElement('option');
+      option.value = entity.id;
+      option.textContent = entity.name;
+      select.appendChild(option);
+    });
+
+    let savedEntityId = '';
+    try {
+      savedEntityId = sessionStorage.getItem('nilavaramSelectedEntityId') || '';
+    } catch (error) {
+      savedEntityId = '';
+    }
+    if (savedEntityId && select.querySelector('option[value="' + savedEntityId + '"]')) {
+      select.value = savedEntityId;
     }
 
-    function renderMenuOptions(data, select) {
-      data.forEach(function(section) {
-        if (section.moduleId) {
-          appendMenuOption(section, select, 0);
+    renderEntityReference(entities);
+    const role = window.nilavaramDashboardInfo && window.nilavaramDashboardInfo.role;
+    renderEntityAddPanel(
+      !entities.length ||
+      role === 'superadmin' ||
+      role === 'admin' ||
+      role === 'editor'
+    );
+
+    showEntityLoadingMessage(false);
+    showEntitySection(true);
+    showMenuSection(true);
+
+    if (select.value) {
+      saveSelectedBusiness(
+        select.value,
+        select.options[select.selectedIndex].text
+      );
+      updateWorkspaceSelectionDisplay();
+      updateMenuSelectorState(true);
+      reloadNavigationForCurrentSelection();
+    } else {
+      updateMenuSelectorState(true);
+    }
+  }
+  
+  function updateMenuSelectorState(skipReload) {
+    const entitySelect = document.getElementById('entity-select');
+    const menuSelect = document.getElementById('menu-select');
+    if (!entitySelect || !menuSelect) return;
+
+    if (entitySelect.value) {
+      saveSelectedBusiness(
+        entitySelect.value,
+        entitySelect.options[entitySelect.selectedIndex].text
+      );
+      updateWorkspaceSelectionDisplay();
+    }
+
+    const enabled = Boolean(entitySelect.value);
+    menuSelect.disabled = !enabled;
+
+    if (menuSelect.options.length) {
+      menuSelect.options[0].textContent = enabled
+        ? 'Choose a menu item...'
+        : 'Choose a business first...';
+    }
+
+    if (!enabled) {
+      menuSelect.value = '';
+      return;
+    }
+
+    if (skipReload !== true) {
+      reloadNavigationForCurrentSelection();
+    }
+  }
+
+  function reloadNavigationForCurrentSelection() {
+    const clientId = window.nilavaramSelectedClient &&
+      window.nilavaramSelectedClient.id;
+    const entityId = window.nilavaramSelectedEntity &&
+      window.nilavaramSelectedEntity.id;
+    const clientName = window.nilavaramSelectedClient &&
+      window.nilavaramSelectedClient.name;
+    const entityName = window.nilavaramSelectedEntity &&
+      window.nilavaramSelectedEntity.name;
+
+    updateWorkspaceSelectionDisplay();
+
+    if (!clientId || !entityId) {
+      showWorkspaceError(
+        'Menu not loaded.',
+        'clientId=' + clientId + ', entityId=' + entityId +
+        '. Reselect client and business.'
+      );
+      return;
+    }
+
+    clearWorkspaceError();
+    showWorkspaceProgress(
+      'Step 3: Loading menu items from Firestore for ' +
+        clientName + ' / ' + entityName + '…',
+      null
+    );
+
+    google.script.run
+    .withSuccessHandler(function(navigation) {
+      try {
+        const menus = Array.isArray(navigation) ? navigation : [];
+        hideWorkspaceProgress();
+        if (!menus.length) {
+          showWorkspaceError(
+            'No menu items returned.',
+            'getNavigationForShell("' + clientId + '", "' + entityId + '") ' +
+            'returned 0 groups. Run rewriteNavigationInFirestore() in Apps Script.'
+          );
           return;
         }
-        const group = document.createElement('optgroup');
-        group.label = section.label;
-        addMenuOptions(section.children || [], group, 1);
-        if (group.options.length) select.appendChild(group);
+        let moduleCount = 0;
+        menus.forEach(function(section) {
+          moduleCount += countNavigationModules(section);
+        });
+        applyNavigationToMenu(menus);
+        showWorkspaceNotice(
+          'Menu loaded: ' + moduleCount + ' item(s) for ' +
+            clientName + ' / ' + entityName + '.'
+        );
+      } catch (error) {
+        showWorkspaceError(
+          'Menu load failed in browser.',
+          (error && error.message ? error.message : String(error))
+        );
+      }
+    })
+      .withFailureHandler(function(error) {
+        showWorkspaceError(
+          'Menu load failed.',
+          (error && error.message ? error.message : String(error)) +
+            '\nCall: getNavigationForShell("' + clientId + '", "' + entityId + '")' +
+            '\nCheck Apps Script → Executions for timeout or error.'
+        );
+      })
+      .getNavigationForShell(clientId, entityId);
+  }
+
+  function renderSidebarNavigationReference(navigation, moduleCount) {
+    const reference = document.getElementById('menu-reference');
+    if (!reference) return;
+    reference.textContent = '';
+    const heading = document.createElement('h3');
+    heading.textContent = 'Available menu items (' + moduleCount + ')';
+    reference.appendChild(heading);
+    const tree = document.createElement('ul');
+    navigation.forEach(function(section) {
+      appendNavigationReferenceNode(tree, section, 0);
+    });
+    reference.appendChild(tree);
+  }
+
+  function appendNavigationReferenceNode(parent, node, level) {
+    const item = document.createElement('li');
+    item.className = 'navigation-reference-item';
+    item.textContent = (level ? '  '.repeat(level) : '') + node.label;
+
+    if (node.moduleId) {
+      item.title = 'Use step 3 dropdown above to open this item.';
+      item.addEventListener('mouseenter', function() {
+        showWorkspaceNotice(
+          'To open "' + node.label + '", choose it from the step 3 dropdown above.'
+        );
+      });
+      item.addEventListener('click', function() {
+        showWorkspaceNotice(
+          'Please select "' + node.label + '" from the dropdown in step 3 above.'
+        );
       });
     }
 
-    function addMenuOptions(nodes, parent, level) {
-      nodes.forEach(function(node) {
-        if (node.moduleId) {
-          appendMenuOption(node, parent, level);
-        }
-        addMenuOptions(node.children || [], parent, level + 1);
-      });
+    parent.appendChild(item);
+    (node.children || []).forEach(function(child) {
+      appendNavigationReferenceNode(parent, child, level + 1);
+    });
+  }
+
+  function renderMenuOptions(data, select) {
+    (data || []).forEach(function(section) {
+      if (section.moduleId) {
+        appendMenuOption(section, select, 0);
+        return;
+      }
+      const group = document.createElement('optgroup');
+      group.label = section.label;
+      addMenuOptions(section.children || [], group, 1);
+      if (group.childNodes.length) {
+        select.appendChild(group);
+      }
+    });
+  }
+
+  function addMenuOptions(nodes, parent, level) {
+    nodes.forEach(function(node) {
+      if (node.moduleId) {
+        appendMenuOption(node, parent, level);
+      }
+      addMenuOptions(node.children || [], parent, level + 1);
+    });
+  }
+
+  function appendMenuOption(node, parent, level) {
+    const option = document.createElement('option');
+    option.value = node.id || node.moduleId;
+    option.dataset.moduleId = node.moduleId;
+    option.dataset.label = node.label;
+    option.textContent = Array(level + 1).join('- ') + node.label;
+    parent.appendChild(option);
+  }
+
+  function openModule(moduleId, label, openSeparateWindow) {
+    if (typeof IS_MAIN_WORKSPACE !== 'undefined' && IS_MAIN_WORKSPACE &&
+        typeof IS_MODULE_WINDOW === 'undefined') {
+      openModuleWindow(moduleId, label);
+      return;
+    }
+    if (openSeparateWindow) {
+      openModuleWindow(moduleId, label);
+      return;
+    }
+    moveContentToTop();
+    document.getElementById('output').textContent = 'Loading ' + label + '...';
+
+    if (moduleId === 'all-businesses') {
+      document.getElementById('output').innerHTML =
+        '<h2>All Businesses</h2>' +
+        '<p>Business records and management actions will be added next.</p>';
+      return;
+    }
+    if (moduleId === 'system-status') {
+      const data = window.nilavaramDashboardInfo || {};
+      document.getElementById('output').innerHTML =
+        '<h2>System Status</h2>' +
+        '<p><b>Application:</b> Nilavaram</p>' +
+        '<p><b>Version:</b> ' + escapeHtml(data.version || '') + '</p>' +
+        '<p><b>Status:</b> ' + escapeHtml(data.status || '') + '</p>';
+      return;
+    }
+    if (moduleId === 'pending-features') {
+      showPendingFeatures();
+      return;
+    }
+    if (['backup-status', 'wizard-backup', 'back-up', 'backup'].indexOf(moduleId) !== -1 ||
+        /backup/i.test(String(label || '')) || /back up/i.test(String(label || ''))) {
+      showBackupStatus();
+      return;
+    }
+    if (['archive-library', 'upload-documents', 'missing-documents', 'expiring-documents', 'archived-documents'].indexOf(moduleId) !== -1) {
+      showDocumentArchive();
+      return;
+    }
+    if (moduleId === 'about-version-history') {
+      showCodeChangeHistory();
+      return;
+    }
+    if (['nilavaram-core',
+      'project-start',
+      'navigation-guide',
+      'getting-started',
+      'users-access-guide',
+      'accounting-guide',
+      'accounting-operating-rules',
+      'documents-imports-guide',
+      'inactivity-sign-in',
+      'project-architecture',
+      'faq',
+      'about-version-history',
+      'admin-technical-guide'
+    ].indexOf(moduleId) !== -1) {
+      showHelpArticle(moduleId, label);
+      return;
+    }
+    if (moduleId === 'alerts') {
+      showAlerts();
+      return;
+    }
+    if (moduleId === 'reminders') {
+      showReminders();
+      return;
+    }
+    if (moduleId === 'chart-of-accounts') {
+      showChartOfAccounts('list');
+      return;
+    }
+    if (moduleId === 'account-add-new') {
+      showChartOfAccounts('add');
+      return;
+    }
+    if (moduleId === 'account-batch-edit') {
+      showChartOfAccounts('batch');
+      return;
+    }
+    if (['input-main',
+      'input-receipt',
+      'input-payment',
+      'input-journal',
+      'input-upload-csv',
+      'input-upload-pdf',
+      'input-upload-image',
+      'input-upload-txt',
+      'input-workbench',
+      'input-acode-map'
+    ].indexOf(moduleId) !== -1) {
+      showInputWorkspace(moduleId);
+      return;
+    }
+    if (moduleId === 'new-transaction') {
+      showTransactionWorkbench('source-input');
+      return;
+    }
+    if (['transaction-workbench',
+      'source-input',
+      'reconciliation-validation',
+      'account-rule-review',
+      'manual-journal-entry'
+    ].indexOf(moduleId) !== -1) {
+      showTransactionWorkbench(moduleId);
+      return;
+    }
+    if (moduleId === 'users') {
+      showUsers();
+      return;
+    }
+    
+    if (moduleId === 'connections') {
+      showConnections();
+      return;
+    }
+    if (String(moduleId || '').indexOf('wizard-') === 0) {
+      showAccountingWizardStatus(moduleId, label);
+      return;
     }
 
-    function appendMenuOption(node, parent, level) {
-      const option = document.createElement('option');
-      option.value = node.id || node.moduleId;
-      option.dataset.moduleId = node.moduleId;
-      option.dataset.label = node.label;
-      option.textContent = Array(level + 1).join('- ') + node.label;
-      parent.appendChild(option);
+    google.script.run
+      .withSuccessHandler(function(result) {
+        document.getElementById('output').textContent = result.message;
+      })
+      .withFailureHandler(showError)
+      .openModule(moduleId);
+  }
+
+  function openModuleWindow(moduleId, label) {
+    const entitySelect = document.getElementById('entity-select');
+    if (!entitySelect || !entitySelect.value) {
+      showWorkspaceNotice('Select a business before opening a module window.');
+      return;
     }
 
-    function createNavigationNode(node, level) {
-      const children = node.children || [];
-      if (node.type === 'link' && (!node.children || !node.children.length)) {
-        const directButton = document.createElement('button');
-        directButton.type = 'button';
-        directButton.className = 'menu-button menu-level-' + level;
-        directButton.textContent = level >= 3
-          ? '\u2014 ' + sentenceStyleMenuLabel(node.label)
-          : (level === 2
-            ? sentenceStyleMenuLabel(node.label)
-            : node.label);
-        directButton.onclick = function() {
-          openModule(node.moduleId, node.label);
-        };
-        return directButton;
-      }
+    const entityId = entitySelect.value;
+    const entityName = entitySelect.options[entitySelect.selectedIndex].text;
+    const sessionId = 'sess_' + Date.now() + '_' +
+      Math.random().toString(36).slice(2, 8);
+    const friendlyWindowName = label || 'Module window';
 
-      const wrapper = document.createElement(level === 1 ? 'section' : 'div');
-      wrapper.className = 'menu-section';
-      const heading = document.createElement('div');
-      heading.className = level === 1
-        ? 'menu-main-heading'
-        : 'menu-subheading';
-      heading.textContent = level >= 3
-        ? '\u2014 ' + sentenceStyleMenuLabel(node.label)
-        : (level === 2
-          ? sentenceStyleMenuLabel(node.label)
-          : node.label);
-
-      const submenu = document.createElement('div');
-      submenu.className = 'menu-open-list';
-      children.forEach(function(child) {
-        submenu.appendChild(createNavigationNode(child, level + 1));
-      });
-
-      if (children.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'submenu-empty';
-        empty.textContent = 'Modules will be added next.';
-        submenu.appendChild(empty);
-      }
-
-      wrapper.appendChild(heading);
-      wrapper.appendChild(submenu);
-      return wrapper;
-    }
-
-    function openModule(moduleId, label, openSeparateWindow) {
-      if (openSeparateWindow) {
-        openModuleWindow(moduleId, label);
-        return;
-      }
-      moveContentToTop();
-      document.getElementById('output').textContent = 'Loading ' + label + '...';
-
-      if (moduleId === 'dashboard') {
-        showDefaultDashboard();
-        const loading = document.getElementById('dashboard-loading');
-        if (loading) {
-          loading.textContent =
-            'Menu items are loaded and you can choose from the drop down box on the left side.';
-        }
-        return;
-      }
-      if (moduleId === 'all-businesses') {
-        document.getElementById('output').innerHTML =
-          '<h2>All Businesses</h2>' +
-          '<p>Business records and management actions will be added next.</p>';
-        return;
-      }
-      if (moduleId === 'system-status') {
-        const data = window.nilavaramDashboardInfo;
-        document.getElementById('output').innerHTML =
-          '<h2>System Status</h2>' +
-          '<p><b>Application:</b> Nilavaram</p>' +
-          '<p><b>Version:</b> ' + escapeHtml(data.version) + '</p>' +
-          '<p><b>Status:</b> ' + escapeHtml(data.status) + '</p>';
-        return;
-      }
-      if (moduleId === 'pending-features') {
-        showPendingFeatures();
-        return;
-      }
-      if (['backup-status', 'wizard-backup', 'back-up', 'backup'].indexOf(moduleId) !== -1 ||
-          /backup/i.test(String(label || '')) || /back up/i.test(String(label || ''))) {
-        showBackupStatus();
-        return;
-      }
-      if (['archive-library', 'upload-documents', 'missing-documents', 'expiring-documents', 'archived-documents'].indexOf(moduleId) !== -1) {
-        showDocumentArchive();
-        return;
-      }
-      if (moduleId === 'about-version-history') {
-        showCodeChangeHistory();
-        return;
-      }
-      if (['nilavaram-core',
-        'project-start',
-        'navigation-guide',
-        'getting-started',
-        'users-access-guide',
-        'accounting-guide',
-        'accounting-operating-rules',
-        'documents-imports-guide',
-        'inactivity-sign-in',
-        'project-architecture',
-        'faq',
-        'about-version-history',
-        'admin-technical-guide'
-      ].indexOf(moduleId) !== -1) {
-        showHelpArticle(moduleId, label);
-        return;
-      }
-      if (moduleId === 'alerts') {
-        showAlerts();
-        return;
-      }
-      if (moduleId === 'reminders') {
-        showReminders();
-        return;
-      }
-      if (moduleId === 'chart-of-accounts') {
-        showChartOfAccounts('list');
-        return;
-      }
-      if (moduleId === 'account-add-new') {
-        showChartOfAccounts('add');
-        return;
-      }
-      if (moduleId === 'account-batch-edit') {
-        showChartOfAccounts('batch');
-        return;
-      }
-      if (['input-main',
-        'input-receipt',
-        'input-payment',
-        'input-journal',
-        'input-upload-csv',
-        'input-upload-pdf',
-        'input-upload-image',
-        'input-upload-txt',
-        'input-workbench',
-        'input-acode-map'
-      ].indexOf(moduleId) !== -1) {
-        showInputWorkspace(moduleId);
-        return;
-      }
-      if (moduleId === 'new-transaction') {
-        showTransactionWorkbench('source-input');
-        return;
-      }
-      if (['transaction-workbench',
-        'source-input',
-        'reconciliation-validation',
-        'account-rule-review',
-        'manual-journal-entry'
-      ].indexOf(moduleId) !== -1) {
-        showTransactionWorkbench(moduleId);
-        return;
-      }
-      if (moduleId === 'users') {
-        showUsers();
-        return;
-      }
-      if (moduleId === 'firestore') {
-        google.script.run
-          .withSuccessHandler(function(result) {
-            document.getElementById('output').innerHTML =
-              '<pre>' + escapeHtml(JSON.stringify(result, null, 2)) + '</pre>';
-          })
-          .withFailureHandler(showError)
-          .testFirestore();
-        return;
-      }
-      if (moduleId === 'connections') {
-        showConnections();
-        return;
-      }
-      if (String(moduleId || '').indexOf('wizard-') === 0) {
-        showAccountingWizardStatus(moduleId, label);
-        return;
-      }
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          document.getElementById('output').textContent = result.message;
-        })
-        .withFailureHandler(showError)
-        .openModule(moduleId);
-    }
-
-      function openModuleWindow(moduleId, label) {
+    google.script.run
+      .withSuccessHandler(function(auth) {
+        resumeMainWorkspaceIfInactive();
+        markUserActivity();
         const baseUrl = window.location.href.split('?')[0];
-        const query = '?moduleId=' + encodeURIComponent(moduleId) +
-          '&moduleLabel=' + encodeURIComponent(label || moduleId);
+        const query = '?moduleWindow=1' +
+          '&moduleId=' + encodeURIComponent(auth.moduleId || moduleId) +
+          '&moduleLabel=' + encodeURIComponent(auth.moduleLabel || label || moduleId) +
+          '&entityId=' + encodeURIComponent(auth.entityId || entityId) +
+          '&entityName=' + encodeURIComponent(auth.entityName || entityName) +
+          '&sessionId=' + encodeURIComponent(sessionId);
         const popup = window.open(
           baseUrl + query,
-          'Nilavaram_' + String(moduleId || 'module').replace(/[^a-z0-9]/gi, '_'),
+          'Nilavaram_' + sessionId,
           'popup=yes,width=1500,height=900,resizable=yes,scrollbars=yes'
         );
-        if (!popup) {
-          showError({
-            message: 'The module window was blocked. Allow pop-ups for Nilavaram and select the menu item again.'
+        if (!popup || popup.closed) {
+          registerModuleSession({
+            sessionId: sessionId,
+            moduleId: auth.moduleId || moduleId,
+            moduleLabel: auth.moduleLabel || label || moduleId,
+            windowName: friendlyWindowName,
+            ipAddress: window.nilavaramClientIp || 'Pending',
+            entityId: auth.entityId || entityId,
+            entityName: auth.entityName || entityName,
+            status: 'blocked',
+            closeReason: 'popup-blocked'
           });
+          showWorkspaceNotice(
+            'The module window was blocked. Allow pop-ups for Nilavaram and try again.'
+          );
           return;
         }
-        popup.focus();
-      }
+        registerModuleSession({
+          sessionId: sessionId,
+          moduleId: auth.moduleId || moduleId,
+          moduleLabel: auth.moduleLabel || label || moduleId,
+          windowName: friendlyWindowName,
+          ipAddress: window.nilavaramClientIp || 'Pending',
+          entityId: auth.entityId || entityId,
+          entityName: auth.entityName || entityName,
+          status: 'open',
+          popup: popup
+        });
+        monitorModulePopup(sessionId, popup);
+      })
+      .withFailureHandler(function(error) {
+        registerModuleSession({
+          sessionId: sessionId,
+          moduleId: moduleId,
+          moduleLabel: label || moduleId,
+          windowName: friendlyWindowName,
+          ipAddress: window.nilavaramClientIp || 'Pending',
+          entityId: entityId,
+          entityName: entityName,
+          status: 'blocked',
+          closeReason: 'access-denied'
+        });
+        showWorkspaceNotice(error && error.message
+          ? error.message
+          : 'That module could not be opened.');
+      })
+      .authorizeModuleAccess(moduleId, entityId);
+  }
 
-    function showAccountingWizardStatus(moduleId, label) {
-      const details = {
-        'wizard-accounting-year': {
-          status: 'Visible â€” controlled setup is pending',
-          text: 'This screen will set the opening date, fiscal year and ' +
-            'reporting-period controls. It must be completed before live ' +
-            'opening balances or transactions are posted.'
-        },
-        'wizard-opening-tb': {
-          status: 'Visible â€” opening-entry workflow is pending',
-          text: 'The Opening Trial Balance will require balanced debit and ' +
-            'credit lines, active Chart of Accounts codes, supporting ' +
-            'evidence, approval and an append-only audit record. For BOA ' +
-            'x0137, a positive opening balance will debit the bank asset and ' +
-            'credit Mâ€™s Equity for the same verified amount.'
-        },
-        'wizard-sheet-index': {
-          status: 'Visible â€” source index is pending',
-          text: 'This will list each bank statement, CSV, PDF, image or text ' +
-            'batch with its date range, file identity, import status and ' +
-            'duplicate-control result.'
-        },
-        'wizard-create-acode-map': {
-          status: 'Visible â€” mapping editor is pending',
-          text: 'This will create reusable description-to-account suggestions ' +
-            'from previously approved accounting decisions.'
-        },
-        'wizard-validate-acode-map': {
-          status: 'Visible â€” validation control is pending',
-          text: 'This will check every suggested code against the active ' +
-            'Chart of Accounts and show green approval or red review status.'
-        },
-        'wizard-ledger': {
-          status: 'Visible â€” report engine is pending',
-          text: 'The General Ledger will be generated only from posted, ' +
-            'balanced journal lines and will retain links to source evidence.'
-        },
-        'wizard-trial-balance': {
-          status: 'Visible â€” report engine is pending',
-          text: 'The Trial Balance will show account debit and credit totals ' +
-            'and must balance to zero difference.'
-        },
-        'wizard-profit-loss': {
-          status: 'Visible â€” report engine is pending',
-          text: 'Profit and Loss will report posted income and expenses for ' +
-            'the selected accounting period.'
-        },
-        'wizard-profit-loss-appropriation': {
-          status: 'Visible â€” report engine is pending',
-          text: 'Profit and Loss Appropriation will show approved allocations ' +
-            'of the period result without altering the underlying audit trail.'
-        },
-        'wizard-balance-sheet': {
-          status: 'Visible â€” report engine is pending',
-          text: 'The Balance Sheet will report assets, liabilities and equity ' +
-            'as of a selected date from posted journal lines.'
-        },
-        'wizard-error-check': {
-          status: 'Visible â€” consolidated control screen is pending',
-          text: 'This will consolidate red alerts for duplicates, imbalance, ' +
-            'missing evidence, invalid account codes and reconciliation ' +
-            'differences.'
-        },
-        'wizard-all-reports': {
-          status: 'Visible â€” enabled after individual reports are verified',
-          text: 'One click will create the complete report package only after ' +
-            'the Ledger, Trial Balance, Profit and Loss, Appropriation and ' +
-            'Balance Sheet have each passed their controls.'
-        },
-        'wizard-export-csv': {
-          status: 'Visible â€” export is pending',
-          text: 'This will export approved tabular accounting data with the ' +
-            'selected business, period and generation timestamp.'
-        },
-        'wizard-export-pdf': {
-          status: 'Visible â€” export is pending',
-          text: 'This will export approved reports as dated PDF evidence.'
-        },
-        'wizard-search': {
-          status: 'Visible â€” indexed search is pending',
-          text: 'Search will locate transactions, account codes, descriptions, ' +
-            'document references, reconciliation items and audit events.'
-        }
-      };
-      const item = details[moduleId] || {
-        status: 'Visible â€” implementation is pending',
-        text: 'This Accounting Wizard function is recorded in the navigation ' +
-          'and will be activated through the controlled development sequence.'
-      };
-      document.getElementById('output').innerHTML =
-        '<h2>' + escapeHtml(label) + '</h2>' +
-        '<p><b>Status:</b> ' + escapeHtml(item.status) + '</p>' +
-        '<p>' + escapeHtml(item.text) + '</p>' +
-        '<p class="help-meta">A visible menu item does not mean that live ' +
-        'posting or final reporting has been enabled. Nilavaram will label ' +
-        'each function accurately until verification is complete.</p>';
-    }
-    </script>
+  function showAccountingWizardStatus(moduleId, label) {
+    const details = {
+      'wizard-accounting-year': {
+        status: 'Visible — controlled setup is pending',
+        text: 'This screen will set the opening date, fiscal year and ' +
+          'reporting-period controls. It must be completed before live ' +
+          'opening balances or transactions are posted.'
+      },
+      'wizard-opening-tb': {
+        status: 'Visible — opening-entry workflow is pending',
+        text: 'The Opening Trial Balance will require balanced debit and ' +
+          'credit lines, active Chart of Accounts codes, supporting ' +
+          'evidence, approval and an append-only audit record.'
+      },
+      'wizard-sheet-index': {
+        status: 'Visible — source index is pending',
+        text: 'This will list each bank statement, CSV, PDF, image or text ' +
+          'batch with its date range, file identity, import status and ' +
+          'duplicate-control result.'
+      },
+      'wizard-create-acode-map': {
+        status: 'Visible — mapping editor is pending',
+        text: 'This will create reusable description-to-account suggestions ' +
+          'from previously approved accounting decisions.'
+      },
+      'wizard-validate-acode-map': {
+        status: 'Visible — validation control is pending',
+        text: 'This will check every suggested code against the active ' +
+          'Chart of Accounts and show green approval or red review status.'
+      },
+      'wizard-ledger': {
+        status: 'Visible — report engine is pending',
+        text: 'The General Ledger will be generated only from posted, ' +
+          'balanced journal lines and will retain links to source evidence.'
+      },
+      'wizard-trial-balance': {
+        status: 'Visible — report engine is pending',
+        text: 'The Trial Balance will show account debit and credit totals ' +
+          'and must balance to zero difference.'
+      },
+      'wizard-profit-loss': {
+        status: 'Visible — report engine is pending',
+        text: 'Profit and Loss will report posted income and expenses for ' +
+          'the selected accounting period.'
+      },
+      'wizard-profit-loss-appropriation': {
+        status: 'Visible — report engine is pending',
+        text: 'Profit and Loss Appropriation will show approved allocations ' +
+          'of the period result without altering the underlying audit trail.'
+      },
+      'wizard-balance-sheet': {
+        status: 'Visible — report engine is pending',
+        text: 'The Balance Sheet will report assets, liabilities and equity ' +
+          'as of a selected date from posted journal lines.'
+      },
+      'wizard-error-check': {
+        status: 'Visible — consolidated control screen is pending',
+        text: 'This will consolidate red alerts for duplicates, imbalance, ' +
+          'missing evidence, invalid account codes and reconciliation ' +
+          'differences.'
+      },
+      'wizard-all-reports': {
+        status: 'Visible — enabled after individual reports are verified',
+        text: 'One click will create the complete report package only after ' +
+          'the Ledger, Trial Balance, Profit and Loss, Appropriation and ' +
+          'Balance Sheet have each passed their controls.'
+      },
+      'wizard-export-csv': {
+        status: 'Visible — export is pending',
+        text: 'This will export approved tabular accounting data with the ' +
+          'selected business, period and generation timestamp.'
+      },
+      'wizard-export-pdf': {
+        status: 'Visible — export is pending',
+        text: 'This will export approved reports as dated PDF evidence.'
+      },
+      'wizard-search': {
+        status: 'Visible — indexed search is pending',
+        text: 'Search will locate transactions, account codes, descriptions, ' +
+          'document references, reconciliation items and audit events.'
+      }
+    };
+    const item = details[moduleId] || {
+      status: 'Visible — implementation is pending',
+      text: 'This Accounting Wizard function is recorded in the navigation ' +
+        'and will be activated through the controlled development sequence.'
+    };
+    document.getElementById('output').innerHTML =
+      '<h2>' + escapeHtml(label) + '</h2>' +
+      '<p><b>Status:</b> ' + escapeHtml(item.status) + '</p>' +
+      '<p>' + escapeHtml(item.text) + '</p>' +
+      '<p class="help-meta">A visible menu item does not mean that live ' +
+      'posting or final reporting has been enabled. Nilavaram will label ' +
+      'each function accurately until verification is complete.</p>';
+  }
+</script>

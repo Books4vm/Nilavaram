@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nilavaram Developer</title>
+  <style>
+    body { font-family: Segoe UI, sans-serif; margin: 16px; line-height: 1.4; }
+    h1 { margin-top: 0; }
+    .panel { border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin: 12px 0; }
+    label { display: block; margin-top: 8px; font-weight: 600; }
+    select, input, textarea, button { margin-top: 4px; font-size: 14px; }
+    textarea { width: 100%; min-height: 180px; font-family: Consolas, monospace; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .status { margin-top: 10px; padding: 8px; background: #f5f5f5; border-radius: 6px; }
+    .danger { background: #fff3f3; border-color: #d88; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Nilavaram Developer Console</h1>
+  <p>Owner only: <b>mangai8100@gmail.com</b>. Firestore shell data only.</p>
+
+  <div class="panel">
+    <div class="row">
+      <button type="button" onclick="loadOverview()">Refresh overview</button>
+      <button type="button" onclick="runReset()">Reset shell data (clients, businesses, menu)</button>
+    </div>
+    <div id="overview" class="status">Loading...</div>
+  </div>
+
+  <div class="panel">
+    <label for="collection">Collection</label>
+    <select id="collection" onchange="loadRecords()">
+      <option value="clients">clients</option>
+      <option value="entities">entities (business only)</option>
+      <option value="menus">menus</option>
+      <option value="menuItems">menuItems</option>
+    </select>
+    <button type="button" onclick="loadRecords()">Load records</button>
+    <div id="records"></div>
+  </div>
+
+  <div class="panel">
+    <label for="doc-id">Document ID</label>
+    <input id="doc-id" type="text" placeholder="e.g. vav-group">
+    <div class="row">
+      <button type="button" onclick="loadRecord()">Load</button>
+      <button type="button" onclick="saveRecord()">Save</button>
+      <button type="button" class="danger" onclick="deleteRecord()">Delete</button>
+    </div>
+    <label for="doc-json">JSON fields</label>
+    <textarea id="doc-json">{}</textarea>
+    <div id="editor-status" class="status"></div>
+  </div>
+
+  <script>
+    function setStatus(id, text) {
+      document.getElementById(id).textContent = text;
+    }
+
+    function loadOverview() {
+      setStatus('overview', 'Loading overview...');
+      google.script.run
+        .withSuccessHandler(function(data) {
+          setStatus('overview', JSON.stringify(data, null, 2));
+        })
+        .withFailureHandler(function(error) {
+          setStatus('overview', error.message || String(error));
+        })
+        .developerGetOverview();
+    }
+
+    function runReset() {
+      if (!window.confirm('Reset clients, business entities, menus and menu items?')) return;
+      setStatus('overview', 'Resetting...');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          setStatus('overview', JSON.stringify(result, null, 2));
+          loadRecords();
+        })
+        .withFailureHandler(function(error) {
+          setStatus('overview', error.message || String(error));
+        })
+        .resetShellDataOnly();
+    }
+
+    function loadRecords() {
+      const collection = document.getElementById('collection').value;
+      setStatus('records', 'Loading...');
+      google.script.run
+        .withSuccessHandler(function(rows) {
+          let html = '<table><thead><tr><th>ID</th><th>Preview</th></tr></thead><tbody>';
+          rows.forEach(function(row) {
+            html += '<tr><td>' + row.id + '</td><td>' +
+              JSON.stringify(row).replace(/</g, '&lt;') + '</td></tr>';
+          });
+          html += '</tbody></table>';
+          document.getElementById('records').innerHTML = html;
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('records').innerHTML =
+            '<p>' + (error.message || String(error)) + '</p>';
+        })
+        .developerListCollection(collection);
+    }
+
+    function loadRecord() {
+      const collection = document.getElementById('collection').value;
+      const id = document.getElementById('doc-id').value.trim();
+      if (!id) return;
+      setStatus('editor-status', 'Loading record...');
+      google.script.run
+        .withSuccessHandler(function(record) {
+          document.getElementById('doc-json').value =
+            JSON.stringify(record, null, 2);
+          setStatus('editor-status', 'Loaded ' + collection + '/' + id);
+        })
+        .withFailureHandler(function(error) {
+          setStatus('editor-status', error.message || String(error));
+        })
+        .developerGetRecord(collection, id);
+    }
+
+    function saveRecord() {
+      const collection = document.getElementById('collection').value;
+      const id = document.getElementById('doc-id').value.trim();
+      if (!id) return;
+      let fields;
+      try {
+        fields = JSON.parse(document.getElementById('doc-json').value || '{}');
+      } catch (error) {
+        setStatus('editor-status', 'Invalid JSON.');
+        return;
+      }
+      delete fields.id;
+      setStatus('editor-status', 'Saving...');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          setStatus('editor-status', result.message || 'Saved.');
+          loadRecords();
+          loadOverview();
+        })
+        .withFailureHandler(function(error) {
+          setStatus('editor-status', error.message || String(error));
+        })
+        .developerSaveRecord(collection, id, fields);
+    }
+
+    function deleteRecord() {
+      const collection = document.getElementById('collection').value;
+      const id = document.getElementById('doc-id').value.trim();
+      if (!id) return;
+      if (!window.confirm('Delete ' + collection + '/' + id + '?')) return;
+      setStatus('editor-status', 'Deleting...');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          setStatus('editor-status', result.message || 'Deleted.');
+          document.getElementById('doc-json').value = '{}';
+          loadRecords();
+          loadOverview();
+        })
+        .withFailureHandler(function(error) {
+          setStatus('editor-status', error.message || String(error));
+        })
+        .developerDeleteRecord(collection, id);
+    }
+
+    loadOverview();
+    loadRecords();
+  </script>
+</body>
+</html>

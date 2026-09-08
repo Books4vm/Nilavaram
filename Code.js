@@ -28,6 +28,15 @@ function include(filename) {
  */
 function doGet(e) {
   const parameters = e && e.parameter || {};
+  if (parameters.developer === '1') {
+    try {
+      requirePrimaryDeveloper_();
+      return HtmlService.createHtmlOutputFromFile('DeveloperConsole')
+        .setTitle('Nilavaram Developer');
+    } catch (error) {
+      return buildAuthorizationErrorPage_('Developer Console', error);
+    }
+  }
   if (parameters.loadingMenu === '1') {
     return HtmlService
       .createHtmlOutputFromFile('LoadingMenu')
@@ -102,6 +111,22 @@ function doGet(e) {
         '</body></html>'
       ).setTitle('OneDrive Recovery Status');
     }
+  }
+  if (parameters.moduleWindow === '1') {
+    const moduleTemplate = HtmlService.createTemplateFromFile('ModuleWindow');
+    moduleTemplate.moduleIdJson = JSON.stringify(String(parameters.moduleId || ''))
+      .replace(/</g, '\\u003c');
+    moduleTemplate.moduleLabelJson = JSON.stringify(String(parameters.moduleLabel || ''))
+      .replace(/</g, '\\u003c');
+    moduleTemplate.entityIdJson = JSON.stringify(String(parameters.entityId || ''))
+      .replace(/</g, '\\u003c');
+    moduleTemplate.entityNameJson = JSON.stringify(String(parameters.entityName || ''))
+      .replace(/</g, '\\u003c');
+    moduleTemplate.sessionIdJson = JSON.stringify(String(parameters.sessionId || ''))
+      .replace(/</g, '\\u003c');
+    return moduleTemplate.evaluate().setTitle(
+      'Nilavaram — ' + String(parameters.moduleLabel || parameters.moduleId || 'Module')
+    );
   }
   if (parameters.reviewWindow === 'acode') {
     const reviewTemplate = HtmlService.createTemplateFromFile('ReviewWindow');
@@ -227,8 +252,6 @@ function doGet(e) {
   const template = HtmlService.createTemplateFromFile('Dashboard');
   const validateOneDrive = parameters.validateOneDrive === '1';
   const validateAkoya = parameters.validateAkoya === '1';
-  const openModuleId = String(parameters.moduleId || '');
-  const openModuleLabel = String(parameters.moduleLabel || '');
   let connectionsBootstrap = buildConnectionsBootstrap_();
   if (validateOneDrive) {
     try {
@@ -250,17 +273,31 @@ function doGet(e) {
         String(error && error.message || error);
     }
   }
+  let dashboardInfoBootstrap;
+  try {
+    dashboardInfoBootstrap = getDashboardInfo();
+    dashboardInfoBootstrap.bootstrapSource = 'engine-page-load';
+  } catch (error) {
+    dashboardInfoBootstrap = {
+      applicationName: 'Nilavaram',
+      user: '',
+      role: '',
+      accessStatus: 'error',
+      status: 'Access not active',
+      bootstrapSource: 'engine-page-load',
+      bootstrapError: String(error && error.message || error)
+    };
+  }
+  template.dashboardInfoJson = JSON.stringify(
+    dashboardInfoBootstrap
+  ).replace(/</g, '\\u003c');
   template.connectionsBootstrapJson = JSON.stringify(
     connectionsBootstrap
   ).replace(/</g, '\\u003c');
   template.openConnectionsOnLoadJson = JSON.stringify(
     validateOneDrive || validateAkoya
   );
-  template.openModuleIdJson = JSON.stringify(openModuleId)
-    .replace(/</g, '\\u003c');
-  template.openModuleLabelJson = JSON.stringify(openModuleLabel)
-    .replace(/</g, '\\u003c');
-  return template.evaluate().setTitle('Nilavaram');
+  return template.evaluate().setTitle('Nilavaram Workspace');
 }
 
 function buildAuthorizationErrorPage_(title, error) {

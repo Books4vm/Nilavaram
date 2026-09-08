@@ -3,7 +3,33 @@
  * Builds role-filtered, nested dashboard navigation from Firestore.
  */
 
-function getNavigation() {
+function normalizeScopeList_(ids) {
+  if (!ids || !ids.length) return ['*'];
+  return ids.map(String);
+}
+
+function scopeAllows_(ids, value) {
+  const list = normalizeScopeList_(ids);
+  if (list.indexOf('*') !== -1) return true;
+  if (!value) return false;
+  return list.indexOf(String(value)) !== -1;
+}
+
+function roleAllowed_(roles, role) {
+  if (role === 'superadmin') return true;
+  return !roles || !roles.length || roles.indexOf(role) !== -1;
+}
+
+function getNavigation(clientId, entityId) {
+  return buildNavigationTree_(clientId, entityId);
+}
+
+function getNavigationForShell(clientId, entityId) {
+  requireCurrentUser_();
+  return buildNavigationTree_(clientId, entityId);
+}
+
+function buildNavigationTree_(clientId, entityId) {
   const user = requireCurrentUser_();
   ensureNavigationSetup_();
 
@@ -18,12 +44,14 @@ function getNavigation() {
     return {
       menus: records.menus.filter(function(menu) {
         return menu.enabled !== false &&
-          (!menu.roles || menu.roles.indexOf(user.role) !== -1);
+          roleAllowed_(menu.roles, user.role) &&
+          scopeAllows_(menu.clientIds, clientId);
       }).sort(function(a, b) { return a.order - b.order; }),
       items: records.items.filter(function(item) {
-        if (!item.enabled || (item.roles || []).indexOf(user.role) === -1) {
-          return false;
-        }
+        if (item.enabled === false) return false;
+        if (!roleAllowed_(item.roles, user.role)) return false;
+        if (!scopeAllows_(item.clientIds, clientId)) return false;
+        if (!scopeAllows_(item.entityIds, entityId)) return false;
         if (user.role !== 'ltd' || item.type === 'group') return true;
         return (user.allowedModules || []).indexOf(item.moduleId) !== -1;
       }).sort(function(a, b) { return a.order - b.order; })
@@ -34,8 +62,7 @@ function getNavigation() {
     return tree.reduce(function(total, menu) {
       function countChildren(children) {
         return (children || []).reduce(function(count, child) {
-          return count + (child.moduleId ? 1 : 0) +
-            countChildren(child.children);
+          return count + (child.moduleId ? 1 : 0) + countChildren(child.children);
         }, 0);
       }
       return total + (menu.moduleId ? 1 : 0) + countChildren(menu.children);
@@ -48,29 +75,29 @@ function getNavigation() {
 
     function buildChildren(parentId) {
       return items
-      .filter(function(item) { return item.parentId === parentId; })
-      .map(function(item) {
-        return {
-          id: item.id,
-          label: item.label,
-          description: item.description || '',
-          moduleId: item.moduleId || '',
-          type: item.type || 'link',
-          level: item.level || 2,
-          children: buildChildren(item.id)
-        };
-      });
+        .filter(function(item) { return item.parentId === parentId; })
+        .map(function(item) {
+          return {
+            id: item.id,
+            label: item.label,
+            description: item.description || '',
+            moduleId: item.moduleId || '',
+            type: item.type || 'link',
+            level: item.level || 2,
+            children: buildChildren(item.id)
+          };
+        });
     }
 
     return menus.map(function(menu) {
-    return {
-      id: menu.id,
-      label: menu.label,
-      description: menu.description || '',
-      type: menu.type || 'group',
-      moduleId: menu.moduleId || '',
-      children: buildChildren(menu.id)
-    };
+      return {
+        id: menu.id,
+        label: menu.label,
+        description: menu.description || '',
+        type: menu.type || 'group',
+        moduleId: menu.moduleId || '',
+        children: buildChildren(menu.id)
+      };
     });
   }
 
@@ -78,42 +105,29 @@ function getNavigation() {
   if (records.menus.length < 2 || !records.items.some(function(item) {
     return item.moduleId;
   })) {
-    const setup = setupNavigation_();
-    if (setup.menuDefinitions && setup.menuItemDefinitions) {
-      records = filterRecords({
-        menus: setup.menuDefinitions,
-        items: setup.menuItemDefinitions
-      });
-    } else {
-      records = filterRecords(readNavigationRecords());
-    }
+    setupNavigation_();
+    records = filterRecords(readNavigationRecords());
   }
+
   const navigation = buildTree(records);
   if (!navigation.some(function(menu) {
     return menu.moduleId || (menu.children || []).some(function(child) {
       return child.moduleId;
     });
   })) {
-    return readStaticNavigationCatalog_();
+    throw new Error(
+      'No menu items matched this user, client and business. Run rewriteNavigationInFirestore().'
+    );
   }
+
   navigation.moduleCount = countModules(navigation);
   return navigation;
 }
 
 function readStaticNavigationCatalog_() {
-  const html = HtmlService.createHtmlOutputFromFile('MenuCatalog').getContent();
-  const match = html.match(/<script[^>]*id="nilavaram-menu-catalog"[^>]*>([\s\S]*?)<\/script>/i);
-  if (!match) throw new Error('MenuCatalog.html does not contain a navigation catalog.');
-  const navigation = JSON.parse(match[1].trim());
-  navigation.moduleCount = navigation.reduce(function(total, menu) {
-    function countChildren(children) {
-      return (children || []).reduce(function(count, child) {
-        return count + (child.moduleId ? 1 : 0) + countChildren(child.children);
-      }, 0);
-    }
-    return total + (menu.moduleId ? 1 : 0) + countChildren(menu.children);
-  }, 0);
-  return navigation;
+  throw new Error(
+    'Navigation is missing in Firestore. Sign in as the owner, open ?developer=1, and run Reset shell data.'
+  );
 }
 
 function ensureNavigationSetup_() {
@@ -128,19 +142,57 @@ function ensureNavigationSetup_() {
     }
   }
 
-  let navigationNeedsSetup = !config ||
-    config.version !== NILAVARAM_NAVIGATION_VERSION;
-  if (!navigationNeedsSetup) {
-    const menus = firestoreGetCollection_('menus');
-    const items = firestoreGetCollection_('menuItems');
-    navigationNeedsSetup = menus.length < 5 || items.length < 20 ||
-      !menus.some(function(menu) {
-      return menu.id === 'personal-life';
-    }) || !items.some(function(item) {
-      return item.id === 'all-businesses';
-    });
-  }
-  if (navigationNeedsSetup) {
+  if (!config || config.version !== NILAVARAM_NAVIGATION_VERSION) {
     setupNavigation_();
   }
+}
+
+/**
+ * Confirms that the signed-in user may open a module for the selected business.
+ *
+ * @param {string} moduleId Requested module identifier.
+ * @param {string} entityId Selected business entity identifier.
+ * @returns {Object}
+ */
+function authorizeModuleAccess(moduleId, entityId) {
+  const user = requireCurrentUser_();
+  const normalizedModuleId = String(moduleId || '').trim();
+  const normalizedEntityId = String(entityId || '').trim();
+
+  if (!normalizedModuleId) {
+    throw new Error('Select a menu item before opening a module window.');
+  }
+  if (!normalizedEntityId) {
+    throw new Error('Select a business before opening a module window.');
+  }
+
+  const entity = getDocumentOrNull_('entities', normalizedEntityId);
+  if (!entity || entity.status !== 'active') {
+    throw new Error('The selected business is not available.');
+  }
+
+  const menuItems = firestoreGetCollection_('menuItems').map(fromFirestoreDocument_);
+  const menuItem = menuItems.find(function(item) {
+    return item.enabled !== false &&
+      (item.id === normalizedModuleId || item.moduleId === normalizedModuleId);
+  });
+  if (!menuItem) {
+    throw new Error('That menu item is not registered in Firestore navigation.');
+  }
+  if ((menuItem.roles || []).indexOf(user.role) === -1) {
+    throw new Error('Your role does not include access to ' + menuItem.label + '.');
+  }
+  if (user.role === 'ltd' && menuItem.type !== 'group' &&
+      (user.allowedModules || []).indexOf(menuItem.moduleId || menuItem.id) === -1) {
+    throw new Error('Your limited access does not include ' + menuItem.label + '.');
+  }
+
+  return {
+    authorized: true,
+    moduleId: menuItem.moduleId || menuItem.id,
+    moduleLabel: menuItem.label,
+    entityId: entity.id,
+    entityName: entity.name,
+    description: menuItem.description || ''
+  };
 }

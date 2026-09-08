@@ -10,67 +10,47 @@
 
   <header class="header">
 
-    <div class="header-top">
-
-      <div class="brand">
-
-        <svg class="brand-icon" viewBox="0 0 24 24" fill="none"
-
-          stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-
-          <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5z"/>
-
-          <path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z"/>
-
-        </svg>
-
-        <h1>Nilavaram</h1>
-
+    <div class="header-bar">
+  
+      <div class="header-panel header-panel-left">
+        <div class="brand">
+          <svg class="brand-icon" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5z"/>
+            <path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z"/>
+          </svg>
+          <h1>Nilavaram</h1>
+        </div>
       </div>
-
-      <div class="appearance-controls" aria-label="Display preferences">
-
-      <?!= include('MenuCatalog') ?>
-      <?!= include('MenuCatalog') ?>
-          <span>Appearance</span>
-
-          <select id="theme-choice">
-
-            <option value="sky">Sky blue</option>
-
-            <option value="dark">Dark</option>
-
-            <option value="system">Device setting</option>
-
-          </select>
-
-        </label>
-
-        <label class="appearance-field" for="font-choice">
-
-          <span>Text size</span>
-
-          <select id="font-choice">
-
-            <option value="large">Large</option>
-
-            <option value="standard">Standard</option>
-
-            <option value="small">Small</option>
-
-          </select>
-
-        </label>
-
+  
+      <div class="header-panel header-panel-center">
+        <div id="startup">Loading...</div>
       </div>
-
+  
+      <div class="header-panel header-panel-right">
+        <div class="appearance-controls" aria-label="Display preferences">
+          <label class="appearance-field" for="theme-choice">
+            <span>Appearance</span>
+            <select id="theme-choice">
+              <option value="sky">Sky blue</option>
+              <option value="dark">Dark</option>
+              <option value="system">Device setting</option>
+            </select>
+          </label>
+          <label class="appearance-field" for="font-choice">
+            <span>Text size</span>
+            <select id="font-choice">
+              <option value="large">Large</option>
+              <option value="standard">Standard</option>
+              <option value="small">Small</option>
+            </select>
+          </label>
+        </div>
+      </div>
+  
     </div>
-
-    <div id="startup">Loading...</div>
-
+  
   </header>
-
-
 
   <div class="layout">
 
@@ -84,9 +64,9 @@
 
       <div id="output" class="panel" tabindex="-1">
 
-        <h2>Dashboard</h2>
+        <h2>Workspace</h2>
 
-        <p>Nilavaram is opening. You may begin here while the menu loads.</p>
+        <p>Nilavaram is opening. Your selections will load securely from the server.</p>
 
       </div>
 
@@ -94,17 +74,16 @@
 
   </div>
 
-
-  <?!= include('MenuCatalog') ?>
-
   <script>
     const PAGE_VIEW_STARTED_AT = new Date();
+    const DASHBOARD_INFO_BOOTSTRAP = <?!= dashboardInfoJson ?>;
+    const SHOW_DEV_ACTIVITY = true;
     const CONNECTIONS_BOOTSTRAP = <?!= connectionsBootstrapJson ?>;
     const OPEN_CONNECTIONS_ON_LOAD = <?!= openConnectionsOnLoadJson ?>;
-    const OPEN_MODULE_ID = <?!= openModuleIdJson ?>;
-    const OPEN_MODULE_LABEL = <?!= openModuleLabelJson ?>;
+    const IS_MAIN_WORKSPACE = true;
   </script>
   <?!= include('DashboardCore') ?>
+  <?!= include('DashboardSessions') ?>
   <?!= include('DashboardNavigation') ?>
   <?!= include('DashboardOperations') ?>
   <?!= include('DashboardTransactions') ?>

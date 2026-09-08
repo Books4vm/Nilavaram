@@ -67,62 +67,89 @@
       background: var(--surface-strong);
       border-bottom: 1px solid var(--border);
       flex: 0 0 auto;
-      padding: 18px 24px;
+      padding: 4px 8px;
       position: relative;
       z-index: 10;
     }
-    .header-top {
+    .header-bar {
       align-items: center;
-      display: flex;
-      gap: 20px;
-      justify-content: space-between;
-      margin-bottom: 10px;
+      display: grid;
+      gap: 8px;
+      grid-template-columns: auto 1fr auto;
+    }
+    .header-panel-left {
+      justify-self: start;
+      padding: 0;
+    }
+    .header-panel-center {
+      justify-self: center;
+      min-width: 0;
+      text-align: center;
+      width: 100%;
+    }
+    .header-panel-right {
+      justify-self: end;
+      padding: 0;
     }
     .brand {
       align-items: center;
       display: flex;
-      gap: 12px;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
     }
     .brand-icon {
       color: var(--primary);
       flex: 0 0 auto;
-      height: 34px;
-      width: 34px;
+      height: 22px;
+      width: 22px;
     }
     .header h1 {
-      font-size: 1.55em;
-      line-height: 1.2;
+      font-size: 1.05em;
+      line-height: 1;
       margin: 0;
+      padding: 0;
     }
     .appearance-controls {
       align-items: end;
       display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
+      flex-wrap: nowrap;
+      gap: 6px;
     }
     .appearance-field span {
       display: block;
-      font-size: .78em;
+      font-size: .65em;
       font-weight: 700;
-      margin-bottom: 3px;
+      line-height: 1;
+      margin-bottom: 1px;
     }
     .appearance-field select {
-      min-width: 145px;
+      font-size: .78em;
+      line-height: 1.1;
+      min-width: 110px;
+      padding: 2px 4px;
       width: auto;
     }
-    #startup { color: var(--muted-text); }
-    .startup-line {
-      align-items: baseline;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px 18px;
+    #startup {
+      color: var(--muted-text);
+      font-size: .82em;
+      line-height: 1.15;
+    }
+    .startup-date-line,
+    .startup-time-line,
+    .startup-user-line {
+      line-height: 1.15;
+      margin: 0;
+      white-space: nowrap;
+    }
+    .startup-date-line {
+      font-weight: 600;
     }
     .startup-time-line {
-      align-items: center;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px 18px;
-      margin-top: 6px;
+      margin-top: 1px;
+    }
+    .startup-user-line {
+      margin-top: 1px;
     }
     .layout {
       display: grid;
@@ -403,11 +430,37 @@
       font-size: .78em;
       margin-top: 5px;
     }
+    .entity-reference {
+      border-bottom: 1px solid var(--border);
+      margin: 8px 0 12px;
+      padding-bottom: 10px;
+    }
+    .entity-reference h3 {
+      font-size: .9em;
+      margin: 0 0 6px;
+    }
+    .entity-reference ul {
+      margin: 0;
+      max-height: 160px;
+      overflow-y: auto;
+      padding-left: 18px;
+    }
+    .entity-reference li { margin: 3px 0; }
+    .entity-add-panel { margin-bottom: 12px; }
+    .entity-add-row {
+      display: flex;
+      gap: 8px;
+    }
+    .entity-add-row input { flex: 1 1 auto; }
     .navigation-reference {
       border-top: 1px solid var(--border);
       margin-top: 20px;
       padding-top: 14px;
     }
+    #entity-loading-msg { margin: 0 0 10px; }
+    #client-section[hidden],
+    #entity-section[hidden],
+    #menu-section[hidden] { display: none !important; }
     .navigation-reference h3 { margin: 0 0 8px; }
     .navigation-reference ul {
       margin: 0;
@@ -416,4 +469,55 @@
       padding-left: 20px;
     }
     .navigation-reference li { margin: 4px 0; }
+    .workspace-sessions { margin-top: 18px; }
+    .session-table {
+      border-collapse: collapse;
+      margin: 8px 0 18px;
+      width: 100%;
+    }
+    .session-table th,
+    .session-table td {
+      border-bottom: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .session-table th { font-size: .85em; }
+    .workspace-intro p {
+      margin: 0 0 10px;
+    }
+    .inactivity-extend-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 12px 0;
+      padding: 10px 12px;
+    }
+    .inactivity-extend-panel p {
+      margin: 0 0 8px;
+    }
+
+    .workspace-selection {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 12px 0;
+      padding: 12px 14px;
+    }
+    .workspace-selection h3 {
+      margin: 0 0 8px;
+    }
+    .workspace-selection p {
+      margin: 0 0 6px;
+    }
+    .workspace-load-status progress {
+      display: block;
+      height: 14px;
+      margin: 8px 0;
+      width: 100%;
+    }
+    #workspace-error {
+      margin-top: 10px;
+      white-space: pre-wrap;
+    }
   </style>

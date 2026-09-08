@@ -3,7 +3,55 @@
  * Invitation-only user and role administration.
  */
 
-const NILAVARAM_ROLES = ['admin', 'editor', 'reader', 'ltd', 'disabled'];
+const NILAVARAM_ROLES = ['superadmin', 'admin', 'editor', 'reader', 'ltd', 'disabled'];
+
+const NILAVARAM_SUPER_ADMIN_EMAILS = [
+  'mangai8100@gmail.com',
+  'mvenkat.jmj@gmail.com',
+  'thesolarcpa@gmail.com',
+  'vm8100@gmail.com',
+  'waleed.fahid.acctg@gmail.com'
+];
+
+function isSuperAdminEmail_(email) {
+  return NILAVARAM_SUPER_ADMIN_EMAILS
+    .map(normalizeEmail_)
+    .indexOf(normalizeEmail_(email)) !== -1;
+}
+
+function requirePrimaryDeveloper_() {
+  const email = getCurrentEmail_();
+  if (email !== normalizeEmail_(NILAVARAM_PRIMARY_ADMIN_EMAIL)) {
+    throw new Error('Developer access denied.');
+  }
+  return requireCurrentUser_();
+}
+
+function requireSuperAdmin_() {
+  const user = requireCurrentUser_();
+  if (user.role !== 'superadmin' && !isSuperAdminEmail_(user.email)) {
+    throw new Error('Super Admin permission is required.');
+  }
+  return user;
+}
+
+function ensureSuperAdminUsers_() {
+  NILAVARAM_SUPER_ADMIN_EMAILS.forEach(function(email, index) {
+    const normalized = normalizeEmail_(email);
+    const existing = getUserByEmail_(normalized);
+    firestoreSetDocument_('users', normalized, toFirestoreFields_({
+      email: normalized,
+      displayName: index === 0 ? 'Owner Super Admin' : 'Super Admin',
+      role: 'superadmin',
+      allowedModules: [],
+      status: 'active',
+      invitedBy: NILAVARAM_PRIMARY_ADMIN_EMAIL,
+      invitedAt: existing ? existing.invitedAt : new Date(),
+      acceptedAt: existing ? existing.acceptedAt : new Date(),
+      updatedAt: new Date()
+    }));
+  });
+}
 
 function normalizeEmail_(email) {
   return String(email || '').trim().toLowerCase();
@@ -40,7 +88,8 @@ function requireCurrentUser_() {
 
 function requireAdmin_() {
   const user = requireCurrentUser_();
-  if (user.role !== 'admin') {
+  if (['superadmin', 'admin'].indexOf(user.role) === -1 &&
+      !isSuperAdminEmail_(user.email)) {
     throw new Error('Admin permission is required.');
   }
   return user;
@@ -118,6 +167,15 @@ function saveUser(input) {
     if (admins.length === 1) {
       throw new Error('The last active Admin cannot be downgraded or disabled.');
     }
+  }
+
+  function requireAdmin_() {
+    const user = requireCurrentUser_();
+    if (['superadmin', 'admin'].indexOf(user.role) === -1 &&
+        !isSuperAdminEmail_(user.email)) {
+      throw new Error('Admin permission is required.');
+    }
+    return user;
   }
 
   const record = {

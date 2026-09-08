@@ -8,8 +8,7 @@ const NILAVARAM_INITIAL_ADMIN_EMAILS = [
   'mangai8100@gmail.com',
   'vm8100@gmail.com'
 ];
-const NILAVARAM_NAVIGATION_VERSION = 21;
-
+const NILAVARAM_NAVIGATION_VERSION = 22;
 /**
  * Creates or refreshes the Firestore-driven navigation.
  *
@@ -124,7 +123,6 @@ function setupNavigation_() {
     { id: 'reminders', menuId: 'tasks', parentId: 'tasks', level: 2, label: 'Reminders', description: 'Shows private and shared reminders with planned notification schedules.', moduleId: 'reminders', order: 20, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'configuration', menuId: 'system', label: 'Configuration', description: 'Maintains Nilavaram and business-level settings.', moduleId: 'configuration', order: 10, enabled: true, roles: ['admin'] },
     { id: 'system-status', menuId: 'system', label: 'System Status', description: 'Shows version, deployment and connection health.', moduleId: 'system-status', order: 20, enabled: true, roles: ['admin'] },
-    { id: 'firestore', menuId: 'system', label: 'Firestore', description: 'Tests and diagnoses the Firestore connection.', moduleId: 'firestore', order: 30, enabled: true, roles: ['admin'] },
     { id: 'connections', menuId: 'system', label: 'Connections', description: 'Manages future online-service connections without displaying readable passwords.', moduleId: 'connections', order: 40, enabled: true, roles: ['admin'] },
     { id: 'modules', menuId: 'system', label: 'Modules', description: 'Enables or disables major Nilavaram features.', moduleId: 'modules', order: 50, enabled: true, roles: ['admin'] },
     { id: 'menus', menuId: 'system', label: 'Menu Management', description: 'Renames, reorders, enables or hides Firestore menu records.', moduleId: 'menus', order: 60, enabled: true, roles: ['admin'] },
@@ -145,9 +143,13 @@ function setupNavigation_() {
       description: menu.description,
       order: menu.order,
       enabled: true,
-      type: menu.type,
+      type: menu.type || 'group',
       moduleId: menu.moduleId || '',
-      roles: menu.roles
+      roles: menu.roles || ['admin'],
+      clientIds: menu.clientIds || ['vav-group'],
+      entityIds: menu.entityIds || ['*'],
+      schemaVersion: 2,
+      updatedAt: new Date()
     }));
   });
 
@@ -180,12 +182,16 @@ function setupNavigation_() {
       parentId: item.parentId || item.menuId,
       level: item.level || 2,
       label: item.label,
-      description: item.description,
+      description: item.description || '',
       moduleId: item.moduleId || '',
       type: item.type || 'link',
       order: item.order,
-      enabled: item.enabled,
-      roles: item.roles
+      enabled: item.enabled !== false,
+      roles: item.roles || ['admin'],
+      clientIds: item.clientIds || ['vav-group'],
+      entityIds: item.entityIds || ['*'],
+      schemaVersion: 2,
+      updatedAt: new Date()
     }));
   });
 
@@ -243,9 +249,7 @@ function setupNavigation_() {
 
   setupProjectIntentTasks_();
   setupInitialReminders_();
-  setupAccountingFoundation_();
-  setupTransactionFoundation_();
-
+  
   return {
     menus: menus.length,
     menuItems: menuItems.length,
