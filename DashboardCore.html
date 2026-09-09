@@ -149,6 +149,11 @@
     document.getElementById('startup').innerHTML =
       '<div class="startup-date-line">' +
         escapeHtml(started.date) + ' &nbsp; ' + escapeHtml(started.weekday) +
+        ' &nbsp; <span class="startup-context">' +
+        escapeHtml(typeof getShellContextHeaderText === 'function'
+          ? getShellContextHeaderText()
+          : 'Select client and business') +
+        '</span>' +
       '</div>' +
       '<div class="startup-time-line">' +
         '<b>Started:</b> ' + escapeHtml(started.time) +
@@ -228,8 +233,10 @@
   }
 
   function loadShellFromEngine() {
-    if (typeof showClientLoadingMessage === 'function') {
-      showClientLoadingMessage(true, 'Connecting securely...');
+    const loading = document.getElementById('shell-loading-msg');
+    if (loading) {
+      loading.hidden = false;
+      loading.textContent = 'Connecting securely...';
     }
     google.script.run
       .withSuccessHandler(function(shell) {
@@ -238,8 +245,9 @@
       .withFailureHandler(function(error) {
         renderStartupLine();
         const message = error && error.message ? error.message : String(error);
-        if (typeof showClientLoadingMessage === 'function') {
-          showClientLoadingMessage(true, 'Connection failed: ' + message);
+        if (loading) {
+          loading.hidden = false;
+          loading.textContent = 'Connection failed: ' + message;
         }
         showWorkspaceNotice('Server connection failed: ' + message);
       })

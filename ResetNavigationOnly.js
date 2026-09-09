@@ -81,3 +81,74 @@ function renameVavTrustAccountingEntity() {
   }));
   return { success: true, name: 'VAV Trust' };
 }
+
+/**
+ * Builds the ready-to-send invite message for an Admin to copy.
+ */
+function buildInviteMessage_(email, displayName, role, mainUiUrl) {
+  const safeEmail = normalizeEmail_(email);
+  const safeRole = String(role || 'reader');
+  const safeName = String(displayName || safeEmail).trim();
+  const url = String(mainUiUrl || getMainUiUrl_()).trim();
+
+  return [
+    'You are invited to Nilavaram.',
+    '',
+    'Name: ' + safeName,
+    'Google account: ' + safeEmail,
+    'Role: ' + safeRole,
+    '',
+    'Steps:',
+    '1. Open this link: ' + url,
+    '2. Sign in with Google using exactly: ' + safeEmail,
+    '3. Click "Accept invitation".',
+    '',
+    'Do not share this link with anyone who was not invited.',
+    'Nilavaram does not use a separate password — Google sign-in only.'
+  ].join('\n');
+}
+
+/**
+ * One server call for the Invite window UI.
+ */
+function getInvitePageData() {
+  const admin = requireAdmin_();
+  const config = getMainUiUrlForAdmin();
+  const users = getUsers();
+  const isSuperAdmin = admin.role === 'superadmin' || isSuperAdminEmail_(admin.email);
+
+  return {
+    mainUiUrl: config.mainUiUrl,
+    mainUiSource: config.source,
+    mainUiUpdatedAt: config.updatedAt,
+    mainUiUpdatedBy: config.updatedBy,
+    canEditMainUiUrl: isSuperAdmin,
+    currentAdminEmail: admin.email,
+    roles: ['admin', 'editor', 'reader', 'ltd', 'disabled'],
+    users: users
+  };
+}
+
+/**
+ * Returns a fresh invite message after save/resend.
+ */
+function getInviteMessageForUser(email) {
+  requireAdmin_();
+  const user = getUserByEmail_(email);
+  if (!user) {
+    throw new Error('User not found.');
+  }
+  return {
+    email: user.email,
+    displayName: user.displayName || user.email,
+    role: user.role,
+    status: user.status,
+    message: buildInviteMessage_(
+      user.email,
+      user.displayName,
+      user.role,
+      getMainUiUrl_()
+    ),
+    mainUiUrl: getMainUiUrl_()
+  };
+}

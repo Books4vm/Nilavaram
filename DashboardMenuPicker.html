@@ -1,0 +1,369 @@
+<script>
+  const NILAVARAM_WIRING_EMOJI = {
+    live: '\u{1F7E2}',
+    partial: '\u{1F7E1}',
+    help: '\u{1F4D8}',
+    planned: '\u{26AA}',
+    improve: '\u{1F527}'
+  };
+
+  const NILAVARAM_WIRING_TITLES = {
+    live: 'Live — opens module window',
+    partial: 'Partly working',
+    help: 'Help guide — read only',
+    planned: 'Planned — to be wired',
+    improve: 'Live — UX to be improved'
+  };
+
+  function getWiringEmoji(status) {
+    return NILAVARAM_WIRING_EMOJI[status] || NILAVARAM_WIRING_EMOJI.planned;
+  }
+
+  function getWiringTitle(status) {
+    return NILAVARAM_WIRING_TITLES[status] || NILAVARAM_WIRING_TITLES.planned;
+  }
+
+  function readMenuExpandedKey(groupId) {
+    try {
+      return sessionStorage.getItem('nilavaramMenuExpanded_' + groupId);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function writeMenuExpandedKey(groupId, expanded) {
+    try {
+      sessionStorage.setItem('nilavaramMenuExpanded_' + groupId, expanded ? '1' : '0');
+    } catch (error) {}
+  }
+
+  function isMenuGroupExpanded(groupId, depth) {
+    const saved = readMenuExpandedKey(groupId);
+    if (saved === '0') return false;
+    if (saved === '1') return true;
+    return depth <= 1;
+  }
+
+  function toggleMenuGroup(groupId) {
+    const expanded = isMenuGroupExpanded(groupId, 1);
+    writeMenuExpandedKey(groupId, !expanded);
+    renderMenuPickerPanel(window.nilavaramNavigation || []);
+  }
+
+  function collectMenuLeaves(nodes, topGroup, path, out) {
+    (nodes || []).forEach(function(node) {
+      const nextPath = path.slice();
+      nextPath.push(node.label);
+      if (node.moduleId) {
+        out.push({
+          id: node.id,
+          label: node.label,
+          description: node.description || '',
+          moduleId: node.moduleId,
+          wiringStatus: node.wiringStatus || 'planned',
+          topGroup: topGroup,
+          breadcrumb: nextPath.join(' \u203A ')
+        });
+      }
+      collectMenuLeaves(node.children, topGroup, nextPath, out);
+    });
+  }
+
+  function flattenNavigationLeaves(navigation) {
+    const leaves = [];
+    (navigation || []).forEach(function(section) {
+      if (section.moduleId) {
+        leaves.push({
+          id: section.id,
+          label: section.label,
+          description: section.description || '',
+          moduleId: section.moduleId,
+          wiringStatus: section.wiringStatus || 'planned',
+          topGroup: section.label,
+          breadcrumb: section.label
+        });
+        return;
+      }
+      collectMenuLeaves(section.children || [], section.label, [section.label], leaves);
+    });
+    return leaves;
+  }
+
+  function summarizeMenuLeaves(leaves) {
+    const summary = { total: leaves.length, live: 0, partial: 0, help: 0, planned: 0, improve: 0 };
+    leaves.forEach(function(leaf) {
+      const key = leaf.wiringStatus || 'planned';
+      if (summary[key] == null) summary.planned += 1;
+      else summary[key] += 1;
+    });
+    return summary;
+  }
+
+  function renderMenuSummaryLine(summary, matchCount) {
+    const el = document.getElementById('menu-status-summary');
+    if (!el) return;
+    if (matchCount != null) {
+      el.textContent = matchCount + ' of ' + summary.total + ' match';
+      return;
+    }
+    el.textContent =
+      summary.total + ' items \u00b7 ' + summary.live + ' ' + getWiringEmoji('live') +
+      ' \u00b7 ' + summary.partial + ' ' + getWiringEmoji('partial') +
+      ' \u00b7 ' + summary.help + ' ' + getWiringEmoji('help') +
+      ' \u00b7 ' + summary.planned + ' ' + getWiringEmoji('planned');
+  }
+
+  function menuSearchMatches(leaf, query) {
+    if (!query) return true;
+    const hay = (
+      leaf.label + ' ' + leaf.description + ' ' + leaf.moduleId +
+      ' ' + leaf.topGroup + ' ' + leaf.breadcrumb
+    ).toLowerCase();
+    return hay.indexOf(query) !== -1;
+  }
+
+  function filterMenuLeaves(leaves, query) {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return leaves;
+    return leaves.filter(function(leaf) { return menuSearchMatches(leaf, q); });
+  }
+
+  function nodeHasMatchingLeaf(node, query, topGroupLabel) {
+    if (!query) return true;
+    if (node.moduleId) {
+      return menuSearchMatches({
+        label: node.label,
+        description: node.description,
+        moduleId: node.moduleId,
+        topGroup: topGroupLabel,
+        breadcrumb: node.label
+      }, query);
+    }
+    return (node.children || []).some(function(child) {
+      return nodeHasMatchingLeaf(child, query, topGroupLabel);
+    });
+  }
+
+  function onMenuSearchInput(event) {
+    const query = event && event.target ? event.target.value : '';
+    renderMenuPickerPanel(window.nilavaramNavigation || [], query);
+  }
+
+  function clearMenuSearch() {
+    const input = document.getElementById('menu-search');
+    if (input) input.value = '';
+    renderMenuPickerPanel(window.nilavaramNavigation || [], '');
+  }
+
+  function openMenuLeaf(moduleId, label) {
+    if (!isShellContextComplete()) {
+      if (typeof showWorkspaceNotice === 'function') {
+        showWorkspaceNotice('Select client and business before opening a module.');
+      }
+      return;
+    }
+    openModule(moduleId, label, true);
+  }
+
+  function renderMenuLeafButton(leaf, indentLevel) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'menu-leaf';
+    btn.style.paddingLeft = (12 + indentLevel * 14) + 'px';
+    btn.title = getWiringTitle(leaf.wiringStatus) + ' — ' + leaf.label;
+    btn.innerHTML =
+      '<span class="menu-leaf-label">' + escapeHtml(leaf.label) + '</span>' +
+      '<span class="menu-leaf-status" aria-hidden="true">' +
+        getWiringEmoji(leaf.wiringStatus) + '</span>';
+    btn.onclick = function() {
+      openMenuLeaf(leaf.moduleId, leaf.label);
+    };
+    return btn;
+  }
+
+  function renderMenuGroupSection(node, container, depth, query, topGroupLabel) {
+    const groupId = node.id || node.label;
+    const expanded = query ? true : isMenuGroupExpanded(groupId, depth);
+    const section = document.createElement('section');
+    section.className = 'menu-group';
+    section.dataset.groupId = groupId;
+
+    const header = document.createElement('div');
+    header.className = 'menu-group-header';
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'menu-group-toggle';
+    toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    toggle.innerHTML = expanded ? '&#9660;' : '&#9654;';
+    toggle.title = expanded ? 'Collapse section' : 'Expand section';
+    toggle.onclick = function(event) {
+      event.stopPropagation();
+      toggleMenuGroup(groupId);
+    };
+
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'menu-group-title-wrap';
+    const title = document.createElement('div');
+    title.className = 'menu-group-title';
+    title.textContent = node.label;
+    titleWrap.appendChild(title);
+    if (depth === 0 && node.description) {
+      const desc = document.createElement('p');
+      desc.className = 'menu-group-desc';
+      desc.textContent = node.description;
+      titleWrap.appendChild(desc);
+    } else if (depth > 0 && node.description) {
+      const desc = document.createElement('p');
+      desc.className = 'menu-subgroup-desc';
+      desc.textContent = node.description;
+      titleWrap.appendChild(desc);
+    }
+
+    header.appendChild(toggle);
+    header.appendChild(titleWrap);
+    section.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'menu-group-body';
+    body.hidden = !expanded;
+
+    if (node.moduleId) {
+      body.appendChild(renderMenuLeafButton({
+        label: node.label,
+        moduleId: node.moduleId,
+        wiringStatus: node.wiringStatus || 'planned'
+      }, depth));
+    }
+
+    (node.children || []).forEach(function(child) {
+      if (child.moduleId && (!child.children || !child.children.length)) {
+        if (!query || nodeHasMatchingLeaf(child, query, topGroupLabel)) {
+          body.appendChild(renderMenuLeafButton(child, depth + 1));
+        }
+        return;
+      }
+      if (!child.moduleId || (child.children && child.children.length)) {
+        if (nodeHasMatchingLeaf(child, query, topGroupLabel)) {
+          renderMenuGroupSection(child, body, depth + 1, query, topGroupLabel);
+        }
+        return;
+      }
+      if (!query || nodeHasMatchingLeaf(child, query, topGroupLabel)) {
+        body.appendChild(renderMenuLeafButton(child, depth + 1));
+      }
+    });
+
+    if (body.childNodes.length) {
+      section.appendChild(body);
+      container.appendChild(section);
+    }
+  }
+
+  function renderMenuSearchResults(leaves, query) {
+    const browse = document.getElementById('menu-browse-panel');
+    const results = document.getElementById('menu-search-results');
+    if (browse) browse.hidden = true;
+    if (!results) return;
+    results.hidden = false;
+    results.textContent = '';
+
+    const heading = document.createElement('h4');
+    heading.className = 'menu-search-heading';
+    heading.textContent = query
+      ? 'Results for "' + query + '" (' + leaves.length + ')'
+      : 'Search results';
+    results.appendChild(heading);
+
+    if (!leaves.length) {
+      const empty = document.createElement('p');
+      empty.className = 'help-meta';
+      empty.textContent = 'No menu items match "' + query +
+        '". Clear search to see all items.';
+      results.appendChild(empty);
+      return;
+    }
+
+    leaves.forEach(function(leaf) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'menu-search-result';
+      row.title = getWiringTitle(leaf.wiringStatus);
+      row.innerHTML =
+        '<span class="menu-search-result-label">' + escapeHtml(leaf.label) +
+        ' <span class="menu-leaf-status">' + getWiringEmoji(leaf.wiringStatus) + '</span></span>' +
+        '<span class="menu-search-result-path">' + escapeHtml(leaf.breadcrumb) + '</span>';
+      row.onclick = function() {
+        openMenuLeaf(leaf.moduleId, leaf.label);
+      };
+      results.appendChild(row);
+    });
+  }
+
+  function renderMenuBrowseTree(navigation, query) {
+    const browse = document.getElementById('menu-browse-panel');
+    const results = document.getElementById('menu-search-results');
+    if (results) results.hidden = true;
+    if (!browse) return;
+    browse.hidden = false;
+    browse.textContent = '';
+
+    navigation.forEach(function(section) {
+      if (!nodeHasMatchingLeaf(section, String(query || '').trim().toLowerCase(), section.label)) {
+        return;
+      }
+      renderMenuGroupSection(
+        section,
+        browse,
+        0,
+        String(query || '').trim().toLowerCase(),
+        section.label
+      );
+    });
+  }
+
+  function renderMenuPickerPanel(navigation, query) {
+    const filteredNav = (navigation || []).filter(function(section) {
+      return section.id !== 'dashboard' && section.moduleId !== 'dashboard';
+    });
+    window.nilavaramNavigation = filteredNav;
+    const leaves = flattenNavigationLeaves(filteredNav);
+    const summary = summarizeMenuLeaves(leaves);
+    const q = String(query == null ? (
+      document.getElementById('menu-search') &&
+      document.getElementById('menu-search').value
+    ) : query).trim().toLowerCase();
+
+    if (q) {
+      const matches = filterMenuLeaves(leaves, q);
+      renderMenuSummaryLine(summary, matches.length);
+      renderMenuSearchResults(matches, q);
+      return;
+    }
+
+    renderMenuSummaryLine(summary, null);
+    renderMenuBrowseTree(filteredNav, '');
+  }
+
+  function applyNavigationToMenu(navigation) {
+    const filtered = (navigation || []).filter(function(section) {
+      return section.id !== 'dashboard' && section.moduleId !== 'dashboard';
+    });
+    window.nilavaramNavigation = filtered;
+    renderMenuPickerPanel(filtered, '');
+    updateMenuSelectorState(true);
+  }
+
+  function bindMenuPickerEvents() {
+    const search = document.getElementById('menu-search');
+    if (search && !search.dataset.bound) {
+      search.dataset.bound = '1';
+      search.addEventListener('input', onMenuSearchInput);
+    }
+    const changeBtn = document.getElementById('context-change-button');
+    if (changeBtn && !changeBtn.dataset.bound) {
+      changeBtn.dataset.bound = '1';
+      changeBtn.onclick = openContextChangePopup;
+    }
+  }
+</script>

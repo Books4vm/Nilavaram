@@ -8,7 +8,7 @@ const NILAVARAM_INITIAL_ADMIN_EMAILS = [
   'mangai8100@gmail.com',
   'vm8100@gmail.com'
 ];
-const NILAVARAM_NAVIGATION_VERSION = 22;
+const NILAVARAM_NAVIGATION_VERSION = 23;
 /**
  * Creates or refreshes the Firestore-driven navigation.
  *
@@ -286,7 +286,14 @@ function setupNilavaram() {
     menusCreated: navigation.menus,
     menuItemsCreated: navigation.menuItems
   });
-
+  const deploymentUrl = getDeploymentMainUiUrl_();
+  if (deploymentUrl) {
+    firestoreSetDocument_('system', 'app-config', toFirestoreFields_({
+      mainUiUrl: deploymentUrl,
+      updatedAt: new Date(),
+      updatedBy: NILAVARAM_PRIMARY_ADMIN_EMAIL
+    }));
+  }
   return {
     success: true,
     message: 'Nilavaram setup completed.',

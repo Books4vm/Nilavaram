@@ -1,0 +1,302 @@
+<script>
+  function escapeHtml(value) {
+    const element = document.createElement('div');
+    element.textContent = String(value == null ? '' : value);
+    return element.innerHTML;
+  }
+
+  function readInviteUrlParam(name) {
+    const match = window.location.search.match(
+      new RegExp('[?&]' + name + '=([^&]*)')
+    );
+    return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : '';
+  }
+
+  function renderInviteShellHeader() {
+    const startup = document.getElementById('startup');
+    const meta = document.getElementById('module-shell-meta');
+    if (!startup) return;
+
+    const now = new Date();
+    const weekday = now.toLocaleDateString(undefined, { weekday: 'long' });
+    const date = now.toLocaleDateString(undefined, {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }).toUpperCase().replace(/ /g, '-');
+
+    const clientName = readInviteUrlParam('clientName') || 'Client not passed';
+    const entityName = readInviteUrlParam('entityName') || 'Business not passed';
+    const user = readInviteUrlParam('user') || '';
+    const role = readInviteUrlParam('role') || '';
+
+    startup.innerHTML =
+      '<div class="startup-date-line">' +
+        escapeHtml(date) + ' &nbsp; ' + escapeHtml(weekday) +
+        ' &nbsp; <span class="startup-context">' +
+        escapeHtml(clientName) + ' · ' + escapeHtml(entityName) +
+        '</span></div>' +
+      '<div class="startup-user-line">' +
+        'User: ' + escapeHtml(user) + ' &nbsp; Role: ' + escapeHtml(role) +
+      '</div>';
+
+    if (meta) {
+      meta.textContent = 'Users & Invitations';
+    }
+  }
+
+  function copyInviteText(text, resultId) {
+    const showCopied = function() {
+      const el = document.getElementById(resultId);
+      if (el) el.textContent = 'Copied.';
+    };
+    const fallbackCopy = function() {
+      const field = document.createElement('textarea');
+      field.value = text;
+      field.setAttribute('readonly', '');
+      field.style.position = 'absolute';
+      field.style.left = '-9999px';
+      document.body.appendChild(field);
+      field.select();
+      document.execCommand('copy');
+      document.body.removeChild(field);
+      showCopied();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(showCopied).catch(fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+  }
+
+  function initInviteWindow() {
+    renderInviteShellHeader();
+
+    google.script.run
+      .withSuccessHandler(renderInviteWindow)
+      .withFailureHandler(function(error) {
+        document.getElementById('output').innerHTML =
+          '<p class="error">' + escapeHtml(error && error.message || error) + '</p>';
+      })
+      .getInvitePageData();
+  }
+
+  function renderInviteWindow(data) {
+    window.nilavaramInvitePage = data;
+    const output = document.getElementById('output');
+
+    let mainUiSection =
+      '<section class="workspace-selection">' +
+        '<h3>Main UI URL</h3>' +
+        '<p class="help-meta">Send this link only to people you have invited. ' +
+          'They must sign in with their Google account.</p>' +
+        '<div class="invite-url-box" id="main-ui-url-display">' +
+          escapeHtml(data.mainUiUrl || '(not set yet)') +
+        '</div>' +
+        '<div class="invite-actions">' +
+          '<button type="button" class="secondary-button" id="copy-main-ui-url">' +
+            'Copy link</button>' +
+          '<span id="copy-main-ui-result" class="help-meta"></span>' +
+        '</div>';
+
+    if (data.canEditMainUiUrl) {
+      mainUiSection +=
+        '<label for="main-ui-url-input"><b>Super Admin — update URL</b></label>' +
+        '<input id="main-ui-url-input" type="url" style="width:100%;margin:8px 0;" ' +
+          'value="' + escapeHtml(data.mainUiUrl || '') + '">' +
+        '<div class="invite-actions">' +
+          '<button type="button" class="primary-button" id="save-main-ui-url">' +
+            'Save URL</button>' +
+          '<button type="button" class="secondary-button" id="refresh-main-ui-url">' +
+            'Refresh from deployment</button>' +
+          '<span id="main-ui-save-result" class="help-meta"></span>' +
+        '</div>';
+    }
+
+    mainUiSection += '</section>';
+
+    output.innerHTML =
+      mainUiSection +
+      '<section class="workspace-selection">' +
+        '<h3>Invite a user</h3>' +
+        '<p class="help-meta">Creates a Firestore invitation. No email is sent automatically.</p>' +
+        '<form id="invite-form">' +
+          '<div class="form-grid">' +
+            '<div><label for="invite-email">Google email</label>' +
+              '<input id="invite-email" type="email" required></div>' +
+            '<div><label for="invite-displayName">Display name</label>' +
+              '<input id="invite-displayName" type="text"></div>' +
+            '<div><label for="invite-role">Role</label>' +
+              '<select id="invite-role">' +
+                '<option value="editor">Editor</option>' +
+                '<option value="reader">Reader</option>' +
+                '<option value="ltd">Ltd</option>' +
+                '<option value="admin">Admin</option>' +
+                '<option value="disabled">Disabled</option>' +
+              '</select></div>' +
+            '<div><label for="invite-allowedModules">Ltd modules (comma-separated)</label>' +
+              '<input id="invite-allowedModules" placeholder="Example: files, reports"></div>' +
+          '</div>' +
+          '<button class="primary-button" type="submit">Save invitation</button>' +
+          '<span id="invite-form-message"></span>' +
+        '</form>' +
+      '</section>' +
+      '<section class="workspace-selection" id="invite-message-panel" hidden>' +
+        '<h3>Invite message</h3>' +
+        '<textarea id="invite-message-text" class="invite-message" readonly></textarea>' +
+        '<div class="invite-actions">' +
+          '<button type="button" class="primary-button" id="copy-invite-message">' +
+            'Copy message</button>' +
+          '<span id="copy-invite-message-result" class="help-meta"></span>' +
+        '</div>' +
+      '</section>' +
+      '<section class="workspace-selection">' +
+        '<h3>Existing users</h3>' +
+        '<div id="invite-users-list">Loading...</div>' +
+      '</section>';
+
+    document.getElementById('copy-main-ui-url').onclick = function() {
+      copyInviteText(data.mainUiUrl || '', 'copy-main-ui-result');
+    };
+
+    if (data.canEditMainUiUrl) {
+      document.getElementById('save-main-ui-url').onclick = saveMainUiUrlFromInviteWindow;
+      document.getElementById('refresh-main-ui-url').onclick = refreshMainUiUrlFromInviteWindow;
+    }
+
+    document.getElementById('invite-form').onsubmit = saveInviteForm;
+    document.getElementById('copy-invite-message').onclick = function() {
+      const text = document.getElementById('invite-message-text').value;
+      copyInviteText(text, 'copy-invite-message-result');
+    };
+
+    renderInviteUsersTable(data.users || []);
+  }
+
+  function saveMainUiUrlFromInviteWindow() {
+    const url = document.getElementById('main-ui-url-input').value;
+    document.getElementById('main-ui-save-result').textContent = ' Saving...';
+    google.script.run
+      .withSuccessHandler(function(result) {
+        document.getElementById('main-ui-save-result').textContent =
+          ' ' + result.message;
+        document.getElementById('main-ui-url-display').textContent = result.mainUiUrl;
+        initInviteWindow();
+      })
+      .withFailureHandler(function(error) {
+        document.getElementById('main-ui-save-result').innerHTML =
+          ' <span class="error">' + escapeHtml(error.message) + '</span>';
+      })
+      .saveMainUiUrl(url);
+  }
+
+  function refreshMainUiUrlFromInviteWindow() {
+    document.getElementById('main-ui-save-result').textContent = ' Refreshing...';
+    google.script.run
+      .withSuccessHandler(function(result) {
+        document.getElementById('main-ui-save-result').textContent =
+          ' ' + result.message;
+        document.getElementById('main-ui-url-input').value = result.mainUiUrl;
+        document.getElementById('main-ui-url-display').textContent = result.mainUiUrl;
+        initInviteWindow();
+      })
+      .withFailureHandler(function(error) {
+        document.getElementById('main-ui-save-result').innerHTML =
+          ' <span class="error">' + escapeHtml(error.message) + '</span>';
+      })
+      .refreshMainUiUrlFromDeployment();
+  }
+
+  function saveInviteForm(event) {
+    event.preventDefault();
+    const modules = document.getElementById('invite-allowedModules').value
+      .split(',')
+      .map(function(v) { return v.trim(); })
+      .filter(Boolean);
+
+    const input = {
+      email: document.getElementById('invite-email').value,
+      displayName: document.getElementById('invite-displayName').value,
+      role: document.getElementById('invite-role').value,
+      allowedModules: modules
+    };
+
+    document.getElementById('invite-form-message').textContent = ' Saving...';
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        document.getElementById('invite-form-message').innerHTML =
+          ' <span class="success">' + escapeHtml(result.message) + '</span>';
+        loadInviteMessage(input.email);
+        initInviteWindow();
+      })
+      .withFailureHandler(function(error) {
+        document.getElementById('invite-form-message').innerHTML =
+          ' <span class="error">' + escapeHtml(error.message) + '</span>';
+      })
+      .saveUser(input);
+  }
+
+  function loadInviteMessage(email) {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        document.getElementById('invite-message-panel').hidden = false;
+        document.getElementById('invite-message-text').value = result.message;
+      })
+      .withFailureHandler(showInviteError)
+      .getInviteMessageForUser(email);
+  }
+
+  function showInviteError(error) {
+    alert(error && error.message ? error.message : String(error));
+  }
+
+  function renderInviteUsersTable(users) {
+    const host = document.getElementById('invite-users-list');
+    if (!host) return;
+
+    let html =
+      '<table class="users-table">' +
+        '<thead><tr>' +
+          '<th>Email</th><th>Name</th><th>Role</th><th>Status</th>' +
+          '<th>Invited by</th><th>Actions</th>' +
+        '</tr></thead><tbody>';
+
+    users.forEach(function(user, index) {
+      html +=
+        '<tr>' +
+          '<td>' + escapeHtml(user.email) + '</td>' +
+          '<td>' + escapeHtml(user.displayName || '') + '</td>' +
+          '<td>' + escapeHtml(user.role) + '</td>' +
+          '<td>' + escapeHtml(user.status) + '</td>' +
+          '<td>' + escapeHtml(user.invitedBy || '') + '</td>' +
+          '<td>' +
+            '<button type="button" class="secondary-button invite-copy-btn" ' +
+              'data-user-index="' + index + '">Copy invite</button>' +
+          '</td>' +
+        '</tr>';
+    });
+
+    html += '</tbody></table>';
+    host.innerHTML = html;
+
+    host.querySelectorAll('.invite-copy-btn').forEach(function(button) {
+      button.onclick = function() {
+        const idx = Number(button.getAttribute('data-user-index'));
+        const user = (window.nilavaramInvitePage &&
+          window.nilavaramInvitePage.users || [])[idx];
+        if (user && user.email) {
+          resendInvite(user.email);
+        }
+      };
+    });
+  }
+
+  function resendInvite(email) {
+    loadInviteMessage(email);
+    const panel = document.getElementById('invite-message-panel');
+    if (panel) {
+      panel.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+</script>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('DashboardStyles') ?>
+  <style>
+    body.module-window-body {
+      height: auto;
+      min-height: 100vh;
+      overflow: auto;
+    }
+    .content {
+      margin: 16px;
+      max-width: 920px;
+    }
+    .invite-url-box {
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 12px 0;
+      word-break: break-all;
+    }
+    .invite-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 8px 0 16px;
+    }
+    .invite-message {
+      width: 100%;
+      min-height: 180px;
+      font-family: inherit;
+      font-size: inherit;
+    }
+    .users-table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    .users-table th,
+    .users-table td {
+      border-bottom: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+  </style>
+</head>
+<body class="module-window-body">
+
+  <header class="header">
+    <div class="header-bar">
+
+      <div class="header-panel header-panel-left">
+        <div class="brand">
+          <svg class="brand-icon" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5z"/>
+            <path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z"/>
+          </svg>
+          <h1>Nilavaram — Users</h1>
+        </div>
+      </div>
+
+      <div class="header-panel header-panel-center">
+        <div id="startup">Loading...</div>
+      </div>
+
+      <div class="header-panel header-panel-right">
+        <div id="module-shell-meta" class="help-meta"></div>
+      </div>
+
+    </div>
+  </header>
+
+  <main id="output" class="content panel" tabindex="-1">
+    <p>Loading invite window...</p>
+  </main>
+
+  <?!= include('InviteWindowCore') ?>
+
+  <script>
+    window.onload = function() {
+      initInviteWindow();
+    };
+  </script>
+
+</body>
+</html>

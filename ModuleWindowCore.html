@@ -1,33 +1,145 @@
-  <script>
-    function escapeHtml(value) {
-      const element = document.createElement('div');
-      element.textContent = String(value == null ? '' : value);
-      return element.innerHTML;
+<script>
+  function escapeHtml(value) {
+    const element = document.createElement('div');
+    element.textContent = String(value == null ? '' : value);
+    return element.innerHTML;
+  }
+
+  function showError(error) {
+    const output = document.getElementById('output');
+    if (output) {
+      output.textContent = 'Error: ' + (error && error.message ? error.message : error);
     }
+  }
 
-    function showError(error) {
-      const message = error && error.message ? error.message : String(error);
-      document.getElementById('output').innerHTML =
-        '<p class="error">' + escapeHtml(message) + '</p>';
+  function moveContentToTop() {
+    const content = document.querySelector('.content');
+    if (content) content.scrollTop = 0;
+    window.scrollTo(0, 0);
+  }
+
+  function readModulePreference(key, fallback) {
+    try {
+      return window.localStorage.getItem(key) || fallback;
+    } catch (error) {
+      return fallback;
     }
+  }
 
-    function moveContentToTop() {
-      window.scrollTo(0, 0);
-      const output = document.getElementById('output');
-      if (output) output.scrollTop = 0;
-    }
+  function applyModuleDisplayPreferences() {
+    const theme = readModulePreference('nilavaram-theme', 'sky');
+    const fontSize = readModulePreference('nilavaram-font-size', 'large');
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.fontSize = fontSize;
+  }
 
-    window.onload = function() {
-      document.getElementById('module-title').textContent =
-        MODULE_LABEL || MODULE_ID || 'Module';
-      document.getElementById('module-meta').innerHTML =
-        '<span><b>Business:</b> ' + escapeHtml(ENTITY_NAME || ENTITY_ID) + '</span>';
-
-      google.script.run
-        .withSuccessHandler(function() {
-          openModule(MODULE_ID, MODULE_LABEL, false);
-        })
-        .withFailureHandler(showError)
-        .authorizeModuleAccess(MODULE_ID, ENTITY_ID);
+  function getUserViewTime(date) {
+    const dateParts = new Intl.DateTimeFormat(undefined, {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      weekday: 'long'
+    }).formatToParts(date);
+    const timeParts = new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).formatToParts(date);
+    const part = function(parts, type) {
+      const found = parts.find(function(item) { return item.type === type; });
+      return found ? found.value : '';
     };
-  </script>
+
+    return {
+      date:
+        part(dateParts, 'day') + '-' +
+        part(dateParts, 'month').toUpperCase() + '-' +
+        part(dateParts, 'year'),
+      weekday: part(dateParts, 'weekday'),
+      time:
+        part(timeParts, 'hour') + ':' +
+        part(timeParts, 'minute') + ' ' +
+        part(timeParts, 'dayPeriod')
+    };
+  }
+
+  function initModuleWindowShell() {
+    applyModuleDisplayPreferences();
+    renderModuleShellHeader();
+    loadModuleContent();
+  }
+
+  function loadModuleContent() {
+    window.nilavaramSelectedClient = {
+      id: CLIENT_ID,
+      name: CLIENT_NAME
+    };
+    window.nilavaramSelectedEntity = {
+      id: ENTITY_ID,
+      name: ENTITY_NAME
+    };
+    window.nilavaramDashboardInfo = {
+      user: USER_EMAIL,
+      role: USER_ROLE
+    };
+
+    document.getElementById('output').textContent = 'Authorizing...';
+
+    google.script.run
+      .withSuccessHandler(function() {
+        document.getElementById('output').textContent =
+          'Loading ' + (MODULE_LABEL || MODULE_ID) + '...';
+
+        if (MODULE_ID === 'chart-of-accounts') {
+          if (typeof showChartOfAccounts === 'function') {
+            showChartOfAccounts('list');
+            return;
+          }
+          showError({ message: 'Chart of Accounts loader is not available.' });
+          return;
+        }
+
+        if (typeof openModule === 'function') {
+          openModule(MODULE_ID, MODULE_LABEL, false);
+          return;
+        }
+        showError({ message: 'Module loader is not available.' });
+      })
+      .withFailureHandler(showError)
+      .authorizeModuleAccess(MODULE_ID, ENTITY_ID);
+  }
+
+  function renderModuleShellHeader() {
+    const startup = document.getElementById('startup');
+    const badge = document.getElementById('module-shell-meta');
+    const started = getUserViewTime(PAGE_VIEW_STARTED_AT);
+    const current = getUserViewTime(new Date());
+
+    const clientName = CLIENT_NAME || 'Client not passed';
+    const entityName = ENTITY_NAME || 'Business not passed';
+    const userEmail = USER_EMAIL || 'User not passed';
+    const userRole = USER_ROLE || 'Role not passed';
+    const moduleLabel = MODULE_LABEL || MODULE_ID || 'Module';
+
+    if (startup) {
+      startup.innerHTML =
+        '<div class="startup-date-line">' +
+          escapeHtml(started.date) + ' &nbsp; ' + escapeHtml(started.weekday) +
+          ' &nbsp; <span class="startup-context">' +
+          escapeHtml(clientName) + ' · ' + escapeHtml(entityName) +
+          '</span></div>' +
+        '<div class="startup-time-line">' +
+          '<b>Started:</b> ' + escapeHtml(started.time) +
+          ' &nbsp; <b>Current:</b> ' + escapeHtml(current.time) +
+        '</div>' +
+        '<div class="startup-user-line">' +
+          '<b>User:</b> ' + escapeHtml(userEmail) +
+          ' &nbsp; <b>Role:</b> ' + escapeHtml(userRole) +
+        '</div>';
+    }
+
+    if (badge) {
+      badge.textContent = moduleLabel;
+    }
+  }
+</script>

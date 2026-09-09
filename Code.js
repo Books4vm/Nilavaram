@@ -112,17 +112,38 @@ function doGet(e) {
       ).setTitle('OneDrive Recovery Status');
     }
   }
+  if (parameters.inviteWindow === '1') {
+    try {
+      requireAdmin_();
+      return HtmlService.createHtmlOutputFromFile('InviteWindow')
+        .setTitle('Nilavaram — Users & Invitations');
+    } catch (error) {
+      return buildAuthorizationErrorPage_('Users & Invitations', error);
+    }
+  }
+  if (parameters.contextWindow === '1') {
+    return HtmlService.createHtmlOutputFromFile('ContextWindow')
+      .setTitle('Nilavaram — Change context');
+  }
   if (parameters.moduleWindow === '1') {
     const moduleTemplate = HtmlService.createTemplateFromFile('ModuleWindow');
     moduleTemplate.moduleIdJson = JSON.stringify(String(parameters.moduleId || ''))
       .replace(/</g, '\\u003c');
     moduleTemplate.moduleLabelJson = JSON.stringify(String(parameters.moduleLabel || ''))
       .replace(/</g, '\\u003c');
+    moduleTemplate.clientIdJson = JSON.stringify(String(parameters.clientId || ''))
+      .replace(/</g, '\\u003c');
+    moduleTemplate.clientNameJson = JSON.stringify(String(parameters.clientName || ''))
+      .replace(/</g, '\\u003c');
     moduleTemplate.entityIdJson = JSON.stringify(String(parameters.entityId || ''))
       .replace(/</g, '\\u003c');
     moduleTemplate.entityNameJson = JSON.stringify(String(parameters.entityName || ''))
       .replace(/</g, '\\u003c');
     moduleTemplate.sessionIdJson = JSON.stringify(String(parameters.sessionId || ''))
+      .replace(/</g, '\\u003c');
+      moduleTemplate.userEmailJson = JSON.stringify(String(parameters.userEmail || ''))
+      .replace(/</g, '\\u003c');
+    moduleTemplate.userRoleJson = JSON.stringify(String(parameters.userRole || ''))
       .replace(/</g, '\\u003c');
     return moduleTemplate.evaluate().setTitle(
       'Nilavaram — ' + String(parameters.moduleLabel || parameters.moduleId || 'Module')

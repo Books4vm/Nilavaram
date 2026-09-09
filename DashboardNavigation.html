@@ -1,50 +1,6 @@
 <script>
   window.nilavaramShellEntities = window.nilavaramShellEntities || [];
 
-  function showClientSection(show) {
-    const section = document.getElementById('client-section');
-    if (section) section.hidden = !show;
-  }
-
-  function showClientLoadingMessage(show, text) {
-    const message = document.getElementById('client-loading-msg');
-    if (!message) return;
-    message.hidden = !show;
-    if (text) message.textContent = text;
-  }
-
-  function showEntityLoadingMessage(show, text) {
-    const message = document.getElementById('entity-loading-msg');
-    if (message) message.hidden = !show;
-    if (text) message.textContent = text || message.textContent;
-  }
-
-  function showEntitySection(show) {
-    const section = document.getElementById('entity-section');
-    if (section) section.hidden = !show;
-  }
-
-  function showMenuSection(show) {
-    const section = document.getElementById('menu-section');
-    if (section) section.hidden = !show;
-  }
-
-  function saveSelectedClient(clientId, clientName) {
-    window.nilavaramSelectedClient = { id: clientId, name: clientName };
-    try {
-      sessionStorage.setItem('nilavaramSelectedClientId', clientId);
-      sessionStorage.setItem('nilavaramSelectedClientName', clientName);
-    } catch (error) {}
-  }
-
-  function saveSelectedBusiness(entityId, entityName) {
-    window.nilavaramSelectedEntity = { id: entityId, name: entityName };
-    try {
-      sessionStorage.setItem('nilavaramSelectedEntityId', entityId);
-      sessionStorage.setItem('nilavaramSelectedEntityName', entityName);
-    } catch (error) {}
-  }
-
   function countNavigationModules(node) {
     if (!node) return 0;
     let count = node.moduleId ? 1 : 0;
@@ -61,47 +17,21 @@
     const tools = document.createElement('div');
     tools.className = 'sidebar-tools';
     tools.innerHTML =
-      '<p id="client-loading-msg" class="help-meta">Connecting securely...</p>' +
-      '<div id="client-section" hidden>' +
-        '<label class="sidebar-search-label" for="client-select">1. Select client</label>' +
-        '<select id="client-select"></select>' +
-      '</div>' +
-      '<p id="entity-loading-msg" class="help-meta" hidden>Loading business names...</p>' +
-      '<div id="entity-section" hidden>' +
-        '<label class="sidebar-search-label" for="entity-select">2. Select business</label>' +
-        '<select id="entity-select"></select>' +
-        '<div id="entity-reference" class="entity-reference"></div>' +
-        '<div id="entity-add-panel" class="entity-add-panel" hidden></div>' +
-      '</div>' +
+      '<p id="shell-loading-msg" class="help-meta">Connecting securely...</p>' +
+      '<button type="button" id="context-change-button" class="secondary-button context-change-button">' +
+        'Change client / business</button>' +
       '<div id="menu-section" hidden>' +
-        '<label class="sidebar-search-label" for="menu-select">3. Select menu item</label>' +
-        '<select id="menu-select" disabled>' +
-          '<option value="">Choose a business first...</option>' +
-        '</select>' +
-      '</div>' +
-      '<span class="sidebar-search-count" id="menu-item-count"></span>';
+        '<label class="sidebar-search-label" for="menu-search">3. Menu</label>' +
+        '<div class="menu-search-wrap">' +
+          '<input id="menu-search" type="search" autocomplete="off" ' +
+            'placeholder="Search menu items\u2026" aria-label="Search menu items">' +
+        '</div>' +
+        '<p id="menu-status-summary" class="menu-status-summary help-meta"></p>' +
+        '<div id="menu-search-results" class="menu-search-results" hidden></div>' +
+        '<div id="menu-browse-panel" class="menu-browse-panel"></div>' +
+      '</div>';
     menu.appendChild(tools);
-
-    const reference = document.createElement('div');
-    reference.id = 'menu-reference';
-    reference.className = 'navigation-reference';
-    menu.appendChild(reference);
-
-    const clientSelect = document.getElementById('client-select');
-    if (clientSelect) clientSelect.onchange = onClientSelected;
-
-    const entitySelect = document.getElementById('entity-select');
-    if (entitySelect) entitySelect.onchange = updateMenuSelectorState;
-
-    const menuSelect = document.getElementById('menu-select');
-    if (menuSelect) {
-      menuSelect.onchange = function(event) {
-        const option = event.target.options[event.target.selectedIndex];
-        if (!option || !option.dataset.moduleId) return;
-        openModule(option.dataset.moduleId, option.dataset.label, true);
-        event.target.value = '';
-      };
-    }
+    bindMenuPickerEvents();
   }
 
   function applyShellFromEngine(shell) {
@@ -119,272 +49,31 @@
     }
 
     if (shell.shellError) {
-      showClientLoadingMessage(true, shell.shellError);
-      showClientSection(true);
+      const loading = document.getElementById('shell-loading-msg');
+      if (loading) {
+        loading.hidden = false;
+        loading.textContent = shell.shellError;
+      }
       showWorkspaceNotice(shell.shellError);
       return;
     }
 
-    populateClientSelector(shell.clients || []);
+    const loading = document.getElementById('shell-loading-msg');
+    if (loading) loading.hidden = true;
+
+    startShellContextFlow(shell.clients || []);
 
     showWorkspaceNotice(
-      'Choose a client, then a business, then a menu item.'
+      'Complete Step 1 and Step 2 in the workspace, then choose a menu item.'
     );
   }
 
-  function populateClientSelector(clients) {
-    const select = document.getElementById('client-select');
-    if (!select) return;
-
-    select.textContent = '';
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = clients.length ? 'Choose a client...' : 'No clients available';
-    select.appendChild(placeholder);
-
-    clients.forEach(function(client) {
-      const option = document.createElement('option');
-      option.value = client.id;
-      option.textContent = client.name;
-      select.appendChild(option);
-      showClientSection(true);
-      showClientLoadingMessage(false);
-    });
-
-    let savedClientId = '';
-    try {
-      savedClientId = sessionStorage.getItem('nilavaramSelectedClientId') || '';
-    } catch (error) {
-      savedClientId = '';
-    }
-
-    if (savedClientId && select.querySelector('option[value="' + savedClientId + '"]')) {
-      select.value = savedClientId;
-      onClientSelected();
-    } else {
-      showEntitySection(false);
-      showMenuSection(false);
-      showEntityLoadingMessage(true, 'Choose a client first...');
-    }
-  }
-
-  function onClientSelected() {
-    const select = document.getElementById('client-select');
-    if (!select || !select.value) {
-      showEntitySection(false);
-      showMenuSection(false);
-      showEntityLoadingMessage(true, 'Choose a client first...');
-      return;
-    }
-
-    saveSelectedClient(
-      select.value,
-      select.options[select.selectedIndex].text
-    );
-
-    clearWorkspaceError();
-    updateWorkspaceSelectionDisplay();
-    showWorkspaceProgress(
-      'Step 2: Loading businesses for ' +
-        select.options[select.selectedIndex].text + '…',
-      30
-    );
-    showEntityLoadingMessage(true, 'Loading business names...');
-    showEntitySection(false);
-    showMenuSection(false);
-
-    google.script.run
-      .withSuccessHandler(function(entities) {
-        hideWorkspaceProgress();
-        showWorkspaceNotice(
-          'Loaded ' + (entities || []).length +
-          ' business(es). Choose one, then the menu will load.'
-        );
-        populateBusinessSelector(entities || []);
-      })
-      .withFailureHandler(function(error) {
-        showWorkspaceError(
-          'Could not load businesses.',
-          error && error.message ? error.message : String(error)
-        );
-        showEntityLoadingMessage(
-          true,
-          error && error.message ? error.message : String(error)
-        );
-      })
-      .getBusinessEntitiesForClient(select.value);
-  }
-    
-  function applyNavigationToMenu(navigation) {
-    const filtered = (navigation || []).filter(function(section) {
-      return section.id !== 'dashboard' && section.moduleId !== 'dashboard';
-    });
-    window.nilavaramNavigation = filtered;
-
-    const menuSelect = document.getElementById('menu-select');
-    if (!menuSelect) return;
-
-    menuSelect.textContent = '';
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = 'Choose a menu item...';
-    menuSelect.appendChild(placeholder);
-    renderMenuOptions(filtered, menuSelect);
-
-    const moduleCount = filtered.reduce(function(total, section) {
-      return total + countNavigationModules(section);
-    }, 0);
-
-    const count = document.getElementById('menu-item-count');
-    if (count) {
-      count.textContent = moduleCount + ' menu item(s) available.';
-    }
-
-    renderSidebarNavigationReference(filtered, moduleCount);
-    updateMenuSelectorState(true);
-  }
-
-  function renderEntityReference(entities) {
-    const panel = document.getElementById('entity-reference');
-    if (!panel) return;
-
-    if (!entities.length) {
-      panel.innerHTML =
-        '<p class="help-meta">No business names are recorded yet for ' +
-        'this client. Enter the first name below.</p>';
-      return;
-    }
-
-    const list = document.createElement('ul');
-    entities.forEach(function(entity) {
-      const item = document.createElement('li');
-      item.textContent = entity.name;
-      list.appendChild(item);
-    });
-    panel.innerHTML = '<h3>Business entities (' + entities.length + ')</h3>';
-    panel.appendChild(list);
-  }
-
-  function renderEntityAddPanel(canEdit) {
-    const panel = document.getElementById('entity-add-panel');
-    if (!panel) return;
-    if (!canEdit) {
-      panel.hidden = true;
-      panel.textContent = '';
-      return;
-    }
-    panel.hidden = false;
-    panel.innerHTML =
-      '<label class="sidebar-search-label" for="entity-add-input">Add business name</label>' +
-      '<div class="entity-add-row">' +
-      '<input id="entity-add-input" type="text" placeholder="Enter business name">' +
-      '<button id="entity-add-button" class="secondary-button" type="button">Add</button>' +
-      '</div>' +
-      '<p id="entity-add-result" class="help-meta" aria-live="polite"></p>';
-
-    document.getElementById('entity-add-button').onclick = function() {
-      const input = document.getElementById('entity-add-input');
-      const result = document.getElementById('entity-add-result');
-      result.textContent = 'Saving...';
-      google.script.run
-        .withSuccessHandler(function(response) {
-          input.value = '';
-          result.textContent = 'Added ' + response.entity.name + '.';
-          onClientSelected();
-        })
-        .withFailureHandler(function(error) {
-          result.textContent = error && error.message ? error.message : String(error);
-        })
-        .addClientBusinessEntity(
-          input.value,
-          window.nilavaramSelectedClient && window.nilavaramSelectedClient.name
-        );
-    };
-  }
-
-  function populateBusinessSelector(entities) {
-    window.nilavaramShellEntities = entities || [];
-    const select = document.getElementById('entity-select');
-    if (!select) return;
-
-    select.textContent = '';
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = entities.length
-      ? 'Choose a business...'
-      : 'No businesses yet — add one below';
-    select.appendChild(placeholder);
-
-    entities.forEach(function(entity) {
-      const option = document.createElement('option');
-      option.value = entity.id;
-      option.textContent = entity.name;
-      select.appendChild(option);
-    });
-
-    let savedEntityId = '';
-    try {
-      savedEntityId = sessionStorage.getItem('nilavaramSelectedEntityId') || '';
-    } catch (error) {
-      savedEntityId = '';
-    }
-    if (savedEntityId && select.querySelector('option[value="' + savedEntityId + '"]')) {
-      select.value = savedEntityId;
-    }
-
-    renderEntityReference(entities);
-    const role = window.nilavaramDashboardInfo && window.nilavaramDashboardInfo.role;
-    renderEntityAddPanel(
-      !entities.length ||
-      role === 'superadmin' ||
-      role === 'admin' ||
-      role === 'editor'
-    );
-
-    showEntityLoadingMessage(false);
-    showEntitySection(true);
-    showMenuSection(true);
-
-    if (select.value) {
-      saveSelectedBusiness(
-        select.value,
-        select.options[select.selectedIndex].text
-      );
-      updateWorkspaceSelectionDisplay();
-      updateMenuSelectorState(true);
-      reloadNavigationForCurrentSelection();
-    } else {
-      updateMenuSelectorState(true);
-    }
-  }
-  
   function updateMenuSelectorState(skipReload) {
-    const entitySelect = document.getElementById('entity-select');
-    const menuSelect = document.getElementById('menu-select');
-    if (!entitySelect || !menuSelect) return;
-
-    if (entitySelect.value) {
-      saveSelectedBusiness(
-        entitySelect.value,
-        entitySelect.options[entitySelect.selectedIndex].text
-      );
-      updateWorkspaceSelectionDisplay();
-    }
-
-    const enabled = Boolean(entitySelect.value);
-    menuSelect.disabled = !enabled;
-
-    if (menuSelect.options.length) {
-      menuSelect.options[0].textContent = enabled
-        ? 'Choose a menu item...'
-        : 'Choose a business first...';
-    }
-
-    if (!enabled) {
-      menuSelect.value = '';
+    if (!isShellContextComplete()) {
+      setMenuPanelEnabled(false);
       return;
     }
-
+    setMenuPanelEnabled(true);
     if (skipReload !== true) {
       reloadNavigationForCurrentSelection();
     }
@@ -458,79 +147,40 @@
       .getNavigationForShell(clientId, entityId);
   }
 
-  function renderSidebarNavigationReference(navigation, moduleCount) {
-    const reference = document.getElementById('menu-reference');
-    if (!reference) return;
-    reference.textContent = '';
-    const heading = document.createElement('h3');
-    heading.textContent = 'Available menu items (' + moduleCount + ')';
-    reference.appendChild(heading);
-    const tree = document.createElement('ul');
-    navigation.forEach(function(section) {
-      appendNavigationReferenceNode(tree, section, 0);
-    });
-    reference.appendChild(tree);
-  }
+  function openInviteWindow() {
+    const baseUrl = window.location.href.split('?')[0];
+    const clientName = window.nilavaramSelectedClient
+      ? encodeURIComponent(window.nilavaramSelectedClient.name) : '';
+    const entityName = window.nilavaramSelectedEntity
+      ? encodeURIComponent(window.nilavaramSelectedEntity.name) : '';
+    const info = window.nilavaramDashboardInfo || {};
+    const user = encodeURIComponent(info.user || '');
+    const role = encodeURIComponent(info.role || '');
 
-  function appendNavigationReferenceNode(parent, node, level) {
-    const item = document.createElement('li');
-    item.className = 'navigation-reference-item';
-    item.textContent = (level ? '  '.repeat(level) : '') + node.label;
+    const query =
+      '?inviteWindow=1' +
+      '&clientName=' + clientName +
+      '&entityName=' + entityName +
+      '&user=' + user +
+      '&role=' + role;
 
-    if (node.moduleId) {
-      item.title = 'Use step 3 dropdown above to open this item.';
-      item.addEventListener('mouseenter', function() {
-        showWorkspaceNotice(
-          'To open "' + node.label + '", choose it from the step 3 dropdown above.'
-        );
-      });
-      item.addEventListener('click', function() {
-        showWorkspaceNotice(
-          'Please select "' + node.label + '" from the dropdown in step 3 above.'
-        );
-      });
+    const popup = window.open(
+      baseUrl + query,
+      'NilavaramInvite',
+      'popup=yes,width=980,height=900,resizable=yes,scrollbars=yes'
+    );
+
+    if (!popup || popup.closed) {
+      showWorkspaceNotice('Allow pop-ups to open the Users & Invitations window.');
     }
-
-    parent.appendChild(item);
-    (node.children || []).forEach(function(child) {
-      appendNavigationReferenceNode(parent, child, level + 1);
-    });
-  }
-
-  function renderMenuOptions(data, select) {
-    (data || []).forEach(function(section) {
-      if (section.moduleId) {
-        appendMenuOption(section, select, 0);
-        return;
-      }
-      const group = document.createElement('optgroup');
-      group.label = section.label;
-      addMenuOptions(section.children || [], group, 1);
-      if (group.childNodes.length) {
-        select.appendChild(group);
-      }
-    });
-  }
-
-  function addMenuOptions(nodes, parent, level) {
-    nodes.forEach(function(node) {
-      if (node.moduleId) {
-        appendMenuOption(node, parent, level);
-      }
-      addMenuOptions(node.children || [], parent, level + 1);
-    });
-  }
-
-  function appendMenuOption(node, parent, level) {
-    const option = document.createElement('option');
-    option.value = node.id || node.moduleId;
-    option.dataset.moduleId = node.moduleId;
-    option.dataset.label = node.label;
-    option.textContent = Array(level + 1).join('- ') + node.label;
-    parent.appendChild(option);
   }
 
   function openModule(moduleId, label, openSeparateWindow) {
+    if (moduleId === 'users') {
+      openInviteWindow();
+      return;
+    }
+
     if (typeof IS_MAIN_WORKSPACE !== 'undefined' && IS_MAIN_WORKSPACE &&
         typeof IS_MODULE_WINDOW === 'undefined') {
       openModuleWindow(moduleId, label);
@@ -540,6 +190,7 @@
       openModuleWindow(moduleId, label);
       return;
     }
+
     moveContentToTop();
     document.getElementById('output').textContent = 'Loading ' + label + '...';
 
@@ -639,11 +290,6 @@
       showTransactionWorkbench(moduleId);
       return;
     }
-    if (moduleId === 'users') {
-      showUsers();
-      return;
-    }
-    
     if (moduleId === 'connections') {
       showConnections();
       return;
@@ -662,14 +308,15 @@
   }
 
   function openModuleWindow(moduleId, label) {
-    const entitySelect = document.getElementById('entity-select');
-    if (!entitySelect || !entitySelect.value) {
-      showWorkspaceNotice('Select a business before opening a module window.');
+    if (!isShellContextComplete()) {
+      showWorkspaceNotice('Select client and business before opening a module window.');
       return;
     }
 
-    const entityId = entitySelect.value;
-    const entityName = entitySelect.options[entitySelect.selectedIndex].text;
+    const entityId = window.nilavaramSelectedEntity.id;
+    const entityName = window.nilavaramSelectedEntity.name;
+    const clientId = window.nilavaramSelectedClient.id;
+    const clientName = window.nilavaramSelectedClient.name;
     const sessionId = 'sess_' + Date.now() + '_' +
       Math.random().toString(36).slice(2, 8);
     const friendlyWindowName = label || 'Module window';
@@ -678,13 +325,28 @@
       .withSuccessHandler(function(auth) {
         resumeMainWorkspaceIfInactive();
         markUserActivity();
-        const baseUrl = window.location.href.split('?')[0];
+        const userEmail = encodeURIComponent(
+          (window.nilavaramDashboardInfo && window.nilavaramDashboardInfo.user) || ''
+        );
+        const userRole = encodeURIComponent(
+          (window.nilavaramDashboardInfo && window.nilavaramDashboardInfo.role) || ''
+        );
+        const baseUrl = String(
+          (typeof CONNECTIONS_BOOTSTRAP !== 'undefined' &&
+            CONNECTIONS_BOOTSTRAP.accessInfo &&
+            CONNECTIONS_BOOTSTRAP.accessInfo.appsScriptWebApp) ||
+          window.location.href.split('?')[0]
+        ).replace(/\?$/, '');
         const query = '?moduleWindow=1' +
           '&moduleId=' + encodeURIComponent(auth.moduleId || moduleId) +
           '&moduleLabel=' + encodeURIComponent(auth.moduleLabel || label || moduleId) +
+          '&clientId=' + encodeURIComponent(clientId) +
+          '&clientName=' + encodeURIComponent(clientName) +
           '&entityId=' + encodeURIComponent(auth.entityId || entityId) +
           '&entityName=' + encodeURIComponent(auth.entityName || entityName) +
-          '&sessionId=' + encodeURIComponent(sessionId);
+          '&sessionId=' + encodeURIComponent(sessionId) +
+          '&userEmail=' + userEmail +
+          '&userRole=' + userRole;
         const popup = window.open(
           baseUrl + query,
           'Nilavaram_' + sessionId,

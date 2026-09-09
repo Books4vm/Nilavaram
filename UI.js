@@ -63,10 +63,7 @@ function buildStorageAccessInfo_() {
     vscodeFolder: 'C:\\Users\\theso\\Documents\\nn\\Nilavaram',
     githubRepository: 'https://github.com/Books4vm/Nilavaram',
     githubBranch: 'main',
-    appsScriptWebApp:
-      'https://script.google.com/macros/s/' +
-      'AKfycbxMMqgLL6xmJp__dI4vDHj0zZ_6ZyZsb_-' +
-      'KsspdNU99WXW1ZJrRzJTaVObTJ8C2s-3Q/exec',
+    appsScriptWebApp: getMainUiUrl_(),
     localOneDrive: 'C:\\Users\\theso\\OneDrive',
     primaryOneDriveAccount: 'vmurugan@hotmail.com',
     externalDrive: 'E:\\',

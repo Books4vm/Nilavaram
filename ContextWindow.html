@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('DashboardStyles') ?>
+  <style>
+    body { min-height: 100vh; }
+    .content { margin: 16px; max-width: 480px; }
+  </style>
+</head>
+<body>
+  <main id="output" class="content panel" tabindex="-1">
+    <p>Loading...</p>
+  </main>
+  <script>
+    function escapeHtml(value) {
+      const element = document.createElement('div');
+      element.textContent = String(value == null ? '' : value);
+      return element.innerHTML;
+    }
+    function saveSelectedClient(clientId, clientName) {
+      window.nilavaramSelectedClient = { id: clientId, name: clientName };
+      try {
+        sessionStorage.setItem('nilavaramSelectedClientId', clientId);
+        sessionStorage.setItem('nilavaramSelectedClientName', clientName);
+      } catch (error) {}
+    }
+    function saveSelectedBusiness(entityId, entityName) {
+      window.nilavaramSelectedEntity = { id: entityId, name: entityName };
+      try {
+        sessionStorage.setItem('nilavaramSelectedEntityId', entityId);
+        sessionStorage.setItem('nilavaramSelectedEntityName', entityName);
+      } catch (error) {}
+    }
+  </script>
+  <?!= include('ShellContextSelector') ?>
+  <script>
+    window.onload = function() {
+      initContextPopupFromShell();
+    };
+  </script>
+</body>
+</html>

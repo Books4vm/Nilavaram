@@ -5,35 +5,98 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <?!= include('DashboardStyles') ?>
   <style>
-    body.module-window-body { height: auto; min-height: 100vh; overflow: auto; }
-    .module-window-header { position: sticky; top: 0; z-index: 20; }
-    .module-content { margin: 0; max-width: none; min-height: calc(100vh - 120px); }
-    .module-meta-line { color: var(--muted-text); font-size: .9em; }
+    body.module-window-body {
+      height: auto;
+      min-height: 100vh;
+      overflow: auto;
+    }
+    .module-window-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .module-content {
+      margin: 16px;
+      max-width: none;
+    }
+    .header-panel-right {
+      align-items: center;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .module-shell-badge {
+      align-self: center;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-weight: 700;
+      line-height: 1.2;
+      max-width: 220px;
+      padding: 8px 12px;
+      text-align: right;
+      white-space: normal;
+    }
   </style>
 </head>
 <body class="module-window-body">
+
   <header class="header module-window-header">
-    <div class="header-top">
-      <div class="brand">
-        <h1 id="module-title">Nilavaram Module</h1>
+    <div class="header-bar">
+
+      <div class="header-panel header-panel-left">
+        <div class="brand">
+          <svg class="brand-icon" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5z"/>
+            <path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z"/>
+          </svg>
+          <h1>Nilavaram</h1>
+        </div>
       </div>
-      <div id="module-meta" class="module-meta-line"></div>
+
+      <div class="header-panel header-panel-center">
+        <div id="startup">Loading header...</div>
+      </div>
+
+      <div class="header-panel header-panel-right">
+        <div id="module-shell-meta" class="module-shell-badge"></div>
+      </div>
+
     </div>
   </header>
+
   <main id="output" class="content panel module-content" tabindex="-1">
     <p>Loading module...</p>
   </main>
+
   <script>
     const MODULE_ID = <?!= moduleIdJson ?>;
     const MODULE_LABEL = <?!= moduleLabelJson ?>;
+    const CLIENT_ID = <?!= clientIdJson ?>;
+    const CLIENT_NAME = <?!= clientNameJson ?>;
     const ENTITY_ID = <?!= entityIdJson ?>;
     const ENTITY_NAME = <?!= entityNameJson ?>;
     const SESSION_ID = <?!= sessionIdJson ?>;
+    const USER_EMAIL = <?!= userEmailJson ?>;
+    const USER_ROLE = <?!= userRoleJson ?>;
+    const PAGE_VIEW_STARTED_AT = new Date();
+    let moduleHeaderTimerId = null;
     const IS_MODULE_WINDOW = true;
   </script>
+
   <?!= include('ModuleWindowCore') ?>
+
   <?!= include('DashboardOperations') ?>
-  <?!= include('DashboardTransactions') ?>
   <?!= include('DashboardNavigation') ?>
+
+  <script>
+    window.onload = function() {
+      initModuleWindowShell();
+      if (moduleHeaderTimerId !== null) {
+        window.clearInterval(moduleHeaderTimerId);
+      }
+      moduleHeaderTimerId = window.setInterval(renderModuleShellHeader, 1000);
+    };
+  </script>
+
 </body>
 </html>

@@ -1,0 +1,355 @@
+<script>
+  window.nilavaramShellClients = window.nilavaramShellClients || [];
+  window.nilavaramContextStep = window.nilavaramContextStep || 'client';
+
+  function saveSelectedClient(clientId, clientName) {
+    window.nilavaramSelectedClient = { id: clientId, name: clientName };
+    try {
+      sessionStorage.setItem('nilavaramSelectedClientId', clientId);
+      sessionStorage.setItem('nilavaramSelectedClientName', clientName);
+    } catch (error) {}
+  }
+
+  function saveSelectedBusiness(entityId, entityName) {
+    window.nilavaramSelectedEntity = { id: entityId, name: entityName };
+    try {
+      sessionStorage.setItem('nilavaramSelectedEntityId', entityId);
+      sessionStorage.setItem('nilavaramSelectedEntityName', entityName);
+    } catch (error) {}
+  }
+
+  function isShellContextComplete() {
+    return Boolean(
+      window.nilavaramSelectedClient && window.nilavaramSelectedClient.id &&
+      window.nilavaramSelectedEntity && window.nilavaramSelectedEntity.id
+    );
+  }
+
+  function getShellContextHeaderText() {
+    if (!isShellContextComplete()) {
+      return 'Select client and business';
+    }
+    return window.nilavaramSelectedClient.name + '  ·  ' +
+      window.nilavaramSelectedEntity.name;
+  }
+
+  function syncContextHeader() {
+    if (typeof renderStartupLine === 'function') {
+      renderStartupLine();
+    }
+    if (typeof updateWorkspaceSelectionDisplay === 'function') {
+      updateWorkspaceSelectionDisplay();
+    }
+    const meta = document.getElementById('module-meta');
+    if (meta && isShellContextComplete()) {
+      meta.innerHTML =
+        '<span><b>Client:</b> ' + escapeHtml(window.nilavaramSelectedClient.name) +
+        '</span> &nbsp; <span><b>Business:</b> ' +
+        escapeHtml(window.nilavaramSelectedEntity.name) + '</span>';
+    }
+  }
+
+  function updateMainWorkspaceContextSession() {
+    const session = window.nilavaramModuleSessions &&
+      window.nilavaramModuleSessions['main-workspace'];
+    if (!session || !isShellContextComplete()) return;
+    session.entityId = window.nilavaramSelectedEntity.id;
+    session.entityName = window.nilavaramSelectedEntity.name;
+    if (typeof renderWorkspaceSessions === 'function') {
+      renderWorkspaceSessions();
+    }
+  }
+
+  function setMenuPanelEnabled(enabled) {
+    const section = document.getElementById('menu-section');
+    if (section) section.hidden = !enabled;
+    const loading = document.getElementById('shell-loading-msg');
+    if (loading) loading.hidden = enabled;
+  }
+
+  function onShellContextComplete() {
+    window.nilavaramContextStep = 'done';
+    syncContextHeader();
+    updateMainWorkspaceContextSession();
+    setMenuPanelEnabled(true);
+    renderWorkspaceContextSteps();
+    if (typeof reloadNavigationForCurrentSelection === 'function') {
+      reloadNavigationForCurrentSelection();
+    }
+    if (typeof showWorkspaceNotice === 'function') {
+      showWorkspaceNotice(
+        'Context set: ' + window.nilavaramSelectedClient.name + ' / ' +
+          window.nilavaramSelectedEntity.name + '. Choose a menu item.'
+      );
+    }
+  }
+
+  function startShellContextFlow(clients) {
+    window.nilavaramShellClients = clients || [];
+    restoreShellContextFromSession();
+    if (isShellContextComplete()) {
+      onShellContextComplete();
+      return;
+    }
+    window.nilavaramContextStep = 'client';
+    setMenuPanelEnabled(false);
+    renderWorkspaceContextSteps();
+    syncContextHeader();
+  }
+
+  function restoreShellContextFromSession() {
+    let clientId = '';
+    let clientName = '';
+    let entityId = '';
+    let entityName = '';
+    try {
+      clientId = sessionStorage.getItem('nilavaramSelectedClientId') || '';
+      clientName = sessionStorage.getItem('nilavaramSelectedClientName') || '';
+      entityId = sessionStorage.getItem('nilavaramSelectedEntityId') || '';
+      entityName = sessionStorage.getItem('nilavaramSelectedEntityName') || '';
+    } catch (error) {}
+
+    if (clientId && clientName) {
+      saveSelectedClient(clientId, clientName);
+    }
+    if (entityId && entityName) {
+      saveSelectedBusiness(entityId, entityName);
+    }
+  }
+
+  function renderWorkspaceContextSteps() {
+    const host = document.getElementById('workspace-context-steps');
+    if (!host) return;
+
+    if (isShellContextComplete()) {
+      host.innerHTML =
+        '<section class="shell-context-steps shell-context-steps-complete">' +
+          '<h3>Working context</h3>' +
+          '<p><b>Client:</b> ' + escapeHtml(window.nilavaramSelectedClient.name) + '</p>' +
+          '<p><b>Business:</b> ' + escapeHtml(window.nilavaramSelectedEntity.name) + '</p>' +
+          '<p class="help-meta">Use <b>Change client / business</b> in the left panel to switch context.</p>' +
+        '</section>';
+      return;
+    }
+
+    let html =
+      '<section class="shell-context-steps">' +
+        '<h3>Before menu items load</h3>' +
+        '<p class="help-meta">Complete both steps below. The header will show your client and business when done.</p>';
+
+    html += renderContextClientListHtml('workspace');
+    if (window.nilavaramContextStep === 'business' ||
+        window.nilavaramSelectedClient) {
+      html += renderContextBusinessListHtml('workspace');
+    }
+    html += '</section>';
+    host.innerHTML = html;
+    bindContextListHandlers(host);
+  }
+
+  function renderContextClientListHtml(mode) {
+    const clients = window.nilavaramShellClients || [];
+    const selectedId = window.nilavaramSelectedClient &&
+      window.nilavaramSelectedClient.id;
+    let html =
+      '<div class="shell-context-block" data-context-block="client">' +
+        '<h4>Step 1 — Select client</h4>' +
+        '<ul class="shell-context-list">';
+    if (!clients.length) {
+      html += '<li class="help-meta">No clients available.</li>';
+    }
+    clients.forEach(function(client) {
+      const active = client.id === selectedId ? ' is-selected' : '';
+      html += '<li><button type="button" class="shell-context-item' + active + '" ' +
+        'data-context-action="client" data-client-id="' + escapeHtml(client.id) + '" ' +
+        'data-client-name="' + escapeHtml(client.name) + '">' +
+        escapeHtml(client.name) + '</button></li>';
+    });
+    html += '</ul></div>';
+    return html;
+  }
+
+  function renderContextBusinessListHtml(mode) {
+    const entities = window.nilavaramShellEntities || [];
+    const selectedId = window.nilavaramSelectedEntity &&
+      window.nilavaramSelectedEntity.id;
+    let html =
+      '<div class="shell-context-block" data-context-block="business">' +
+        '<h4>Step 2 — Select business</h4>';
+    if (!window.nilavaramSelectedClient) {
+      html += '<p class="help-meta">Choose a client first.</p></div>';
+      return html;
+    }
+    if (window.nilavaramContextLoadingBusinesses) {
+      html += '<p class="help-meta">Loading businesses...</p></div>';
+      return html;
+    }
+    html += '<ul class="shell-context-list">';
+    if (!entities.length) {
+      html += '<li class="help-meta">No businesses yet for this client.</li>';
+    }
+    entities.forEach(function(entity) {
+      const active = entity.id === selectedId ? ' is-selected' : '';
+      html += '<li><button type="button" class="shell-context-item' + active + '" ' +
+        'data-context-action="business" data-entity-id="' + escapeHtml(entity.id) + '" ' +
+        'data-entity-name="' + escapeHtml(entity.name) + '">' +
+        escapeHtml(entity.name) + '</button></li>';
+    });
+    html += '</ul></div>';
+    return html;
+  }
+
+  function bindContextListHandlers(root) {
+    if (!root) return;
+    root.querySelectorAll('[data-context-action="client"]').forEach(function(button) {
+      button.onclick = function() {
+        selectShellClient(
+          button.getAttribute('data-client-id'),
+          button.getAttribute('data-client-name')
+        );
+      };
+    });
+    root.querySelectorAll('[data-context-action="business"]').forEach(function(button) {
+      button.onclick = function() {
+        selectShellBusiness(
+          button.getAttribute('data-entity-id'),
+          button.getAttribute('data-entity-name')
+        );
+      };
+    });
+  }
+
+  function selectShellClient(clientId, clientName) {
+    if (!clientId) return;
+    saveSelectedClient(clientId, clientName);
+    window.nilavaramContextStep = 'business';
+    window.nilavaramSelectedEntity = null;
+    try {
+      sessionStorage.removeItem('nilavaramSelectedEntityId');
+      sessionStorage.removeItem('nilavaramSelectedEntityName');
+    } catch (error) {}
+    syncContextHeader();
+    window.nilavaramContextLoadingBusinesses = true;
+    renderWorkspaceContextSteps();
+    if (typeof showWorkspaceProgress === 'function') {
+      showWorkspaceProgress('Step 2: Loading businesses for ' + clientName + '…', 30);
+    }
+    google.script.run
+      .withSuccessHandler(function(entities) {
+        window.nilavaramContextLoadingBusinesses = false;
+        window.nilavaramShellEntities = entities || [];
+        if (typeof hideWorkspaceProgress === 'function') hideWorkspaceProgress();
+        renderWorkspaceContextSteps();
+        if (typeof showWorkspaceNotice === 'function') {
+          showWorkspaceNotice(
+            'Client: ' + clientName + '. Now choose a business (Step 2).'
+          );
+        }
+      })
+      .withFailureHandler(function(error) {
+        window.nilavaramContextLoadingBusinesses = false;
+        renderWorkspaceContextSteps();
+        if (typeof showWorkspaceError === 'function') {
+          showWorkspaceError(
+            'Could not load businesses.',
+            error && error.message ? error.message : String(error)
+          );
+        }
+      })
+      .getBusinessEntitiesForClient(clientId);
+  }
+
+  function selectShellBusiness(entityId, entityName) {
+    if (!entityId) return;
+    saveSelectedBusiness(entityId, entityName);
+    syncContextHeader();
+    onShellContextComplete();
+  }
+
+  function openContextChangePopup() {
+    const baseUrl = window.location.href.split('?')[0];
+    const popup = window.open(
+      baseUrl + '?contextWindow=1',
+      'NilavaramContext',
+      'popup=yes,width=520,height=720,resizable=yes,scrollbars=yes'
+    );
+    if (!popup || popup.closed) {
+      if (typeof showWorkspaceNotice === 'function') {
+        showWorkspaceNotice('Allow pop-ups to change client and business.');
+      }
+    }
+  }
+
+  function renderContextChangePopup() {
+    const output = document.getElementById('output');
+    if (!output) return;
+    output.innerHTML =
+      '<h2>Change client / business</h2>' +
+      '<p class="help-meta">Choose a client, then a business. The main workspace header and menu will update.</p>' +
+      '<div id="popup-context-host"></div>' +
+      '<div class="shell-context-popup-actions">' +
+        '<button type="button" class="primary-button" id="context-popup-apply">Apply</button>' +
+        '<button type="button" class="secondary-button" id="context-popup-cancel">Cancel</button>' +
+      '</div>';
+    const host = document.getElementById('popup-context-host');
+    host.innerHTML = renderContextClientListHtml('popup');
+    if (window.nilavaramSelectedClient) {
+      host.innerHTML += renderContextBusinessListHtml('popup');
+    }
+    bindContextListHandlers(host);
+    document.getElementById('context-popup-cancel').onclick = function() {
+      window.close();
+    };
+    document.getElementById('context-popup-apply').onclick = function() {
+      if (!isShellContextComplete()) {
+        output.insertAdjacentHTML('beforeend',
+          '<p class="error">Select both a client and a business before Apply.</p>');
+        return;
+      }
+      if (window.opener && !window.opener.closed) {
+        window.opener.nilavaramSelectedClient = window.nilavaramSelectedClient;
+        window.opener.nilavaramSelectedEntity = window.nilavaramSelectedEntity;
+        try {
+          window.opener.sessionStorage.setItem(
+            'nilavaramSelectedClientId', window.nilavaramSelectedClient.id);
+          window.opener.sessionStorage.setItem(
+            'nilavaramSelectedClientName', window.nilavaramSelectedClient.name);
+          window.opener.sessionStorage.setItem(
+            'nilavaramSelectedEntityId', window.nilavaramSelectedEntity.id);
+          window.opener.sessionStorage.setItem(
+            'nilavaramSelectedEntityName', window.nilavaramSelectedEntity.name);
+        } catch (error) {}
+        if (typeof window.opener.syncContextHeader === 'function') {
+          window.opener.syncContextHeader();
+        }
+        if (typeof window.opener.onShellContextComplete === 'function') {
+          window.opener.onShellContextComplete();
+        }
+      }
+      window.close();
+    };
+  }
+
+  function initContextPopupFromShell() {
+    google.script.run
+      .withSuccessHandler(function(shell) {
+        window.nilavaramShellClients = shell.clients || [];
+        restoreShellContextFromSession();
+        if (window.nilavaramSelectedClient) {
+          google.script.run
+            .withSuccessHandler(function(entities) {
+              window.nilavaramShellEntities = entities || [];
+              renderContextChangePopup();
+            })
+            .getBusinessEntitiesForClient(window.nilavaramSelectedClient.id);
+        } else {
+          renderContextChangePopup();
+        }
+      })
+      .withFailureHandler(function(error) {
+        document.getElementById('output').innerHTML =
+          '<p class="error">' + escapeHtml(error && error.message || error) + '</p>';
+      })
+      .getDashboardShell();
+  }
+</script>
