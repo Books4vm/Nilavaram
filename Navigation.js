@@ -72,6 +72,17 @@ function getNavigationForShell(clientId, entityId) {
 
 function buildNavigationTree_(clientId, entityId) {
   const user = requireCurrentUser_();
+  const normalizedClientId = resolveWorkspaceClientId_(clientId, entityId);
+  const normalizedEntityId = String(entityId || '').trim();
+
+  if (normalizedClientId) {
+    requireActiveClient_(normalizedClientId);
+  }
+  if (normalizedClientId) {
+    requireActiveClient_(normalizedClientId);
+    requireUserClientAccess_(user, normalizedClientId);
+  }
+
   ensureNavigationSetup_();
 
   function readNavigationRecords() {
@@ -86,14 +97,15 @@ function buildNavigationTree_(clientId, entityId) {
       menus: records.menus.filter(function(menu) {
         return menu.enabled !== false &&
           roleAllowed_(menu.roles, user.role) &&
-          scopeAllows_(menu.clientIds, clientId);
+          scopeAllows_(menu.clientIds, normalizedClientId);
       }).sort(function(a, b) { return a.order - b.order; }),
       items: records.items.filter(function(item) {
         if (item.enabled === false) return false;
         if (!roleAllowed_(item.roles, user.role)) return false;
-        if (!scopeAllows_(item.clientIds, clientId)) return false;
-        if (!scopeAllows_(item.entityIds, entityId)) return false;
+        if (!scopeAllows_(item.clientIds, normalizedClientId)) return false;
+        if (!scopeAllows_(item.entityIds, normalizedEntityId)) return false;
         if (user.role !== 'ltd' || item.type === 'group') return true;
+        if (!(user.allowedModules || []).length) return true;
         return (user.allowedModules || []).indexOf(item.moduleId) !== -1;
       }).sort(function(a, b) { return a.order - b.order; })
     };
@@ -191,51 +203,24 @@ function ensureNavigationSetup_() {
 }
 
 /**
- * Confirms that the signed-in user may open a module for the selected business.
+ * Confirms that the signed-in user may open a module for the selected
+ * client and business.
  *
  * @param {string} moduleId Requested module identifier.
  * @param {string} entityId Selected business entity identifier.
+ * @param {string} clientId Selected client identifier.
  * @returns {Object}
  */
-function authorizeModuleAccess(moduleId, entityId) {
-  const user = requireCurrentUser_();
-  const normalizedModuleId = String(moduleId || '').trim();
-  const normalizedEntityId = String(entityId || '').trim();
-
-  if (!normalizedModuleId) {
-    throw new Error('Select a menu item before opening a module window.');
-  }
-  if (!normalizedEntityId) {
-    throw new Error('Select a business before opening a module window.');
-  }
-
-  const entity = getDocumentOrNull_('entities', normalizedEntityId);
-  if (!entity || entity.status !== 'active') {
-    throw new Error('The selected business is not available.');
-  }
-
-  const menuItems = firestoreGetCollection_('menuItems').map(fromFirestoreDocument_);
-  const menuItem = menuItems.find(function(item) {
-    return item.enabled !== false &&
-      (item.id === normalizedModuleId || item.moduleId === normalizedModuleId);
-  });
-  if (!menuItem) {
-    throw new Error('That menu item is not registered in Firestore navigation.');
-  }
-  if (!roleAllowed_(menuItem.roles, user.role)) {
-    throw new Error('Your role does not include access to ' + menuItem.label + '.');
-  }
-  if (user.role === 'ltd' && menuItem.type !== 'group' &&
-      (user.allowedModules || []).indexOf(menuItem.moduleId || menuItem.id) === -1) {
-    throw new Error('Your limited access does not include ' + menuItem.label + '.');
-  }
+function authorizeModuleAccess(moduleId, entityId, clientId) {
+  const context = requireWorkspaceContext_(clientId, entityId, moduleId);
 
   return {
     authorized: true,
-    moduleId: menuItem.moduleId || menuItem.id,
-    moduleLabel: menuItem.label,
-    entityId: entity.id,
-    entityName: entity.name,
-    description: menuItem.description || ''
+    moduleId: context.menuItem.moduleId || context.menuItem.id,
+    moduleLabel: context.menuItem.label,
+    clientId: context.clientId,
+    entityId: context.entity.id,
+    entityName: context.entity.name,
+    description: context.menuItem.description || ''
   };
 }

@@ -1,0 +1,196 @@
+<script>
+    function escapeHtml(value) {
+      const element = document.createElement('div');
+      element.textContent = String(value == null ? '' : value);
+      return element.innerHTML;
+    }
+  
+    function readClientBusinessUrlParam(name) {
+      const match = window.location.search.match(
+        new RegExp('[?&]' + name + '=([^&]*)')
+      );
+      return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : '';
+    }
+  
+    function renderClientBusinessShellHeader() {
+      const startup = document.getElementById('startup');
+      const meta = document.getElementById('module-shell-meta');
+      if (!startup) return;
+  
+      const now = new Date();
+      const weekday = now.toLocaleDateString(undefined, { weekday: 'long' });
+      const date = now.toLocaleDateString(undefined, {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }).toUpperCase().replace(/ /g, '-');
+  
+      startup.innerHTML =
+        '<div class="startup-date-line">' +
+          escapeHtml(date) + ' &nbsp; ' + escapeHtml(weekday) +
+          ' &nbsp; <span class="startup-context">' +
+          escapeHtml(readClientBusinessUrlParam('clientName') || 'Client not passed') +
+          ' · ' + escapeHtml(readClientBusinessUrlParam('entityName') || 'Business not passed') +
+          '</span></div>' +
+        '<div class="startup-user-line">' +
+          'User: ' + escapeHtml(readClientBusinessUrlParam('user') || '') +
+          ' &nbsp; Role: ' + escapeHtml(readClientBusinessUrlParam('role') || '') +
+        '</div>';
+  
+      if (meta) meta.textContent = 'Clients & Businesses';
+    }
+  
+    function initClientBusinessWindow() {
+      renderClientBusinessShellHeader();
+      google.script.run
+        .withSuccessHandler(renderClientBusinessWindow)
+        .withFailureHandler(function(error) {
+          document.getElementById('output').innerHTML =
+            '<p class="error">' + escapeHtml(error && error.message || error) + '</p>';
+        })
+        .getClientBusinessPageData();
+    }
+  
+    function renderClientBusinessWindow(data) {
+      window.nilavaramClientBusinessPage = data || { clients: [] };
+      const clients = data.clients || [];
+      const output = document.getElementById('output');
+  
+      let html =
+        '<section class="workspace-selection">' +
+          '<h3>Add a new client</h3>' +
+          '<p class="help-meta">Admin only. Creates a Firestore client record.</p>' +
+          '<form id="cb-add-client-form" class="cb-inline-form">' +
+            '<div><label for="cb-new-client-name">Client name</label>' +
+              '<input id="cb-new-client-name" type="text" required></div>' +
+            '<button type="submit" class="primary-button">Add client</button>' +
+            '<span id="cb-add-client-msg" class="help-meta cb-status"></span>' +
+          '</form>' +
+        '</section>' +
+        '<section class="workspace-selection">' +
+          '<h3>Clients and businesses</h3>' +
+          '<p class="help-meta">Rename clients and businesses. Add businesses under each client.</p>';
+  
+      clients.forEach(function(client) {
+        html +=
+          '<div class="cb-client-block" data-client-id="' + escapeHtml(client.id) + '">' +
+            '<h3>' + escapeHtml(client.name) + '</h3>' +
+            '<p class="help-meta">Client id: ' + escapeHtml(client.id) + '</p>' +
+            '<form class="cb-rename-client-form cb-inline-form" data-client-id="' +
+              escapeHtml(client.id) + '">' +
+              '<div><label>Rename client</label>' +
+                '<input type="text" class="cb-rename-client-input" ' +
+                  'value="' + escapeHtml(client.name) + '" required></div>' +
+              '<button type="submit" class="secondary-button">Save client name</button>' +
+              '<span class="help-meta cb-status cb-client-rename-msg"></span>' +
+            '</form>' +
+            '<form class="cb-add-business-form cb-inline-form" data-client-id="' +
+              escapeHtml(client.id) + '">' +
+              '<div><label>Add business</label>' +
+                '<input type="text" class="cb-new-business-input" ' +
+                  'placeholder="Business name" required></div>' +
+              '<button type="submit" class="primary-button">Add business</button>' +
+              '<span class="help-meta cb-status cb-add-business-msg"></span>' +
+            '</form>' +
+            '<ul class="cb-business-list">';
+  
+        (client.entities || []).forEach(function(entity) {
+          html +=
+            '<li data-entity-id="' + escapeHtml(entity.id) + '">' +
+              '<form class="cb-rename-business-form cb-inline-form" ' +
+                'data-entity-id="' + escapeHtml(entity.id) + '">' +
+                '<input type="text" class="cb-rename-business-input" ' +
+                  'value="' + escapeHtml(entity.name) + '" required>' +
+                '<button type="submit" class="secondary-button">Save</button>' +
+                '<span class="help-meta cb-status cb-business-rename-msg"></span>' +
+              '</form>' +
+              '<span class="help-meta">id: ' + escapeHtml(entity.id) + '</span>' +
+            '</li>';
+        });
+  
+        html += '</ul></div>';
+      });
+  
+      html += '</section>';
+      output.innerHTML = html;
+  
+      document.getElementById('cb-add-client-form').onsubmit = submitAddClient;
+      output.querySelectorAll('.cb-rename-client-form').forEach(bindRenameClientForm);
+      output.querySelectorAll('.cb-add-business-form').forEach(bindAddBusinessForm);
+      output.querySelectorAll('.cb-rename-business-form').forEach(bindRenameBusinessForm);
+    }
+  
+    function submitAddClient(event) {
+      event.preventDefault();
+      const msg = document.getElementById('cb-add-client-msg');
+      const name = document.getElementById('cb-new-client-name').value;
+      msg.textContent = ' Saving...';
+      google.script.run
+        .withSuccessHandler(function(result) {
+          msg.textContent = ' ' + result.message;
+          initClientBusinessWindow();
+        })
+        .withFailureHandler(function(error) {
+          msg.innerHTML = ' <span class="error">' + escapeHtml(error.message) + '</span>';
+        })
+        .createClientRecord(name);
+    }
+  
+    function bindRenameClientForm(form) {
+      form.onsubmit = function(event) {
+        event.preventDefault();
+        const clientId = form.getAttribute('data-client-id');
+        const msg = form.querySelector('.cb-client-rename-msg');
+        const name = form.querySelector('.cb-rename-client-input').value;
+        msg.textContent = ' Saving...';
+        google.script.run
+          .withSuccessHandler(function(result) {
+            msg.textContent = ' ' + result.message;
+            initClientBusinessWindow();
+          })
+          .withFailureHandler(function(error) {
+            msg.innerHTML = ' <span class="error">' + escapeHtml(error.message) + '</span>';
+          })
+          .updateClientRecord(clientId, name);
+      };
+    }
+  
+    function bindAddBusinessForm(form) {
+      form.onsubmit = function(event) {
+        event.preventDefault();
+        const clientId = form.getAttribute('data-client-id');
+        const msg = form.querySelector('.cb-add-business-msg');
+        const name = form.querySelector('.cb-new-business-input').value;
+        msg.textContent = ' Saving...';
+        google.script.run
+          .withSuccessHandler(function(result) {
+            msg.textContent = ' ' + result.message;
+            form.querySelector('.cb-new-business-input').value = '';
+            initClientBusinessWindow();
+          })
+          .withFailureHandler(function(error) {
+            msg.innerHTML = ' <span class="error">' + escapeHtml(error.message) + '</span>';
+          })
+          .createBusinessForClient(clientId, name);
+      };
+    }
+  
+    function bindRenameBusinessForm(form) {
+      form.onsubmit = function(event) {
+        event.preventDefault();
+        const entityId = form.getAttribute('data-entity-id');
+        const msg = form.querySelector('.cb-business-rename-msg');
+        const name = form.querySelector('.cb-rename-business-input').value;
+        msg.textContent = ' Saving...';
+        google.script.run
+          .withSuccessHandler(function(result) {
+            msg.textContent = ' ' + result.message;
+            initClientBusinessWindow();
+          })
+          .withFailureHandler(function(error) {
+            msg.innerHTML = ' <span class="error">' + escapeHtml(error.message) + '</span>';
+          })
+          .updateBusinessEntityRecord(entityId, name);
+      };
+    }
+  </script>

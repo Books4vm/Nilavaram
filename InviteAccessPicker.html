@@ -1,0 +1,163 @@
+<script>
+  function readInviteModuleCatalog() {
+    const element = document.getElementById('nilavaram-invite-module-catalog');
+    if (!element) return [];
+    try {
+      const parsed = JSON.parse(element.textContent || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function inviteRoleShowsClientPickers(role) {
+    return ['admin', 'reader', 'editor', 'ltd'].indexOf(String(role || '')) !== -1;
+  }
+
+  function inviteRoleShowsModulePickers(role) {
+    return String(role || '') === 'ltd';
+  }
+
+  function renderInviteAccessPickers(accessCatalog, role) {
+    role = String(role || 'editor');
+    const clients = (accessCatalog && accessCatalog.clients) || [];
+    const modules = readInviteModuleCatalog();
+    let html = '';
+
+    if (inviteRoleShowsClientPickers(role)) {
+      let clientHtml =
+        '<fieldset class="invite-access-block" id="invite-client-fieldset">' +
+          '<legend><b>Clients</b></legend>' +
+          '<p class="help-meta">Leave all unchecked to allow every client. ' +
+            'Check one or more to restrict this user.</p>' +
+          '<div class="invite-check-grid">';
+
+      clients.forEach(function(client) {
+        clientHtml +=
+          '<label class="invite-check-item">' +
+            '<input type="checkbox" class="invite-client-checkbox" ' +
+              'data-client-id="' + escapeHtml(client.id) + '"> ' +
+            escapeHtml(client.name) +
+          '</label>';
+      });
+      clientHtml += '</div></fieldset>';
+
+      let entityHtml =
+        '<fieldset class="invite-access-block" id="invite-entity-fieldset">' +
+          '<legend><b>Businesses within each client</b></legend>' +
+          '<p class="help-meta">Leave all unchecked to allow every business ' +
+            'under the allowed client(s). Check to restrict further.</p>';
+
+      clients.forEach(function(client) {
+        entityHtml +=
+          '<div class="invite-client-block" data-client-block="' +
+            escapeHtml(client.id) + '">' +
+            '<h4>' + escapeHtml(client.name) + '</h4>' +
+            '<div class="invite-check-grid">';
+
+        (client.entities || []).forEach(function(entity) {
+          entityHtml +=
+            '<label class="invite-check-item">' +
+              '<input type="checkbox" class="invite-entity-checkbox" ' +
+                'data-client-id="' + escapeHtml(client.id) + '" ' +
+                'data-entity-id="' + escapeHtml(entity.id) + '"> ' +
+              escapeHtml(entity.name) +
+            '</label>';
+        });
+
+        entityHtml += '</div></div>';
+      });
+      entityHtml += '</fieldset>';
+
+      html += clientHtml + entityHtml;
+    }
+
+    if (inviteRoleShowsModulePickers(role)) {
+      let moduleHtml =
+        '<fieldset class="invite-access-block" id="invite-module-fieldset">' +
+          '<legend><b>Modules (Ltd role only)</b></legend>' +
+          '<p class="help-meta">Leave all unchecked to allow every Ltd module. ' +
+            'Check to restrict menu access.</p>' +
+          '<div class="invite-check-grid">';
+
+      modules.forEach(function(item) {
+        moduleHtml +=
+          '<label class="invite-check-item invite-module-item">' +
+            '<input type="checkbox" class="invite-module-checkbox" ' +
+              'value="' + escapeHtml(item.moduleId) + '"> ' +
+            escapeHtml(item.label) +
+            ' <span class="help-meta">(' + escapeHtml(item.group || 'Other') + ')</span>' +
+          '</label>';
+      });
+      moduleHtml += '</div></fieldset>';
+
+      html += moduleHtml;
+    }
+
+    if (role === 'admin' || role === 'reader') {
+      html +=
+        '<p class="help-meta"><b>' + escapeHtml(role) + '</b> receives all modules ' +
+          'allowed for that role. Use client/business checkboxes only to limit ' +
+          'workspace scope. Admin cannot access backend developer code.</p>';
+    }
+    if (role === 'editor') {
+      html +=
+        '<p class="help-meta"><b>Editor</b> receives all edit modules for the role. ' +
+          'Use client/business checkboxes only to limit workspace scope.</p>';
+    }
+
+    return html;
+  }
+
+  function updateInviteAccessPickersForRole(role) {
+    const host = document.getElementById('invite-access-pickers');
+    const catalog = window.nilavaramInviteAccessCatalog || { clients: [] };
+    if (!host) return;
+    host.innerHTML = renderInviteAccessPickers(catalog, role);
+  }
+
+  function collectInviteAccessInput(role) {
+    role = String(role || 'editor');
+    const allowedClientIds = [];
+    const allowedEntityIds = [];
+    let allowedModules = [];
+
+    if (inviteRoleShowsClientPickers(role)) {
+      document.querySelectorAll('.invite-client-checkbox:checked').forEach(function(box) {
+        allowedClientIds.push(box.getAttribute('data-client-id'));
+      });
+      document.querySelectorAll('.invite-entity-checkbox:checked').forEach(function(box) {
+        allowedEntityIds.push(box.getAttribute('data-entity-id'));
+      });
+    }
+
+    if (inviteRoleShowsModulePickers(role)) {
+      document.querySelectorAll('.invite-module-checkbox:checked').forEach(function(box) {
+        allowedModules.push(box.value);
+      });
+    }
+
+    return {
+      allowedClientIds: allowedClientIds,
+      allowedEntityIds: allowedEntityIds,
+      allowedModules: allowedModules
+    };
+  }
+
+  function applyInviteAccessSelection(selection) {
+    selection = selection || {};
+    const clientIds = selection.allowedClientIds || [];
+    const entityIds = selection.allowedEntityIds || [];
+    const moduleIds = selection.allowedModules || [];
+
+    document.querySelectorAll('.invite-client-checkbox').forEach(function(box) {
+      box.checked = clientIds.indexOf(box.getAttribute('data-client-id')) !== -1;
+    });
+    document.querySelectorAll('.invite-entity-checkbox').forEach(function(box) {
+      box.checked = entityIds.indexOf(box.getAttribute('data-entity-id')) !== -1;
+    });
+    document.querySelectorAll('.invite-module-checkbox').forEach(function(box) {
+      box.checked = moduleIds.indexOf(box.value) !== -1;
+    });
+  }
+</script>

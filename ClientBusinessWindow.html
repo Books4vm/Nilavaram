@@ -12,62 +12,48 @@
     }
     .content {
       margin: 16px;
-      max-width: 920px;
+      max-width: 980px;
     }
-    .invite-url-box {
-      background: var(--surface-strong);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 14px;
-      margin: 12px 0;
-      word-break: break-all;
-    }
-    .invite-actions {
+    .cb-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      margin: 8px 0 16px;
+      margin: 8px 0 12px;
     }
-    .invite-message {
-      width: 100%;
-      min-height: 180px;
-      font-family: inherit;
-      font-size: inherit;
-    }
-    .users-table {
-      border-collapse: collapse;
-      width: 100%;
-    }
-    .users-table th,
-    .users-table td {
-      border-bottom: 1px solid var(--border);
-      padding: 8px 10px;
-      text-align: left;
-      vertical-align: top;
-    }
-    .invite-access-block {
+    .cb-client-block {
       border: 1px solid var(--border);
       border-radius: 8px;
-      margin: 16px 0;
       padding: 12px 14px;
+      margin: 16px 0;
     }
-    .invite-check-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 8px 12px;
-      margin-top: 8px;
-    }
-    .invite-check-item {
-      display: block;
-      line-height: 1.4;
-    }
-    .invite-client-block {
-      margin: 12px 0 8px;
-      padding-top: 8px;
-      border-top: 1px solid var(--border);
-    }
-    .invite-client-block h4 {
+    .cb-client-block h3 {
       margin: 0 0 8px;
+    }
+    .cb-inline-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: end;
+      margin: 8px 0;
+    }
+    .cb-inline-form input[type="text"] {
+      min-width: 220px;
+    }
+    .cb-business-list {
+      margin: 8px 0 0;
+      padding-left: 0;
+      list-style: none;
+    }
+    .cb-business-list li {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .cb-status {
+      margin-left: 8px;
     }
   </style>
 </head>
@@ -75,7 +61,6 @@
 
   <header class="header">
     <div class="header-bar">
-
       <div class="header-panel header-panel-left">
         <div class="brand">
           <svg class="brand-icon" viewBox="0 0 24 24" fill="none"
@@ -83,32 +68,27 @@
             <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5z"/>
             <path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z"/>
           </svg>
-          <h1>Nilavaram — Users</h1>
+          <h1>Nilavaram — Clients &amp; Businesses</h1>
         </div>
       </div>
-
       <div class="header-panel header-panel-center">
         <div id="startup">Loading...</div>
       </div>
-
       <div class="header-panel header-panel-right">
         <div id="module-shell-meta" class="help-meta"></div>
       </div>
-
     </div>
   </header>
 
   <main id="output" class="content panel" tabindex="-1">
-    <p>Loading invite window...</p>
+    <p>Loading clients and businesses...</p>
   </main>
 
-  <?!= include('InviteModuleCatalog') ?>
-  <?!= include('InviteAccessPicker') ?>
-  <?!= include('InviteWindowCore') ?>
+  <?!= include('ClientBusinessWindowCore') ?>
 
   <script>
     window.onload = function() {
-      initInviteWindow();
+      initClientBusinessWindow();
     };
   </script>
 

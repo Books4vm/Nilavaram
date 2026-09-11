@@ -12,6 +12,17 @@
     return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : '';
   }
 
+  function formatInviteScopeSummary(user) {
+    const parts = [];
+    const clients = user.allowedClientIds || [];
+    const entities = user.allowedEntityIds || [];
+    const modules = user.allowedModules || [];
+    if (clients.length) parts.push(clients.length + ' client(s)');
+    if (entities.length) parts.push(entities.length + ' business(es)');
+    if (modules.length) parts.push(modules.length + ' module(s)');
+    return parts.length ? parts.join(', ') : 'All';
+  }
+
   function renderInviteShellHeader() {
     const startup = document.getElementById('startup');
     const meta = document.getElementById('module-shell-meta');
@@ -20,29 +31,22 @@
     const now = new Date();
     const weekday = now.toLocaleDateString(undefined, { weekday: 'long' });
     const date = now.toLocaleDateString(undefined, {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
+      day: '2-digit', month: 'short', year: 'numeric'
     }).toUpperCase().replace(/ /g, '-');
-
-    const clientName = readInviteUrlParam('clientName') || 'Client not passed';
-    const entityName = readInviteUrlParam('entityName') || 'Business not passed';
-    const user = readInviteUrlParam('user') || '';
-    const role = readInviteUrlParam('role') || '';
 
     startup.innerHTML =
       '<div class="startup-date-line">' +
         escapeHtml(date) + ' &nbsp; ' + escapeHtml(weekday) +
         ' &nbsp; <span class="startup-context">' +
-        escapeHtml(clientName) + ' · ' + escapeHtml(entityName) +
+        escapeHtml(readInviteUrlParam('clientName') || 'Client not passed') +
+        ' · ' + escapeHtml(readInviteUrlParam('entityName') || 'Business not passed') +
         '</span></div>' +
       '<div class="startup-user-line">' +
-        'User: ' + escapeHtml(user) + ' &nbsp; Role: ' + escapeHtml(role) +
+        'User: ' + escapeHtml(readInviteUrlParam('user') || '') +
+        ' &nbsp; Role: ' + escapeHtml(readInviteUrlParam('role') || '') +
       '</div>';
 
-    if (meta) {
-      meta.textContent = 'Users & Invitations';
-    }
+    if (meta) meta.textContent = 'Users & Invitations';
   }
 
   function copyInviteText(text, resultId) {
@@ -71,7 +75,6 @@
 
   function initInviteWindow() {
     renderInviteShellHeader();
-
     google.script.run
       .withSuccessHandler(renderInviteWindow)
       .withFailureHandler(function(error) {
@@ -81,15 +84,40 @@
       .getInvitePageData();
   }
 
+  function bindInviteRolePicker() {
+    const roleSelect = document.getElementById('invite-role');
+    if (!roleSelect) return;
+    roleSelect.onchange = function() {
+      updateInviteAccessPickersForRole(roleSelect.value);
+    };
+  }
+
+  function loadUserIntoInviteForm(user) {
+    if (!user) return;
+    document.getElementById('invite-email').value = user.email || '';
+    document.getElementById('invite-displayName').value = user.displayName || '';
+    document.getElementById('invite-role').value = user.role || 'reader';
+    updateInviteAccessPickersForRole(user.role || 'reader');
+    applyInviteAccessSelection({
+      allowedClientIds: user.allowedClientIds || [],
+      allowedEntityIds: user.allowedEntityIds || [],
+      allowedModules: user.allowedModules || []
+    });
+    document.getElementById('invite-form').scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('invite-form-message').textContent =
+      ' Editing ' + (user.email || '') + '. Save to update, then Copy invite to resend.';
+  }
+
   function renderInviteWindow(data) {
     window.nilavaramInvitePage = data;
+    window.nilavaramInviteAccessCatalog = data.accessCatalog || { clients: [] };
     const output = document.getElementById('output');
 
     let mainUiSection =
       '<section class="workspace-selection">' +
         '<h3>Main UI URL</h3>' +
-        '<p class="help-meta">Send this link only to people you have invited. ' +
-          'They must sign in with their Google account.</p>' +
+        '<p class="help-meta">No email is sent automatically yet. Copy the invite message ' +
+          'below and send it in Gmail until Step 4C is built.</p>' +
         '<div class="invite-url-box" id="main-ui-url-display">' +
           escapeHtml(data.mainUiUrl || '(not set yet)') +
         '</div>' +
@@ -112,14 +140,12 @@
           '<span id="main-ui-save-result" class="help-meta"></span>' +
         '</div>';
     }
-
     mainUiSection += '</section>';
 
     output.innerHTML =
       mainUiSection +
       '<section class="workspace-selection">' +
         '<h3>Invite a user</h3>' +
-        '<p class="help-meta">Creates a Firestore invitation. No email is sent automatically.</p>' +
         '<form id="invite-form">' +
           '<div class="form-grid">' +
             '<div><label for="invite-email">Google email</label>' +
@@ -128,21 +154,20 @@
               '<input id="invite-displayName" type="text"></div>' +
             '<div><label for="invite-role">Role</label>' +
               '<select id="invite-role">' +
+                '<option value="admin">Admin</option>' +
                 '<option value="editor">Editor</option>' +
                 '<option value="reader">Reader</option>' +
                 '<option value="ltd">Ltd</option>' +
-                '<option value="admin">Admin</option>' +
                 '<option value="disabled">Disabled</option>' +
               '</select></div>' +
-            '<div><label for="invite-allowedModules">Ltd modules (comma-separated)</label>' +
-              '<input id="invite-allowedModules" placeholder="Example: files, reports"></div>' +
           '</div>' +
+          '<div id="invite-access-pickers"></div>' +
           '<button class="primary-button" type="submit">Save invitation</button>' +
           '<span id="invite-form-message"></span>' +
         '</form>' +
       '</section>' +
       '<section class="workspace-selection" id="invite-message-panel" hidden>' +
-        '<h3>Invite message</h3>' +
+        '<h3>Invite message — copy and send in Gmail</h3>' +
         '<textarea id="invite-message-text" class="invite-message" readonly></textarea>' +
         '<div class="invite-actions">' +
           '<button type="button" class="primary-button" id="copy-invite-message">' +
@@ -155,19 +180,24 @@
         '<div id="invite-users-list">Loading...</div>' +
       '</section>';
 
+    updateInviteAccessPickersForRole(
+      document.getElementById('invite-role').value || 'admin'
+    );
+    bindInviteRolePicker();
+
     document.getElementById('copy-main-ui-url').onclick = function() {
       copyInviteText(data.mainUiUrl || '', 'copy-main-ui-result');
     };
-
     if (data.canEditMainUiUrl) {
       document.getElementById('save-main-ui-url').onclick = saveMainUiUrlFromInviteWindow;
       document.getElementById('refresh-main-ui-url').onclick = refreshMainUiUrlFromInviteWindow;
     }
-
     document.getElementById('invite-form').onsubmit = saveInviteForm;
     document.getElementById('copy-invite-message').onclick = function() {
-      const text = document.getElementById('invite-message-text').value;
-      copyInviteText(text, 'copy-invite-message-result');
+      copyInviteText(
+        document.getElementById('invite-message-text').value,
+        'copy-invite-message-result'
+      );
     };
 
     renderInviteUsersTable(data.users || []);
@@ -178,9 +208,7 @@
     document.getElementById('main-ui-save-result').textContent = ' Saving...';
     google.script.run
       .withSuccessHandler(function(result) {
-        document.getElementById('main-ui-save-result').textContent =
-          ' ' + result.message;
-        document.getElementById('main-ui-url-display').textContent = result.mainUiUrl;
+        document.getElementById('main-ui-save-result').textContent = ' ' + result.message;
         initInviteWindow();
       })
       .withFailureHandler(function(error) {
@@ -194,10 +222,7 @@
     document.getElementById('main-ui-save-result').textContent = ' Refreshing...';
     google.script.run
       .withSuccessHandler(function(result) {
-        document.getElementById('main-ui-save-result').textContent =
-          ' ' + result.message;
-        document.getElementById('main-ui-url-input').value = result.mainUiUrl;
-        document.getElementById('main-ui-url-display').textContent = result.mainUiUrl;
+        document.getElementById('main-ui-save-result').textContent = ' ' + result.message;
         initInviteWindow();
       })
       .withFailureHandler(function(error) {
@@ -209,20 +234,18 @@
 
   function saveInviteForm(event) {
     event.preventDefault();
-    const modules = document.getElementById('invite-allowedModules').value
-      .split(',')
-      .map(function(v) { return v.trim(); })
-      .filter(Boolean);
-
+    const role = document.getElementById('invite-role').value;
+    const access = collectInviteAccessInput(role);
     const input = {
       email: document.getElementById('invite-email').value,
       displayName: document.getElementById('invite-displayName').value,
-      role: document.getElementById('invite-role').value,
-      allowedModules: modules
+      role: role,
+      allowedClientIds: access.allowedClientIds,
+      allowedEntityIds: access.allowedEntityIds,
+      allowedModules: access.allowedModules
     };
 
     document.getElementById('invite-form-message').textContent = ' Saving...';
-
     google.script.run
       .withSuccessHandler(function(result) {
         document.getElementById('invite-form-message').innerHTML =
@@ -243,12 +266,10 @@
         document.getElementById('invite-message-panel').hidden = false;
         document.getElementById('invite-message-text').value = result.message;
       })
-      .withFailureHandler(showInviteError)
+      .withFailureHandler(function(error) {
+        alert(error && error.message ? error.message : String(error));
+      })
       .getInviteMessageForUser(email);
-  }
-
-  function showInviteError(error) {
-    alert(error && error.message ? error.message : String(error));
   }
 
   function renderInviteUsersTable(users) {
@@ -256,11 +277,10 @@
     if (!host) return;
 
     let html =
-      '<table class="users-table">' +
-        '<thead><tr>' +
-          '<th>Email</th><th>Name</th><th>Role</th><th>Status</th>' +
-          '<th>Invited by</th><th>Actions</th>' +
-        '</tr></thead><tbody>';
+      '<table class="users-table"><thead><tr>' +
+        '<th>Email</th><th>Name</th><th>Role</th><th>Scope</th>' +
+        '<th>Status</th><th>Actions</th>' +
+      '</tr></thead><tbody>';
 
     users.forEach(function(user, index) {
       html +=
@@ -268,9 +288,11 @@
           '<td>' + escapeHtml(user.email) + '</td>' +
           '<td>' + escapeHtml(user.displayName || '') + '</td>' +
           '<td>' + escapeHtml(user.role) + '</td>' +
+          '<td>' + escapeHtml(formatInviteScopeSummary(user)) + '</td>' +
           '<td>' + escapeHtml(user.status) + '</td>' +
-          '<td>' + escapeHtml(user.invitedBy || '') + '</td>' +
           '<td>' +
+            '<button type="button" class="secondary-button invite-edit-btn" ' +
+              'data-user-index="' + index + '">Edit</button> ' +
             '<button type="button" class="secondary-button invite-copy-btn" ' +
               'data-user-index="' + index + '">Copy invite</button>' +
           '</td>' +
@@ -280,23 +302,27 @@
     html += '</tbody></table>';
     host.innerHTML = html;
 
+    host.querySelectorAll('.invite-edit-btn').forEach(function(button) {
+      button.onclick = function() {
+        const idx = Number(button.getAttribute('data-user-index'));
+        loadUserIntoInviteForm(
+          (window.nilavaramInvitePage && window.nilavaramInvitePage.users || [])[idx]
+        );
+      };
+    });
+
     host.querySelectorAll('.invite-copy-btn').forEach(function(button) {
       button.onclick = function() {
         const idx = Number(button.getAttribute('data-user-index'));
         const user = (window.nilavaramInvitePage &&
           window.nilavaramInvitePage.users || [])[idx];
         if (user && user.email) {
-          resendInvite(user.email);
+          loadInviteMessage(user.email);
+          document.getElementById('invite-message-panel').scrollIntoView({
+            behavior: 'smooth'
+          });
         }
       };
     });
-  }
-
-  function resendInvite(email) {
-    loadInviteMessage(email);
-    const panel = document.getElementById('invite-message-panel');
-    if (panel) {
-      panel.scrollIntoView({ behavior: 'smooth' });
-    }
   }
 </script>

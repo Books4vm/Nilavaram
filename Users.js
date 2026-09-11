@@ -44,6 +44,8 @@ function ensureSuperAdminUsers_() {
       displayName: index === 0 ? 'Owner Super Admin' : 'Super Admin',
       role: 'superadmin',
       allowedModules: [],
+      allowedClientIds: [],
+      allowedEntityIds: [],
       status: 'active',
       invitedBy: NILAVARAM_PRIMARY_ADMIN_EMAIL,
       invitedAt: existing ? existing.invitedAt : new Date(),
@@ -142,6 +144,47 @@ function canAccessPrivateRecord_(record, email) {
 }
 
 /**
+ * Active clients and businesses for the invite checkbox UI.
+ *
+ * @returns {Object[]}
+ */
+function getInviteClientEntityCatalogForAdmin_() {
+  requireAdmin_();
+  ensureClientRecords_();
+  ensureClientBusinessEntities_();
+
+  return firestoreGetCollection_('clients')
+    .map(fromFirestoreDocument_)
+    .filter(function(client) {
+      return client.status === 'active';
+    })
+    .sort(function(a, b) {
+      return Number(a.order || 0) - Number(b.order || 0);
+    })
+    .map(function(client) {
+      const entities = firestoreGetCollection_('entities')
+        .map(fromFirestoreDocument_)
+        .filter(function(entity) {
+          return entity.status === 'active' &&
+            entity.entityType === 'business' &&
+            entity.clientId === client.id;
+        })
+        .sort(function(a, b) {
+          return String(a.name).localeCompare(String(b.name));
+        })
+        .map(function(entity) {
+          return { id: entity.id, name: entity.name };
+        });
+
+      return {
+        id: client.id,
+        name: client.name,
+        entities: entities
+      };
+    });
+}
+
+/**
  * Lists users for the Admin Users page.
  *
  * @returns {Object[]}
@@ -168,6 +211,12 @@ function saveUser(input) {
   const allowedModules = Array.isArray(input && input.allowedModules)
     ? input.allowedModules.map(String)
     : [];
+  const allowedClientIds = Array.isArray(input && input.allowedClientIds)
+    ? normalizeAllowedClientIds_(input.allowedClientIds)
+    : [];
+  const allowedEntityIds = Array.isArray(input && input.allowedEntityIds)
+    ? normalizeAllowedEntityIds_(input.allowedEntityIds)
+    : [];
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error('Enter a valid Google account email address.');
@@ -186,19 +235,16 @@ function saveUser(input) {
     }
   }
 
-  function requireAdmin_() {
-    const user = requireCurrentUser_();
-    if (['superadmin', 'admin'].indexOf(user.role) === -1 &&
-        !isSuperAdminEmail_(user.email)) {
-      throw new Error('Admin permission is required.');
-    }
-    return user;
-  }
-
   const record = {
     email: email,
     displayName: String(input.displayName || '').trim(),
     role: role,
+    allowedClientIds: ['admin', 'reader', 'editor', 'ltd'].indexOf(role) !== -1
+      ? allowedClientIds
+      : [],
+    allowedEntityIds: ['admin', 'reader', 'editor', 'ltd'].indexOf(role) !== -1
+      ? allowedEntityIds
+      : [],
     allowedModules: role === 'ltd' ? allowedModules : [],
     status: role === 'disabled' ? 'disabled' : (previous ? previous.status : 'invited'),
     invitedBy: previous ? previous.invitedBy : admin.email,
@@ -210,7 +256,9 @@ function saveUser(input) {
   writeAudit_(previous ? 'user-access-changed' : 'user-invited', email, {
     oldRole: previous ? previous.role : null,
     newRole: role,
-    allowedModules: record.allowedModules
+    allowedModules: record.allowedModules,
+    allowedClientIds: record.allowedClientIds,
+    allowedEntityIds: record.allowedEntityIds
   });
 
   return {
@@ -297,6 +345,9 @@ function getInvitePageData() {
     canEditMainUiUrl: isSuperAdmin,
     currentAdminEmail: admin.email,
     roles: ['admin', 'editor', 'reader', 'ltd', 'disabled'],
+    accessCatalog: {
+      clients: getInviteClientEntityCatalogForAdmin_()
+    },
     users: users
   };
 }

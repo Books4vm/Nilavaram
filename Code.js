@@ -114,11 +114,30 @@ function doGet(e) {
   }
   if (parameters.inviteWindow === '1') {
     try {
-      requireAdmin_();
-      return HtmlService.createHtmlOutputFromFile('InviteWindow')
+      authorizePopupWindow_(
+        'inviteWindow',
+        parameters.clientId,
+        parameters.entityId
+      );
+      return HtmlService.createTemplateFromFile('InviteWindow')
+        .evaluate()
         .setTitle('Nilavaram — Users & Invitations');
     } catch (error) {
       return buildAuthorizationErrorPage_('Users & Invitations', error);
+    }
+  }
+  if (parameters.clientBusinessWindow === '1') {
+    try {
+      authorizePopupWindow_(
+        'clientBusinessWindow',
+        parameters.clientId,
+        parameters.entityId
+      );
+      return HtmlService.createTemplateFromFile('ClientBusinessWindow')
+        .evaluate()
+        .setTitle('Nilavaram — Clients & Businesses');
+    } catch (error) {
+      return buildAuthorizationErrorPage_('Clients & Businesses', error);
     }
   }
   if (parameters.contextWindow === '1') {
@@ -126,6 +145,19 @@ function doGet(e) {
       .setTitle('Nilavaram — Change context');
   }
   if (parameters.moduleWindow === '1') {
+    try {
+      authorizeModuleWindowLoad_(
+        parameters.clientId,
+        parameters.entityId,
+        parameters.moduleId
+      );
+    } catch (error) {
+      return buildAuthorizationErrorPage_(
+        String(parameters.moduleLabel || parameters.moduleId || 'Module'),
+        error
+      );
+    }
+  
     const moduleTemplate = HtmlService.createTemplateFromFile('ModuleWindow');
     moduleTemplate.moduleIdJson = JSON.stringify(String(parameters.moduleId || ''))
       .replace(/</g, '\\u003c');
@@ -141,7 +173,7 @@ function doGet(e) {
       .replace(/</g, '\\u003c');
     moduleTemplate.sessionIdJson = JSON.stringify(String(parameters.sessionId || ''))
       .replace(/</g, '\\u003c');
-      moduleTemplate.userEmailJson = JSON.stringify(String(parameters.userEmail || ''))
+    moduleTemplate.userEmailJson = JSON.stringify(String(parameters.userEmail || ''))
       .replace(/</g, '\\u003c');
     moduleTemplate.userRoleJson = JSON.stringify(String(parameters.userRole || ''))
       .replace(/</g, '\\u003c');
