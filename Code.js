@@ -112,20 +112,7 @@ function doGet(e) {
       ).setTitle('OneDrive Recovery Status');
     }
   }
-  if (parameters.inviteWindow === '1') {
-    try {
-      authorizePopupWindow_(
-        'inviteWindow',
-        parameters.clientId,
-        parameters.entityId
-      );
-      return HtmlService.createTemplateFromFile('InviteWindow')
-        .evaluate()
-        .setTitle('Nilavaram — Users & Invitations');
-    } catch (error) {
-      return buildAuthorizationErrorPage_('Users & Invitations', error);
-    }
-  }
+  
   if (parameters.clientBusinessWindow === '1') {
     try {
       authorizePopupWindow_(
@@ -133,8 +120,20 @@ function doGet(e) {
         parameters.clientId,
         parameters.entityId
       );
-      return HtmlService.createTemplateFromFile('ClientBusinessWindow')
-        .evaluate()
+      const cbTemplate = HtmlService.createTemplateFromFile('ClientBusinessWindow');
+      cbTemplate.clientIdJson = JSON.stringify(String(parameters.clientId || ''))
+        .replace(/</g, '\\u003c');
+      cbTemplate.clientNameJson = JSON.stringify(String(parameters.clientName || ''))
+        .replace(/</g, '\\u003c');
+      cbTemplate.entityIdJson = JSON.stringify(String(parameters.entityId || ''))
+        .replace(/</g, '\\u003c');
+      cbTemplate.entityNameJson = JSON.stringify(String(parameters.entityName || ''))
+        .replace(/</g, '\\u003c');
+      cbTemplate.userEmailJson = JSON.stringify(String(parameters.user || ''))
+        .replace(/</g, '\\u003c');
+      cbTemplate.userRoleJson = JSON.stringify(String(parameters.role || ''))
+        .replace(/</g, '\\u003c');
+      return cbTemplate.evaluate()
         .setTitle('Nilavaram — Clients & Businesses');
     } catch (error) {
       return buildAuthorizationErrorPage_('Clients & Businesses', error);
@@ -275,31 +274,30 @@ function doGet(e) {
       );
     }
   }
-  if (parameters.code || parameters.error) {
+  if (parameters.inviteWindow === '1') {
     try {
-      const summary = completeMicrosoftAuthorization_(parameters);
-      return HtmlService.createHtmlOutput(
-        '<!doctype html><html><head><base target="_top">' +
-        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-        '<title>OneDrive Connected</title></head><body>' +
-        '<h1>OneDrive connected</h1>' +
-        '<p>Nilavaram is connected to ' +
-        escapeHtmlServer_(summary.account) + '.</p>' +
-        '<p>Available space: ' +
-        escapeHtmlServer_(String(summary.remainingGb)) + ' GB.</p>' +
-        '<p>You may close this page and refresh Connections in Nilavaram.</p>' +
-        '</body></html>'
-      ).setTitle('OneDrive Connected');
+      authorizePopupWindow_(
+        'inviteWindow',
+        parameters.clientId,
+        parameters.entityId
+      );
+      const inviteTemplate = HtmlService.createTemplateFromFile('InviteWindow');
+      inviteTemplate.clientIdJson = JSON.stringify(String(parameters.clientId || ''))
+        .replace(/</g, '\\u003c');
+      inviteTemplate.clientNameJson = JSON.stringify(String(parameters.clientName || ''))
+        .replace(/</g, '\\u003c');
+      inviteTemplate.entityIdJson = JSON.stringify(String(parameters.entityId || ''))
+        .replace(/</g, '\\u003c');
+      inviteTemplate.entityNameJson = JSON.stringify(String(parameters.entityName || ''))
+        .replace(/</g, '\\u003c');
+      inviteTemplate.userEmailJson = JSON.stringify(String(parameters.user || ''))
+        .replace(/</g, '\\u003c');
+      inviteTemplate.userRoleJson = JSON.stringify(String(parameters.role || ''))
+        .replace(/</g, '\\u003c');
+      return inviteTemplate.evaluate()
+        .setTitle('Nilavaram — Users & Invitations');
     } catch (error) {
-      return HtmlService.createHtmlOutput(
-        '<!doctype html><html><head><base target="_top">' +
-        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-        '<title>OneDrive Connection</title></head><body>' +
-        '<h1>Connection not completed</h1><p>' +
-        escapeHtmlServer_(error.message) + '</p>' +
-        '<p>Return to Nilavaram Connections and try again.</p>' +
-        '</body></html>'
-      ).setTitle('OneDrive Connection');
+      return buildAuthorizationErrorPage_('Users & Invitations', error);
     }
   }
   const template = HtmlService.createTemplateFromFile('Dashboard');

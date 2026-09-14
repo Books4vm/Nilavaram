@@ -5,11 +5,49 @@
     return element.innerHTML;
   }
 
-  function readInviteUrlParam(name) {
-    const match = window.location.search.match(
-      new RegExp('[?&]' + name + '=([^&]*)')
-    );
-    return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : '';
+  function readPopupPreference(key, fallback) {
+    try {
+      return window.localStorage.getItem(key) || fallback;
+    } catch (error) {
+      return fallback;
+    }
+  }
+
+  function applyPopupDisplayPreferences() {
+    const theme = readPopupPreference('nilavaram-theme', 'sky');
+    const fontSize = readPopupPreference('nilavaram-font-size', 'large');
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.fontSize = fontSize;
+  }
+
+  function getUserViewTime(date) {
+    const dateParts = new Intl.DateTimeFormat(undefined, {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      weekday: 'long'
+    }).formatToParts(date);
+    const timeParts = new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).formatToParts(date);
+    const part = function(parts, type) {
+      const found = parts.find(function(item) { return item.type === type; });
+      return found ? found.value : '';
+    };
+
+    return {
+      date:
+        part(dateParts, 'day') + '-' +
+        part(dateParts, 'month').toUpperCase() + '-' +
+        part(dateParts, 'year'),
+      weekday: part(dateParts, 'weekday'),
+      time:
+        part(timeParts, 'hour') + ':' +
+        part(timeParts, 'minute') + ' ' +
+        part(timeParts, 'dayPeriod')
+    };
   }
 
   function formatInviteScopeSummary(user) {
@@ -25,28 +63,43 @@
 
   function renderInviteShellHeader() {
     const startup = document.getElementById('startup');
-    const meta = document.getElementById('module-shell-meta');
-    if (!startup) return;
+    const badge = document.getElementById('module-shell-meta');
+    const started = getUserViewTime(
+      typeof PAGE_VIEW_STARTED_AT !== 'undefined'
+        ? PAGE_VIEW_STARTED_AT
+        : new Date()
+    );
+    const current = getUserViewTime(new Date());
 
-    const now = new Date();
-    const weekday = now.toLocaleDateString(undefined, { weekday: 'long' });
-    const date = now.toLocaleDateString(undefined, {
-      day: '2-digit', month: 'short', year: 'numeric'
-    }).toUpperCase().replace(/ /g, '-');
+    const clientName = (typeof INVITE_CLIENT_NAME !== 'undefined' && INVITE_CLIENT_NAME)
+      ? INVITE_CLIENT_NAME : 'Client not passed';
+    const entityName = (typeof INVITE_ENTITY_NAME !== 'undefined' && INVITE_ENTITY_NAME)
+      ? INVITE_ENTITY_NAME : 'Business not passed';
+    const userEmail = (typeof INVITE_USER_EMAIL !== 'undefined' && INVITE_USER_EMAIL)
+      ? INVITE_USER_EMAIL : 'User not passed';
+    const userRole = (typeof INVITE_USER_ROLE !== 'undefined' && INVITE_USER_ROLE)
+      ? INVITE_USER_ROLE : 'Role not passed';
 
-    startup.innerHTML =
-      '<div class="startup-date-line">' +
-        escapeHtml(date) + ' &nbsp; ' + escapeHtml(weekday) +
-        ' &nbsp; <span class="startup-context">' +
-        escapeHtml(readInviteUrlParam('clientName') || 'Client not passed') +
-        ' · ' + escapeHtml(readInviteUrlParam('entityName') || 'Business not passed') +
-        '</span></div>' +
-      '<div class="startup-user-line">' +
-        'User: ' + escapeHtml(readInviteUrlParam('user') || '') +
-        ' &nbsp; Role: ' + escapeHtml(readInviteUrlParam('role') || '') +
-      '</div>';
+    if (startup) {
+      startup.innerHTML =
+        '<div class="startup-date-line">' +
+          escapeHtml(started.date) + ' &nbsp; ' + escapeHtml(started.weekday) +
+          ' &nbsp; <span class="startup-context">' +
+          escapeHtml(clientName) + ' · ' + escapeHtml(entityName) +
+          '</span></div>' +
+        '<div class="startup-time-line">' +
+          '<b>Started:</b> ' + escapeHtml(started.time) +
+          ' &nbsp; <b>Current:</b> ' + escapeHtml(current.time) +
+        '</div>' +
+        '<div class="startup-user-line">' +
+          '<b>User:</b> ' + escapeHtml(userEmail) +
+          ' &nbsp; <b>Role:</b> ' + escapeHtml(userRole) +
+        '</div>';
+    }
 
-    if (meta) meta.textContent = 'Users & Invitations';
+    if (badge) {
+      badge.textContent = 'Users & Invitations';
+    }
   }
 
   function copyInviteText(text, resultId) {
@@ -74,6 +127,7 @@
   }
 
   function initInviteWindow() {
+    applyPopupDisplayPreferences();
     renderInviteShellHeader();
     google.script.run
       .withSuccessHandler(renderInviteWindow)

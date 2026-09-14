@@ -18,6 +18,28 @@
     return String(role || '') === 'ltd';
   }
 
+  function toggleInviteAccessButton(button) {
+    if (!button) return;
+    const pressed = button.getAttribute('aria-pressed') === 'true';
+    const next = !pressed;
+    button.setAttribute('aria-pressed', next ? 'true' : 'false');
+    button.classList.toggle('is-selected', next);
+  }
+
+  function setInviteAccessButtonState(button, selected) {
+    if (!button) return;
+    button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    button.classList.toggle('is-selected', !!selected);
+  }
+
+  function bindInviteAccessToggleButtons() {
+    document.querySelectorAll('.invite-client-toggle, .invite-entity-toggle').forEach(function(button) {
+      button.onclick = function() {
+        toggleInviteAccessButton(button);
+      };
+    });
+  }
+
   function renderInviteAccessPickers(accessCatalog, role) {
     role = String(role || 'editor');
     const clients = (accessCatalog && accessCatalog.clients) || [];
@@ -28,44 +50,52 @@
       let clientHtml =
         '<fieldset class="invite-access-block" id="invite-client-fieldset">' +
           '<legend><b>Clients</b></legend>' +
-          '<p class="help-meta">Leave all unchecked to allow every client. ' +
-            'Check one or more to restrict this user.</p>' +
-          '<div class="invite-check-grid">';
+          '<p class="help-meta">Click client names to restrict access. ' +
+            'Leave all unselected to allow every client.</p>' +
+          '<div class="invite-group-caption">Choose client(s)</div>' +
+          '<div class="invite-toggle-row">';
 
       clients.forEach(function(client) {
         clientHtml +=
-          '<label class="invite-check-item">' +
-            '<input type="checkbox" class="invite-client-checkbox" ' +
-              'data-client-id="' + escapeHtml(client.id) + '"> ' +
+          '<button type="button" class="secondary-button invite-toggle-btn invite-client-toggle" ' +
+            'data-client-id="' + escapeHtml(client.id) + '" ' +
+            'aria-pressed="false" aria-label="Client ' + escapeHtml(client.name) + '">' +
             escapeHtml(client.name) +
-          '</label>';
+          '</button>';
       });
       clientHtml += '</div></fieldset>';
 
       let entityHtml =
         '<fieldset class="invite-access-block" id="invite-entity-fieldset">' +
           '<legend><b>Businesses within each client</b></legend>' +
-          '<p class="help-meta">Leave all unchecked to allow every business ' +
-            'under the allowed client(s). Check to restrict further.</p>';
+          '<p class="help-meta">Click business names under each client caption. ' +
+            'Leave all unselected to allow every business under the allowed client(s).</p>';
 
       clients.forEach(function(client) {
         entityHtml +=
           '<div class="invite-client-block" data-client-block="' +
             escapeHtml(client.id) + '">' +
-            '<h4>' + escapeHtml(client.name) + '</h4>' +
-            '<div class="invite-check-grid">';
+            '<div class="invite-group-caption">' + escapeHtml(client.name) + '</div>';
 
-        (client.entities || []).forEach(function(entity) {
+        if (!(client.entities || []).length) {
           entityHtml +=
-            '<label class="invite-check-item">' +
-              '<input type="checkbox" class="invite-entity-checkbox" ' +
+            '<p class="invite-empty-group">No businesses listed yet for this client.</p>';
+        } else {
+          entityHtml += '<div class="invite-toggle-row">';
+          (client.entities || []).forEach(function(entity) {
+            entityHtml +=
+              '<button type="button" class="secondary-button invite-toggle-btn invite-entity-toggle" ' +
                 'data-client-id="' + escapeHtml(client.id) + '" ' +
-                'data-entity-id="' + escapeHtml(entity.id) + '"> ' +
-              escapeHtml(entity.name) +
-            '</label>';
-        });
+                'data-entity-id="' + escapeHtml(entity.id) + '" ' +
+                'aria-pressed="false" aria-label="' +
+                escapeHtml(client.name) + ' business ' + escapeHtml(entity.name) + '">' +
+                escapeHtml(entity.name) +
+              '</button>';
+          });
+          entityHtml += '</div>';
+        }
 
-        entityHtml += '</div></div>';
+        entityHtml += '</div>';
       });
       entityHtml += '</fieldset>';
 
@@ -97,13 +127,13 @@
     if (role === 'admin' || role === 'reader') {
       html +=
         '<p class="help-meta"><b>' + escapeHtml(role) + '</b> receives all modules ' +
-          'allowed for that role. Use client/business checkboxes only to limit ' +
+          'allowed for that role. Use client/business buttons only to limit ' +
           'workspace scope. Admin cannot access backend developer code.</p>';
     }
     if (role === 'editor') {
       html +=
         '<p class="help-meta"><b>Editor</b> receives all edit modules for the role. ' +
-          'Use client/business checkboxes only to limit workspace scope.</p>';
+          'Use client/business buttons only to limit workspace scope.</p>';
     }
 
     return html;
@@ -114,6 +144,7 @@
     const catalog = window.nilavaramInviteAccessCatalog || { clients: [] };
     if (!host) return;
     host.innerHTML = renderInviteAccessPickers(catalog, role);
+    bindInviteAccessToggleButtons();
   }
 
   function collectInviteAccessInput(role) {
@@ -123,11 +154,11 @@
     let allowedModules = [];
 
     if (inviteRoleShowsClientPickers(role)) {
-      document.querySelectorAll('.invite-client-checkbox:checked').forEach(function(box) {
-        allowedClientIds.push(box.getAttribute('data-client-id'));
+      document.querySelectorAll('.invite-client-toggle[aria-pressed="true"]').forEach(function(button) {
+        allowedClientIds.push(button.getAttribute('data-client-id'));
       });
-      document.querySelectorAll('.invite-entity-checkbox:checked').forEach(function(box) {
-        allowedEntityIds.push(box.getAttribute('data-entity-id'));
+      document.querySelectorAll('.invite-entity-toggle[aria-pressed="true"]').forEach(function(button) {
+        allowedEntityIds.push(button.getAttribute('data-entity-id'));
       });
     }
 
@@ -150,11 +181,17 @@
     const entityIds = selection.allowedEntityIds || [];
     const moduleIds = selection.allowedModules || [];
 
-    document.querySelectorAll('.invite-client-checkbox').forEach(function(box) {
-      box.checked = clientIds.indexOf(box.getAttribute('data-client-id')) !== -1;
+    document.querySelectorAll('.invite-client-toggle').forEach(function(button) {
+      setInviteAccessButtonState(
+        button,
+        clientIds.indexOf(button.getAttribute('data-client-id')) !== -1
+      );
     });
-    document.querySelectorAll('.invite-entity-checkbox').forEach(function(box) {
-      box.checked = entityIds.indexOf(box.getAttribute('data-entity-id')) !== -1;
+    document.querySelectorAll('.invite-entity-toggle').forEach(function(button) {
+      setInviteAccessButtonState(
+        button,
+        entityIds.indexOf(button.getAttribute('data-entity-id')) !== -1
+      );
     });
     document.querySelectorAll('.invite-module-checkbox').forEach(function(box) {
       box.checked = moduleIds.indexOf(box.value) !== -1;

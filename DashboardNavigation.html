@@ -149,8 +149,9 @@
 
   function openInviteWindow() {
     if (!isShellContextComplete()) {
-      showWorkspaceNotice(
-        'Select client and business before opening Users & Invitations.'
+      showWorkspaceError(
+        'Select client and business before opening Users & Invitations.',
+        ''
       );
       return;
     }
@@ -170,39 +171,50 @@
       window.location.href.split('?')[0]
     ).replace(/\?$/, '');
 
-    google.script.run
-      .withSuccessHandler(function() {
-        const query =
-          '?inviteWindow=1' +
-          '&clientId=' + encodeURIComponent(clientId) +
-          '&entityId=' + encodeURIComponent(entityId) +
-          '&clientName=' + encodeURIComponent(clientName) +
-          '&entityName=' + encodeURIComponent(entityName) +
-          '&user=' + user +
-          '&role=' + role;
+    const query =
+      '?inviteWindow=1' +
+      '&clientId=' + encodeURIComponent(clientId) +
+      '&entityId=' + encodeURIComponent(entityId) +
+      '&clientName=' + encodeURIComponent(clientName) +
+      '&entityName=' + encodeURIComponent(entityName) +
+      '&user=' + user +
+      '&role=' + role;
 
-        const popup = window.open(
-          baseUrl + query,
-          'NilavaramInvite',
-          'popup=yes,width=980,height=900,resizable=yes,scrollbars=yes'
-        );
+    const popup = window.open(
+      baseUrl + query,
+      'NilavaramInvite',
+      'popup=yes,width=1500,height=900,resizable=yes,scrollbars=yes'
+    );
 
-        if (!popup || popup.closed) {
-          showWorkspaceNotice('Allow pop-ups to open the Users & Invitations window.');
-        }
-      })
-      .withFailureHandler(function(error) {
-        showWorkspaceNotice(error && error.message
-          ? error.message
-          : 'Users & Invitations could not be opened.');
-      })
-      .authorizePopupWindow_('inviteWindow', clientId, entityId);
+    if (!popup || popup.closed) {
+      showWorkspaceError(
+        'Pop-up blocked.',
+        'Allow pop-ups for this site, then click Users again.'
+      );
+      return;
+    }
+
+    const sessionId = 'invite_' + Date.now();
+    registerModuleSession({
+      sessionId: sessionId,
+      moduleId: 'users',
+      moduleLabel: 'Users & Invitations',
+      windowName: 'Users & Invitations',
+      ipAddress: window.nilavaramClientIp || 'Pending',
+      entityId: entityId,
+      entityName: entityName,
+      status: 'open',
+      popup: popup
+    });
+    monitorModulePopup(sessionId, popup);
+    showWorkspaceNotice('Opened Users & Invitations in a new window.');
   }
 
   function openClientBusinessWindow() {
     if (!isShellContextComplete()) {
-      showWorkspaceNotice(
-        'Select client and business before opening Clients & Businesses.'
+      showWorkspaceError(
+        'Select client and business before opening Clients & Businesses.',
+        ''
       );
       return;
     }
@@ -222,35 +234,31 @@
       window.location.href.split('?')[0]
     ).replace(/\?$/, '');
 
-    google.script.run
-      .withSuccessHandler(function() {
-        const query =
-          '?clientBusinessWindow=1' +
-          '&clientId=' + encodeURIComponent(clientId) +
-          '&entityId=' + encodeURIComponent(entityId) +
-          '&clientName=' + encodeURIComponent(clientName) +
-          '&entityName=' + encodeURIComponent(entityName) +
-          '&user=' + user +
-          '&role=' + role;
+    const query =
+      '?clientBusinessWindow=1' +
+      '&clientId=' + encodeURIComponent(clientId) +
+      '&entityId=' + encodeURIComponent(entityId) +
+      '&clientName=' + encodeURIComponent(clientName) +
+      '&entityName=' + encodeURIComponent(entityName) +
+      '&user=' + user +
+      '&role=' + role;
 
-        const popup = window.open(
-          baseUrl + query,
-          'NilavaramClientBusiness',
-          'popup=yes,width=980,height=900,resizable=yes,scrollbars=yes'
-        );
+    const popup = window.open(
+      baseUrl + query,
+      'NilavaramClientBusiness',
+      'popup=yes,width=980,height=900,resizable=yes,scrollbars=yes'
+    );
 
-        if (!popup || popup.closed) {
-          showWorkspaceNotice('Allow pop-ups to open the Clients & Businesses window.');
-        }
-      })
-      .withFailureHandler(function(error) {
-        showWorkspaceNotice(error && error.message
-          ? error.message
-          : 'Clients & Businesses could not be opened.');
-      })
-      .authorizePopupWindow_('clientBusinessWindow', clientId, entityId);
+    if (!popup || popup.closed) {
+      showWorkspaceError(
+        'Pop-up blocked.',
+        'Allow pop-ups for this site, then try again.'
+      );
+      return;
+    }
+
+    showWorkspaceNotice('Opened Clients & Businesses in a new window.');
   }
-
   function openModule(moduleId, label, openSeparateWindow) {
     if (moduleId === 'users') {
       openInviteWindow();
