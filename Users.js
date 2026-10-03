@@ -59,30 +59,166 @@ function normalizeEmail_(email) {
   return String(email || '').trim().toLowerCase();
 }
 
-function getCurrentEmail_() {
-  let email = '';
+function generateInviteToken_() {
+  return Utilities.getUuid().replace(/-/g, '');
+}
 
+/**
+ * Normalizes a US mobile number to E.164 (+1XXXXXXXXXX).
+ *
+ * @param {string} input Raw phone input.
+ * @returns {string}
+ */
+function normalizeUsMobilePhone_(input) {
+  const digits = String(input || '').replace(/\D/g, '');
+  let tenDigit = digits;
+  if (tenDigit.length === 11 && tenDigit.charAt(0) === '1') {
+    tenDigit = tenDigit.slice(1);
+  }
+  if (tenDigit.length !== 10) {
+    throw new Error('Enter a valid US mobile phone number (10 digits).');
+  }
+  return '+1' + tenDigit;
+}
+
+/**
+ * @param {string} e164 Phone in E.164 form.
+ * @returns {string}
+ */
+function formatUsMobilePhoneForDisplay_(e164) {
+  const digits = String(e164 || '').replace(/\D/g, '');
+  const tenDigit = digits.length === 11 && digits.charAt(0) === '1'
+    ? digits.slice(1)
+    : digits;
+  if (tenDigit.length !== 10) {
+    return String(e164 || '');
+  }
+  return '(' + tenDigit.slice(0, 3) + ') ' +
+    tenDigit.slice(3, 6) + '-' + tenDigit.slice(6);
+}
+
+/**
+ * @param {string} mainUiUrl Canonical Main UI URL.
+ * @param {string} inviteToken Invitation token.
+ * @returns {string}
+ */
+function buildInviteUrl_(mainUiUrl, inviteToken) {
+  const base = String(mainUiUrl || getMainUiUrl_()).trim();
+  const token = String(inviteToken || '').trim();
+  if (!token) {
+    return base;
+  }
+  const joiner = base.indexOf('?') === -1 ? '?' : '&';
+  return base + joiner + 'invite=' + encodeURIComponent(token);
+}
+
+/**
+ * @param {string} inviteToken Invitation token from the URL.
+ * @returns {Object|null}
+ */
+function getUserByInviteToken_(inviteToken) {
+  const token = String(inviteToken || '').trim();
+  if (!token) {
+    return null;
+  }
+  return firestoreGetCollection_('users')
+    .map(fromFirestoreDocument_)
+    .find(function(user) {
+      return String(user.inviteToken || '') === token;
+    }) || null;
+}
+
+/**
+ * Ensures a pending invite has a token before building invite links.
+ *
+ * @param {string} email Invited user email.
+ * @returns {Object}
+ */
+function ensureInviteTokenForUser_(email) {
+  const normalized = normalizeEmail_(email);
+  const user = getUserByEmail_(normalized);
+  if (!user || user.status !== 'invited') {
+    return user;
+  }
+  if (user.inviteToken) {
+    return user;
+  }
+  user.inviteToken = generateInviteToken_();
+  user.inviteTokenIssuedAt = new Date();
+  user.updatedAt = new Date();
+  delete user.id;
+  firestoreSetDocument_('users', normalized, toFirestoreFields_(user));
+  return user;
+}
+
+function getCurrentEmail_(nilavaramSessionKey) {
+  const sk = String(nilavaramSessionKey || '').trim();
+  if (sk) {
+    const fromSession = getEmailForNilavaramSession_(sk);
+    if (fromSession) {
+      return fromSession;
+    }
+    throw new Error('Your sign-in expired. Please sign in again.');
+  }
+
+  let email = '';
   try {
     email = Session.getActiveUser().getEmail();
   } catch (error) {}
 
+  email = normalizeEmail_(email);
   if (!email) {
-    try {
-      email = Session.getEffectiveUser().getEmail();
-    } catch (error) {}
+    throw new Error(
+      'Sign in with your Google account and allow Nilavaram when prompted.'
+    );
   }
+  return email;
+}
+
+/**
+ * Shows which email an invite link expects (login hint only).
+ *
+ * @param {string} inviteToken Token from URL.
+ * @returns {string} Invited email or empty.
+ */
+function getInvitedEmailHintForToken_(inviteToken) {
+  const token = String(inviteToken || '').trim();
+  if (!token) {
+    return '';
+  }
+  const user = getUserByInviteToken_(token);
+  return user ? normalizeEmail_(user.email) : '';
+}
+
+/**
+ * Login gate — visitor identity only (never the deploying account).
+ * Called from Login.html via google.script.run.
+ *
+ * @returns {{success: boolean, email: string, message: string}}
+ */
+function getLoggedInUser() {
+  let email = '';
+  try {
+    email = Session.getActiveUser().getEmail();
+  } catch (error) {}
 
   email = normalizeEmail_(email);
 
   if (!email) {
-    throw new Error(
-      'Google could not identify the signed-in email address. ' +
-      'Sign in with your Google account and allow Nilavaram when prompted.'
-    );
+    return {
+      success: false,
+      email: '',
+      message:
+        'Sign in with your invited Google account and allow Nilavaram when Google asks.'
+    };
   }
 
-  return email;
-}
+  return {
+    success: true,
+    email: email,
+    message: 'Signed in.'
+  };
+} 
 
 function getUserByEmail_(email) {
   try {
@@ -235,6 +371,10 @@ function saveUser(input) {
     }
   }
 
+  const status = role === 'disabled'
+    ? 'disabled'
+    : (previous ? previous.status : 'invited');
+
   const record = {
     email: email,
     displayName: String(input.displayName || '').trim(),
@@ -246,11 +386,43 @@ function saveUser(input) {
       ? allowedEntityIds
       : [],
     allowedModules: role === 'ltd' ? allowedModules : [],
-    status: role === 'disabled' ? 'disabled' : (previous ? previous.status : 'invited'),
+    status: status,
     invitedBy: previous ? previous.invitedBy : admin.email,
     invitedAt: previous ? previous.invitedAt : new Date(),
     updatedAt: new Date()
   };
+
+  if (role !== 'disabled') {
+    record.mobilePhone = normalizeUsMobilePhone_(input && input.mobilePhone);
+    record.mobileCountry = 'US';
+    record.smsOptIn = true;
+  } else if (previous) {
+    record.mobilePhone = previous.mobilePhone || '';
+    record.mobileCountry = previous.mobileCountry || 'US';
+    record.smsOptIn = !!previous.smsOptIn;
+  } else {
+    record.mobilePhone = '';
+    record.mobileCountry = 'US';
+    record.smsOptIn = false;
+  }
+
+  if (status === 'invited') {
+    record.inviteToken = generateInviteToken_();
+    record.inviteTokenIssuedAt = new Date();
+  } else if (previous && previous.inviteToken) {
+    record.inviteToken = previous.inviteToken;
+    record.inviteTokenIssuedAt = previous.inviteTokenIssuedAt || null;
+  }
+
+  if (previous) {
+    record.lastInviteSentAt = previous.lastInviteSentAt || null;
+    record.inviteEmailSentCount = Number(previous.inviteEmailSentCount || 0);
+    record.inviteProfileConfirmedAt = previous.inviteProfileConfirmedAt || null;
+  } else {
+    record.lastInviteSentAt = null;
+    record.inviteEmailSentCount = 0;
+    record.inviteProfileConfirmedAt = null;
+  }
 
   firestoreSetDocument_('users', email, toFirestoreFields_(record));
   writeAudit_(previous ? 'user-access-changed' : 'user-invited', email, {
@@ -258,30 +430,171 @@ function saveUser(input) {
     newRole: role,
     allowedModules: record.allowedModules,
     allowedClientIds: record.allowedClientIds,
-    allowedEntityIds: record.allowedEntityIds
+    allowedEntityIds: record.allowedEntityIds,
+    mobilePhone: record.mobilePhone || ''
   });
+
+  const baseMessage = previous ? 'User access updated.' : 'User invitation created.';
+
+  if (record.status === 'invited' && role !== 'disabled') {
+    try {
+      const emailResult = sendInviteEmailToUser_(email);
+      return {
+        success: true,
+        message: baseMessage + ' ' + emailResult.message,
+        emailSent: true,
+        email: email,
+        inviteUrl: emailResult.inviteUrl
+      };
+    } catch (error) {
+      return {
+        success: true,
+        message: baseMessage + ' Email was not sent: ' +
+          String(error && error.message || error),
+        emailSent: false,
+        emailError: String(error && error.message || error),
+        email: email
+      };
+    }
+  }
 
   return {
     success: true,
-    message: previous ? 'User access updated.' : 'User invitation created.'
+    message: baseMessage,
+    emailSent: false,
+    email: email
   };
 }
 
 /**
- * Activates the matching invitation after Google identifies the user.
+ * Validates an invite token against the signed-in Google account.
  *
+ * @param {string} inviteToken Token from the URL.
  * @returns {Object}
  */
-function acceptMyInvitation() {
+function validateInviteLanding(inviteToken) {
+  const signedInEmail = getCurrentEmail_();
+  const token = String(inviteToken || '').trim();
+  if (!token) {
+    return { hasToken: false };
+  }
+
+  const invitedUser = getUserByInviteToken_(token);
+  if (!invitedUser) {
+    return {
+      hasToken: true,
+      valid: false,
+      message: 'This invitation link is invalid or has expired.'
+    };
+  }
+
+  if (invitedUser.status === 'active') {
+    return {
+      hasToken: true,
+      valid: true,
+      alreadyActive: true,
+      email: invitedUser.email,
+      displayName: invitedUser.displayName || invitedUser.email,
+      role: invitedUser.role,
+      emailMatchesSignedIn: normalizeEmail_(invitedUser.email) === signedInEmail,
+      mobilePhoneDisplay: formatUsMobilePhoneForDisplay_(invitedUser.mobilePhone || ''),
+      profileConfirmed: !!invitedUser.inviteProfileConfirmedAt
+    };
+  }
+
+  if (invitedUser.status !== 'invited') {
+    return {
+      hasToken: true,
+      valid: false,
+      message: 'This invitation is no longer available.'
+    };
+  }
+
+  return {
+    hasToken: true,
+    valid: true,
+    email: invitedUser.email,
+    displayName: invitedUser.displayName || invitedUser.email,
+    role: invitedUser.role,
+    emailMatchesSignedIn: normalizeEmail_(invitedUser.email) === signedInEmail,
+    mobilePhoneDisplay: formatUsMobilePhoneForDisplay_(invitedUser.mobilePhone || ''),
+    profileConfirmed: !!invitedUser.inviteProfileConfirmedAt
+  };
+}
+
+/**
+ * Saves one-time invitee profile confirmation before acceptance.
+ *
+ * @param {string} inviteToken Token from the invitation URL.
+ * @param {Object} input Profile fields from the onboarding form.
+ * @returns {Object}
+ */
+function completeInviteOnboarding(inviteToken, input) {
   const email = getCurrentEmail_();
   const user = getUserByEmail_(email);
   if (!user || user.status !== 'invited') {
     throw new Error('No pending invitation was found for this Google account.');
   }
 
+  const token = String(inviteToken || '').trim();
+  if (user.inviteToken) {
+    if (!token || token !== user.inviteToken) {
+      throw new Error('Open the invitation link from your email and try again.');
+    }
+  }
+
+  const displayName = String(input && input.displayName || '').trim();
+  if (!displayName) {
+    throw new Error('Enter your display name.');
+  }
+
+  user.displayName = displayName;
+  user.mobilePhone = normalizeUsMobilePhone_(input && input.mobilePhone);
+  user.mobileCountry = 'US';
+  user.smsOptIn = true;
+  user.inviteProfileConfirmedAt = new Date();
+  user.updatedAt = new Date();
+  delete user.id;
+  firestoreSetDocument_('users', email, toFirestoreFields_(user));
+  writeAudit_('invite-profile-confirmed', email, {
+    mobilePhone: user.mobilePhone
+  });
+
+  return {
+    success: true,
+    message: 'Profile confirmed.'
+  };
+}
+
+/**
+ * Activates the matching invitation after Google identifies the user.
+ *
+ * @param {string} inviteToken Optional token from the invitation URL.
+ * @returns {Object}
+ */
+function acceptMyInvitation(inviteToken) {
+  const email = getCurrentEmail_();
+  const user = getUserByEmail_(email);
+  if (!user || user.status !== 'invited') {
+    throw new Error('No pending invitation was found for this Google account.');
+  }
+
+  const token = String(inviteToken || '').trim();
+  if (user.inviteToken) {
+    if (!token || token !== user.inviteToken) {
+      throw new Error('Open the invitation link from your email and try again.');
+    }
+  }
+
+  if (!user.inviteProfileConfirmedAt) {
+    throw new Error('Confirm your profile details before accepting the invitation.');
+  }
+
   user.status = 'active';
   user.acceptedAt = new Date();
   user.updatedAt = new Date();
+  delete user.inviteToken;
+  delete user.inviteTokenIssuedAt;
   delete user.id;
   firestoreSetDocument_('users', email, toFirestoreFields_(user));
   writeAudit_('invitation-accepted', email, {});
@@ -305,11 +618,11 @@ function writeAudit_(action, targetEmail, details) {
 /**
  * Builds the ready-to-send invite message for an Admin to copy.
  */
-function buildInviteMessage_(email, displayName, role, mainUiUrl) {
+function buildInviteMessage_(email, displayName, role, mainUiUrl, inviteToken) {
   const safeEmail = normalizeEmail_(email);
   const safeRole = String(role || 'reader');
   const safeName = String(displayName || safeEmail).trim();
-  const url = String(mainUiUrl || getMainUiUrl_()).trim();
+  const onboardingUrl = buildInviteUrl_(mainUiUrl, inviteToken);
 
   return [
     'You are invited to Nilavaram.',
@@ -318,13 +631,19 @@ function buildInviteMessage_(email, displayName, role, mainUiUrl) {
     'Google account: ' + safeEmail,
     'Role: ' + safeRole,
     '',
-    'Steps:',
-    '1. Open this link: ' + url,
-    '2. Sign in with Google using exactly: ' + safeEmail,
-    '3. Click "Accept invitation".',
+    'Important:',
+    '- If this message is not in your Inbox, check Spam or Junk.',
+    '- You will also receive a short ALERT email — that is intentional.',
+    '- Sign in with Google using exactly: ' + safeEmail,
     '',
-    'Do not share this link with anyone who was not invited.',
-    'Nilavaram does not use a separate password — Google sign-in only.'
+    'Steps:',
+    '1. Open your personal setup link: ' + onboardingUrl,
+    '2. Sign in with the Google account above.',
+    '3. Confirm your profile and accept the invitation.',
+    '4. Nilavaram will then open your workspace.',
+    '',
+    'Do not share this link.',
+    'Nilavaram uses Google sign-in only — no separate password.'
   ].join('\n');
 }
 
@@ -334,7 +653,19 @@ function buildInviteMessage_(email, displayName, role, mainUiUrl) {
 function getInvitePageData() {
   const admin = requireAdmin_();
   const config = getMainUiUrlForAdmin();
-  const users = getUsers();
+  const users = getUsers().map(function(user) {
+    return {
+      email: user.email,
+      displayName: user.displayName || '',
+      role: user.role,
+      status: user.status,
+      allowedClientIds: user.allowedClientIds || [],
+      allowedEntityIds: user.allowedEntityIds || [],
+      allowedModules: user.allowedModules || [],
+      mobilePhone: user.mobilePhone || '',
+      mobilePhoneDisplay: formatUsMobilePhoneForDisplay_(user.mobilePhone || '')
+    };
+  });
   const isSuperAdmin = admin.role === 'superadmin' || isSuperAdminEmail_(admin.email);
 
   return {
@@ -357,7 +688,7 @@ function getInvitePageData() {
  */
 function getInviteMessageForUser(email) {
   requireAdmin_();
-  const user = getUserByEmail_(email);
+  let user = ensureInviteTokenForUser_(email);
   if (!user) {
     throw new Error('User not found.');
   }
@@ -366,12 +697,59 @@ function getInviteMessageForUser(email) {
     displayName: user.displayName || user.email,
     role: user.role,
     status: user.status,
+    inviteUrl: buildInviteUrl_(getMainUiUrl_(), user.inviteToken),
     message: buildInviteMessage_(
       user.email,
       user.displayName,
       user.role,
-      getMainUiUrl_()
+      getMainUiUrl_(),
+      user.inviteToken
     ),
     mainUiUrl: getMainUiUrl_()
   };
+}
+
+/**
+ * Refreshes client/business pickers without reloading the whole invite page.
+ */
+function getInviteAccessCatalog() {
+  requireAdmin_();
+  return {
+    accessCatalog: {
+      clients: getInviteClientEntityCatalogForAdmin_()
+    }
+  }; 
+}
+
+/**
+ * @deprecated Use signInWithGoogleIdToken from Login.html.
+ */
+function verifyUserToken(idToken, inviteEmailHint) {
+  const auth = signInWithGoogleIdToken(idToken, inviteEmailHint || '');
+  if (!auth.success) {
+    return {
+      success: false,
+      error: auth.message || 'Authentication failed.'
+    };
+  }
+  const base = String(ScriptApp.getService().getUrl() || '').split('?')[0];
+  return {
+    success: true,
+    email: auth.email,
+    sessionKey: auth.sessionKey,
+    redirectUrl: base + '?workspace=1'
+  };
+}
+
+/**
+ * Checks Firestore to verify if the user exists and is authorized.
+ */
+function checkUserAuthorization(email) {
+  if (!email) return false;
+  
+  // Uses Nilavaram's existing Firestore helper
+  const user = getUserByEmail_(email); 
+  
+  // Grant access if the user document exists and status is active or invited
+  return !!(user && (user.status === 'active' || user.status === 'invited'));
 }

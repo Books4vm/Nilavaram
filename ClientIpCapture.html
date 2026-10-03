@@ -1,0 +1,125 @@
+<script>
+    /**
+     * ClientIpCapture.html
+     * Browser-side public IP lookup for session logs.
+     * Apps Script cannot read the visitor IP on the server.
+     */
+  
+    function applyNilavaramClientIp(ipAddress) {
+      if (!ipAddress) {
+        return;
+      }
+      window.nilavaramClientIp = String(ipAddress);
+      window.nilavaramClientIpStatus = 'ready';
+      if (typeof updateMainWorkspaceIp === 'function') {
+        updateMainWorkspaceIp(window.nilavaramClientIp);
+      }
+      if (typeof renderWorkspaceSessions === 'function') {
+        renderWorkspaceSessions();
+      }
+    }
+  
+    function inheritClientIpFromOpener() {
+      try {
+        if (window.opener && !window.opener.closed &&
+            window.opener.nilavaramClientIp) {
+          applyNilavaramClientIp(window.opener.nilavaramClientIp);
+          return true;
+        }
+      } catch (error) {
+        // Cross-origin or closed opener.
+      }
+      return false;
+    }
+  
+    function fetchJsonIp(url) {
+      return fetch(url).then(function(response) {
+        if (!response.ok) {
+          throw new Error('HTTP ' + response.status);
+        }
+        return response.json();
+      }).then(function(data) {
+        if (!data || !data.ip) {
+          throw new Error('No IP in JSON response');
+        }
+        return String(data.ip);
+      });
+    }
+  
+    function fetchCloudflareIp() {
+      return fetch('https://www.cloudflare.com/cdn-cgi/trace')
+        .then(function(response) {
+          if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+          }
+          return response.text();
+        })
+        .then(function(text) {
+          const match = String(text).match(/(?:^|\n)ip=([^\n]+)/);
+          if (!match) {
+            throw new Error('No IP in Cloudflare trace');
+          }
+          return match[1].trim();
+        });
+    }
+  
+    function captureClientIpOnce() {
+      if (window.nilavaramClientIpCaptureStarted) {
+        return;
+      }
+      window.nilavaramClientIpCaptureStarted = true;
+  
+      if (inheritClientIpFromOpener()) {
+        return;
+      }
+  
+      if (window.nilavaramClientIp) {
+        applyNilavaramClientIp(window.nilavaramClientIp);
+        return;
+      }
+  
+      const providers = [
+        function() {
+          return fetchJsonIp('https://api.ipify.org?format=json');
+        },
+        function() {
+          return fetchJsonIp('https://api64.ipify.org?format=json');
+        },
+        function() {
+          return fetchCloudflareIp();
+        }
+      ];
+  
+      let chain = Promise.reject(new Error('start'));
+      providers.forEach(function(provider) {
+        chain = chain.catch(function() {
+          return provider();
+        });
+      });
+  
+      chain
+        .then(applyNilavaramClientIp)
+        .catch(function() {
+          window.nilavaramClientIpStatus = 'unavailable';
+          if (typeof renderWorkspaceSessions === 'function') {
+            renderWorkspaceSessions();
+          }
+        });
+    }
+  
+    function shareClientIpWithPopup(popup) {
+      if (!popup || popup.closed || !window.nilavaramClientIp) {
+        return;
+      }
+      const share = function() {
+        try {
+          if (!popup.closed) {
+            popup.nilavaramClientIp = window.nilavaramClientIp;
+          }
+        } catch (error) {}
+      };
+      share();
+      window.setTimeout(share, 500);
+      window.setTimeout(share, 2000);
+    }
+  </script>

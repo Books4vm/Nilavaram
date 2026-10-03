@@ -82,6 +82,7 @@
     const OPEN_CONNECTIONS_ON_LOAD = <?!= openConnectionsOnLoadJson ?>;
     const IS_MAIN_WORKSPACE = true;
   </script>
+  <?!= include('ClientIpCapture') ?>
   <?!= include('DashboardCore') ?>
   <?!= include('DashboardSessions') ?>
   <?!= include('ShellContextSelector') ?>

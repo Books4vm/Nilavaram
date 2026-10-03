@@ -11,8 +11,8 @@
 /**
  * Dashboard startup information.
  */
-function getDashboardInfo() {
-  const email = getCurrentEmail_();
+function getDashboardInfo(nilavaramSessionKey) {
+  const email = getCurrentEmail_(nilavaramSessionKey);
   let currentUser = getUserByEmail_(email);
 
   /*
@@ -44,6 +44,10 @@ function getDashboardInfo() {
     role: currentUser ? currentUser.role : 'none',
 
     accessStatus: currentUser ? currentUser.status : 'not-invited',
+
+    inviteTokenRequired: currentUser &&
+      currentUser.status === 'invited' &&
+      !!String(currentUser.inviteToken || '').trim(),
 
     dateTime: new Date().toLocaleString(),
 

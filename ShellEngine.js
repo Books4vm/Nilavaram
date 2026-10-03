@@ -6,8 +6,8 @@
 const NILAVARAM_SESSION_WARNING_MINUTES = 9;
 const NILAVARAM_SESSION_TIMEOUT_MINUTES = 10;
 
-function getDashboardShell() {
-  const info = getDashboardInfo();
+function getDashboardShell(nilavaramSessionKey) {
+  const info = getDashboardInfo(nilavaramSessionKey);
   const shell = {
     info: info,
     clients: [],

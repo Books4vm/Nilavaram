@@ -61,6 +61,33 @@
     return parts.length ? parts.join(', ') : 'All';
   }
 
+  function formatInvitePhoneDisplay(user) {
+    if (user && user.mobilePhoneDisplay) {
+      return user.mobilePhoneDisplay;
+    }
+    const digits = String(user && user.mobilePhone || '').replace(/\D/g, '');
+    const tenDigit = digits.length === 11 && digits.charAt(0) === '1'
+      ? digits.slice(1)
+      : digits;
+    if (tenDigit.length !== 10) {
+      return '';
+    }
+    return '(' + tenDigit.slice(0, 3) + ') ' +
+      tenDigit.slice(3, 6) + '-' + tenDigit.slice(6);
+  }
+
+  function updateInvitePhoneFieldForRole(role) {
+    const phoneInput = document.getElementById('invite-mobilePhone');
+    const disclaimer = document.getElementById('invite-sms-disclaimer');
+    if (!phoneInput) return;
+    const disabledRole = role === 'disabled';
+    phoneInput.required = !disabledRole;
+    phoneInput.disabled = disabledRole;
+    if (disclaimer) {
+      disclaimer.hidden = disabledRole;
+    }
+  }
+
   function renderInviteShellHeader() {
     const startup = document.getElementById('startup');
     const badge = document.getElementById('module-shell-meta');
@@ -143,6 +170,7 @@
     if (!roleSelect) return;
     roleSelect.onchange = function() {
       updateInviteAccessPickersForRole(roleSelect.value);
+      updateInvitePhoneFieldForRole(roleSelect.value);
     };
   }
 
@@ -150,8 +178,10 @@
     if (!user) return;
     document.getElementById('invite-email').value = user.email || '';
     document.getElementById('invite-displayName').value = user.displayName || '';
+    document.getElementById('invite-mobilePhone').value = formatInvitePhoneDisplay(user);
     document.getElementById('invite-role').value = user.role || 'reader';
     updateInviteAccessPickersForRole(user.role || 'reader');
+    updateInvitePhoneFieldForRole(user.role || 'reader');
     applyInviteAccessSelection({
       allowedClientIds: user.allowedClientIds || [],
       allowedEntityIds: user.allowedEntityIds || [],
@@ -162,6 +192,25 @@
       ' Editing ' + (user.email || '') + '. Save to update, then Copy invite to resend.';
   }
 
+  function resendInviteEmailForUser(email) {
+    if (!email) return;
+    google.script.run
+      .withSuccessHandler(function(result) {
+        alert(result.message);
+        loadInviteMessage(email);
+        google.script.run
+          .withSuccessHandler(function(pageData) {
+            window.nilavaramInvitePage = pageData;
+            renderInviteUsersTable(pageData.users || []);
+          })
+          .getInvitePageData();
+      })
+      .withFailureHandler(function(error) {
+        alert(error && error.message ? error.message : String(error));
+      })
+      .resendInviteEmail(email);
+  }
+
   function renderInviteWindow(data) {
     window.nilavaramInvitePage = data;
     window.nilavaramInviteAccessCatalog = data.accessCatalog || { clients: [] };
@@ -170,8 +219,8 @@
     let mainUiSection =
       '<section class="workspace-selection">' +
         '<h3>Main UI URL</h3>' +
-        '<p class="help-meta">No email is sent automatically yet. Copy the invite message ' +
-          'below and send it in Gmail until Step 4C is built.</p>' +
+        '<p class="help-meta">Saving an invitation sends email automatically from your ' +
+          'Gmail account. Each invite link includes a unique token (?invite=...).</p>' +
         '<div class="invite-url-box" id="main-ui-url-display">' +
           escapeHtml(data.mainUiUrl || '(not set yet)') +
         '</div>' +
@@ -205,7 +254,10 @@
             '<div><label for="invite-email">Google email</label>' +
               '<input id="invite-email" type="email" required></div>' +
             '<div><label for="invite-displayName">Display name</label>' +
-              '<input id="invite-displayName" type="text"></div>' +
+              '<input id="invite-displayName" type="text" required></div>' +
+            '<div><label for="invite-mobilePhone">US mobile phone</label>' +
+              '<input id="invite-mobilePhone" type="tel" inputmode="tel" ' +
+              'autocomplete="tel" placeholder="(555) 123-4567" required></div>' +
             '<div><label for="invite-role">Role</label>' +
               '<select id="invite-role">' +
                 '<option value="admin">Admin</option>' +
@@ -215,16 +267,22 @@
                 '<option value="disabled">Disabled</option>' +
               '</select></div>' +
           '</div>' +
+          '<p id="invite-sms-disclaimer" class="help-meta">' +
+            'SMS account reminders are sent only to US mobile numbers. ' +
+            'By saving this invitation, you confirm this is a US mobile number for the invitee.' +
+          '</p>' +
           '<div id="invite-access-pickers"></div>' +
           '<button class="primary-button" type="submit">Save invitation</button>' +
           '<span id="invite-form-message"></span>' +
         '</form>' +
       '</section>' +
       '<section class="workspace-selection" id="invite-message-panel" hidden>' +
-        '<h3>Invite message — copy and send in Gmail</h3>' +
+        '<h3>Invite message — backup copy</h3>' +
+        '<p class="help-meta">Email is sent automatically on Save. Use Copy message only if ' +
+          'you need to resend manually.</p>' +
         '<textarea id="invite-message-text" class="invite-message" readonly></textarea>' +
         '<div class="invite-actions">' +
-          '<button type="button" class="primary-button" id="copy-invite-message">' +
+          '<button type="button" class="secondary-button" id="copy-invite-message">' +
             'Copy message</button>' +
           '<span id="copy-invite-message-result" class="help-meta"></span>' +
         '</div>' +
@@ -235,6 +293,9 @@
       '</section>';
 
     updateInviteAccessPickersForRole(
+      document.getElementById('invite-role').value || 'admin'
+    );
+    updateInvitePhoneFieldForRole(
       document.getElementById('invite-role').value || 'admin'
     );
     bindInviteRolePicker();
@@ -293,19 +354,28 @@
     const input = {
       email: document.getElementById('invite-email').value,
       displayName: document.getElementById('invite-displayName').value,
+      mobilePhone: document.getElementById('invite-mobilePhone').value,
       role: role,
       allowedClientIds: access.allowedClientIds,
       allowedEntityIds: access.allowedEntityIds,
       allowedModules: access.allowedModules
     };
 
-    document.getElementById('invite-form-message').textContent = ' Saving...';
+    document.getElementById('invite-form-message').textContent = ' Saving and sending email...';
     google.script.run
       .withSuccessHandler(function(result) {
+        const cssClass = result.emailSent ? 'success' : 'error';
         document.getElementById('invite-form-message').innerHTML =
-          ' <span class="success">' + escapeHtml(result.message) + '</span>';
-        loadInviteMessage(input.email);
-        initInviteWindow();
+          ' <span class="' + cssClass + '">' + escapeHtml(result.message) + '</span>';
+        loadInviteMessage(input.email, function(inviteResult) {
+          showInviteSavedPopup(input.email, inviteResult, result);
+          google.script.run
+            .withSuccessHandler(function(pageData) {
+              window.nilavaramInvitePage = pageData;
+              renderInviteUsersTable(pageData.users || []);
+            })
+            .getInvitePageData();
+        });
       })
       .withFailureHandler(function(error) {
         document.getElementById('invite-form-message').innerHTML =
@@ -314,11 +384,14 @@
       .saveUser(input);
   }
 
-  function loadInviteMessage(email) {
+  function loadInviteMessage(email, onComplete) {
     google.script.run
       .withSuccessHandler(function(result) {
         document.getElementById('invite-message-panel').hidden = false;
         document.getElementById('invite-message-text').value = result.message;
+        if (typeof onComplete === 'function') {
+          onComplete(result);
+        }
       })
       .withFailureHandler(function(error) {
         alert(error && error.message ? error.message : String(error));
@@ -332,7 +405,7 @@
 
     let html =
       '<table class="users-table"><thead><tr>' +
-        '<th>Email</th><th>Name</th><th>Role</th><th>Scope</th>' +
+        '<th>Email</th><th>Name</th><th>Phone</th><th>Role</th><th>Scope</th>' +
         '<th>Status</th><th>Actions</th>' +
       '</tr></thead><tbody>';
 
@@ -341,14 +414,19 @@
         '<tr>' +
           '<td>' + escapeHtml(user.email) + '</td>' +
           '<td>' + escapeHtml(user.displayName || '') + '</td>' +
+          '<td>' + escapeHtml(formatInvitePhoneDisplay(user) || '—') + '</td>' +
           '<td>' + escapeHtml(user.role) + '</td>' +
           '<td>' + escapeHtml(formatInviteScopeSummary(user)) + '</td>' +
           '<td>' + escapeHtml(user.status) + '</td>' +
           '<td>' +
             '<button type="button" class="secondary-button invite-edit-btn" ' +
               'data-user-index="' + index + '">Edit</button> ' +
+            (user.status === 'invited'
+              ? '<button type="button" class="secondary-button invite-resend-btn" ' +
+                  'data-user-index="' + index + '">Resend email</button> '
+              : '') +
             '<button type="button" class="secondary-button invite-copy-btn" ' +
-              'data-user-index="' + index + '">Copy invite</button>' +
+              'data-user-index="' + index + '">Copy message</button>' +
           '</td>' +
         '</tr>';
     });
@@ -365,18 +443,135 @@
       };
     });
 
-    host.querySelectorAll('.invite-copy-btn').forEach(function(button) {
+    host.querySelectorAll('.invite-resend-btn').forEach(function(button) {
       button.onclick = function() {
         const idx = Number(button.getAttribute('data-user-index'));
         const user = (window.nilavaramInvitePage &&
           window.nilavaramInvitePage.users || [])[idx];
         if (user && user.email) {
-          loadInviteMessage(user.email);
-          document.getElementById('invite-message-panel').scrollIntoView({
-            behavior: 'smooth'
-          });
+          resendInviteEmailForUser(user.email);
         }
       };
     });
   }
+
+function openManageClientsFromInviteWindow() {
+  const page = window.nilavaramInvitePage || {};
+  const baseUrl = String(page.mainUiUrl || '').replace(/\?$/, '');
+  if (!baseUrl) {
+    alert('Save or refresh the Main UI URL first.');
+    return;
+  }
+
+  const query =
+    '?clientBusinessWindow=1' +
+    '&clientId=' + encodeURIComponent(
+      typeof INVITE_CLIENT_ID !== 'undefined' ? INVITE_CLIENT_ID : ''
+    ) +
+    '&entityId=' + encodeURIComponent(
+      typeof INVITE_ENTITY_ID !== 'undefined' ? INVITE_ENTITY_ID : ''
+    ) +
+    '&clientName=' + encodeURIComponent(
+      typeof INVITE_CLIENT_NAME !== 'undefined' ? INVITE_CLIENT_NAME : ''
+    ) +
+    '&entityName=' + encodeURIComponent(
+      typeof INVITE_ENTITY_NAME !== 'undefined' ? INVITE_ENTITY_NAME : ''
+    ) +
+    '&user=' + encodeURIComponent(page.currentAdminEmail || '') +
+    '&role=' + encodeURIComponent('admin');
+
+  const popup = window.open(
+    baseUrl + query,
+    'NilavaramClientBusiness',
+    'popup=yes,width=980,height=900,resizable=yes,scrollbars=yes'
+  );
+
+  if (!popup || popup.closed) {
+    alert('Pop-up blocked. Allow pop-ups, then try again.');
+    return;
+  }
+
+  const msg = document.getElementById('invite-manage-clients-msg');
+  if (msg) {
+    msg.textContent = ' Manage window open — close it to refresh the list.';
+  }
+
+  const timer = window.setInterval(function() {
+    if (!popup || popup.closed) {
+      window.clearInterval(timer);
+      refreshInviteClientCatalog();
+    }
+  }, 500);
+}
+
+function refreshInviteClientCatalog() {
+  const msg = document.getElementById('invite-manage-clients-msg');
+  if (msg) {
+    msg.textContent = ' Refreshing client list...';
+  }
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      window.nilavaramInviteAccessCatalog = data.accessCatalog || { clients: [] };
+      const roleSelect = document.getElementById('invite-role');
+      updateInviteAccessPickersForRole(roleSelect ? roleSelect.value : 'admin');
+      if (msg) {
+        msg.textContent = ' Client and business list updated.';
+      }
+    })
+    .withFailureHandler(function(error) {
+      if (msg) {
+        msg.textContent = ' ' + (error && error.message ? error.message : String(error));
+      }
+    })
+    .getInviteAccessCatalog();
+}
+
+function bindInviteManageClientsButton() {
+  const button = document.getElementById('invite-manage-clients-btn');
+  if (!button) return;
+  button.onclick = openManageClientsFromInviteWindow;
+}
+
+function showInviteSavedPopup(email, inviteResult, saveResult) {
+  const safeEmail = String(email || '').trim();
+  const save = saveResult || {};
+  const lines = [];
+
+  if (save.emailSent) {
+    lines.push(
+      'Invitation saved.',
+      'Two emails were sent:',
+      '  1. Full invitation (with setup link)',
+      '  2. Short ALERT — check Spam/Junk',
+      '',
+      'Invitee: ' + safeEmail,
+      '',
+      'They must sign in with exactly that Google account.',
+      'Phone push only works if that Gmail is on their phone Gmail app.'
+    );
+  } else {
+    lines.push(
+      'Invitation saved, but email was NOT sent.',
+      '',
+      'Invitee: ' + safeEmail,
+      '',
+      String(save.emailError || save.message || 'Unknown email error.'),
+      '',
+      'Use Resend email on the user row, or Copy message below.'
+    );
+  }
+
+  if (inviteResult && inviteResult.inviteUrl) {
+    lines.push('', 'Setup link:', inviteResult.inviteUrl);
+  }
+
+  alert(lines.join('\n'));
+
+  const panel = document.getElementById('invite-message-panel');
+  if (panel) {
+    panel.hidden = false;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
 </script>

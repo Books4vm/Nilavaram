@@ -149,12 +149,14 @@
     let inviteHeaderTimerId = null;
   </script>
 
+  <?!= include('ClientIpCapture') ?>
   <?!= include('InviteModuleCatalog') ?>
   <?!= include('InviteAccessPicker') ?>
   <?!= include('InviteWindowCore') ?>
 
   <script>
     window.onload = function() {
+      captureClientIpOnce();
       initInviteWindow();
       if (inviteHeaderTimerId !== null) {
         window.clearInterval(inviteHeaderTimerId);

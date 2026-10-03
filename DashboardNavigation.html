@@ -35,14 +35,19 @@
   }
 
   function applyShellFromEngine(shell) {
-    const data = shell.info || {};
-    window.nilavaramDashboardInfo = data;
-    window.nilavaramSessionPolicy = shell.sessionPolicy || {
-      warningMinutes: 9,
-      timeoutMinutes: 10
-    };
-    renderStartupInfo(data);
+  const data = shell.info || {};
+  window.nilavaramDashboardInfo = data;
+  window.nilavaramSessionPolicy = shell.sessionPolicy || {
+    warningMinutes: 9,
+    timeoutMinutes: 10
+  };
+  renderStartupInfo(data);
 
+  const inviteToken = typeof getInviteTokenFromUrl === 'function'
+    ? getInviteTokenFromUrl()
+    : '';
+
+  function continueShellLoad() {
     if (typeof blockInactiveShellAccess === 'function' &&
         blockInactiveShellAccess(data)) {
       return;
@@ -67,6 +72,27 @@
       'Complete Step 1 and Step 2 in the workspace, then choose a menu item.'
     );
   }
+
+  if (inviteToken) {
+    google.script.run
+      .withSuccessHandler(function(landing) {
+        window.nilavaramInviteLanding = landing;
+        continueShellLoad();
+      })
+      .withFailureHandler(function(error) {
+        window.nilavaramInviteLanding = {
+          hasToken: true,
+          valid: false,
+          message: error && error.message ? error.message : String(error)
+        };
+        continueShellLoad();
+      })
+      .validateInviteLanding(inviteToken);
+    return;
+  }
+
+  continueShellLoad();
+}
 
   function updateMenuSelectorState(skipReload) {
     if (!isShellContextComplete()) {
@@ -193,6 +219,8 @@
       );
       return;
     }
+
+    shareClientIpWithPopup(popup);
 
     const sessionId = 'invite_' + Date.now();
     registerModuleSession({

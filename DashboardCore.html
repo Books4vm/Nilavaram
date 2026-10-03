@@ -1,5 +1,11 @@
 <script>
-  let startupTimerId = null;
+  function nilavaramSessionKey() {
+    try {
+      return window.localStorage.getItem('nilavaramSessionKey') || '';
+    } catch (error) {
+      return '';
+    }
+  }
 
   function applyDashboardInfoBootstrap() {
     const info = (typeof DASHBOARD_INFO_BOOTSTRAP === 'object' &&
@@ -12,41 +18,31 @@
     }
     renderStartupLine();
   }
-  
+
   window.onload = function() {
     applyDashboardInfoBootstrap();
-    captureClientIpOnce();
+    if (typeof captureClientIpOnce === 'function') {
+      captureClientIpOnce();
+    }
     initializeDisplayPreferences();
     if (startupTimerId !== null) {
       window.clearInterval(startupTimerId);
     }
     startupTimerId = window.setInterval(renderStartupLine, 1000);
     if (OPEN_CONNECTIONS_ON_LOAD) {
-      showConnections();
-    } else {
+      if (typeof showConnections === 'function') {
+        showConnections();
+      }
+    } else if (typeof showDefaultWorkspace === 'function') {
       showDefaultWorkspace();
     }
-    buildShellSkeleton();
-    loadShellFromEngine();
+    if (typeof buildShellSkeleton === 'function') {
+      buildShellSkeleton();
+    }
+    if (typeof loadShellFromEngine === 'function') {
+      loadShellFromEngine();
+    }
   };
-
-  function captureClientIpOnce() {
-    if (window.nilavaramClientIpCaptureStarted) return;
-    window.nilavaramClientIpCaptureStarted = true;
-
-    fetch('https://api.ipify.org?format=json')
-      .then(function(response) { return response.json(); })
-      .then(function(data) {
-        if (!data || !data.ip) return;
-        window.nilavaramClientIp = String(data.ip);
-        if (typeof updateMainWorkspaceIp === 'function') {
-          updateMainWorkspaceIp(window.nilavaramClientIp);
-        }
-      })
-      .catch(function() {
-        // Keep Pending if lookup fails.
-      });
-  }
 
   function moveContentToTop() {
     const content = document.querySelector('.content');
@@ -210,17 +206,114 @@
     }
   }
 
+  function getInviteTokenFromUrl() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return String(params.get('invite') || '').trim();
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function renderWrongInviteAccountPanel(landing) {
+    document.getElementById('menu').textContent = '';
+    document.getElementById('output').innerHTML =
+      '<h2>Invitation link</h2>' +
+      '<p><b>This invitation is for:</b> ' + escapeHtml(landing.email) + '</p>' +
+      '<p><b>You are signed in as:</b> ' +
+        escapeHtml((window.nilavaramDashboardInfo || {}).user || '') + '</p>' +
+      '<p class="error">Sign out, then open the invitation link again and choose ' +
+        escapeHtml(landing.email) + ' when Google asks which account to use.</p>' +
+      '<p class="help-meta">Tip: use a private/incognito window to avoid the wrong ' +
+        'Google account opening automatically.</p>';
+  }
+
+  function renderInviteOnboardingPanel(data, landing) {
+    document.getElementById('menu').textContent = '';
+
+    const displayName = landing.displayName || data.user || '';
+    const phoneDisplay = landing.mobilePhoneDisplay || '';
+
+    let html =
+      '<h2>Welcome to Nilavaram</h2>' +
+      '<p>Complete this one-time setup before entering the workspace.</p>' +
+      '<p class="help-meta"><b>Invited role:</b> ' + escapeHtml(data.role || landing.role || '') +
+      '</p>' +
+      '<p class="help-meta">If you did not receive the invitation email in your Inbox, ' +
+      'check your <b>Spam</b> or <b>Junk</b> folder.</p>' +
+      '<form id="invite-onboarding-form">' +
+        '<div><label for="onboard-displayName">Display name</label>' +
+          '<input id="onboard-displayName" type="text" required value="' +
+          escapeHtml(displayName) + '"></div>' +
+        '<div><label for="onboard-email">Google email (read-only)</label>' +
+          '<input id="onboard-email" type="email" readonly value="' +
+          escapeHtml(data.user || landing.email || '') + '"></div>' +
+        '<div><label for="onboard-mobilePhone">US mobile phone</label>' +
+          '<input id="onboard-mobilePhone" type="tel" inputmode="tel" required value="' +
+          escapeHtml(phoneDisplay) + '"></div>' +
+        '<p class="help-meta">Confirm this is your US mobile number. SMS reminders may be sent later.</p>' +
+        '<label><input id="onboard-spam-ack" type="checkbox" required> ' +
+          'I will check Spam/Junk if the invitation email is not in my Inbox.</label>' +
+        '<div style="margin-top:16px">' +
+          '<button class="primary-button" type="submit" id="onboard-submit-btn">' +
+            'Confirm profile and accept invitation</button>' +
+        '</div>' +
+        '<p id="onboard-message" class="help-meta"></p>' +
+      '</form>';
+
+    document.getElementById('output').innerHTML = html;
+
+    const form = document.getElementById('invite-onboarding-form');
+    if (!form) {
+      return;
+    }
+    form.onsubmit = function(event) {
+      event.preventDefault();
+      confirmAndAcceptInvitation();
+    };
+  }
+
   function blockInactiveShellAccess(data) {
-    if (data.accessStatus === 'invited') {
-      document.getElementById('menu').textContent = '';
-      document.getElementById('output').innerHTML =
-        '<h2>Invitation found</h2>' +
-        '<p>Your Google account has been invited to Nilavaram as ' +
-        escapeHtml(data.role) + '.</p>' +
-        '<button class="primary-button" type="button" ' +
-        'onclick="acceptInvitation()">Accept invitation</button>';
+    const inviteToken = getInviteTokenFromUrl();
+    const landing = window.nilavaramInviteLanding;
+
+    if (landing && landing.hasToken && landing.valid && !landing.emailMatchesSignedIn) {
+      renderWrongInviteAccountPanel(landing);
       return true;
     }
+
+    if (data.accessStatus === 'invited') {
+      if (landing && landing.hasToken) {
+        if (!landing.valid) {
+          document.getElementById('menu').textContent = '';
+          document.getElementById('output').innerHTML =
+            '<h2>Invitation link</h2>' +
+            '<p class="error">' + escapeHtml(landing.message) + '</p>';
+          return true;
+        }
+        if (!landing.emailMatchesSignedIn) {
+          renderWrongInviteAccountPanel(landing);
+          return true;
+        }
+        if (landing.alreadyActive) {
+          document.getElementById('menu').textContent = '';
+          document.getElementById('output').innerHTML =
+            '<h2>Invitation already active</h2>' +
+            '<p>Your invitation is already active. Reloading the workspace...</p>';
+          return true;
+        }
+      } else if (data.inviteTokenRequired && !inviteToken) {
+        document.getElementById('menu').textContent = '';
+        document.getElementById('output').innerHTML =
+          '<h2>Invitation required</h2>' +
+          '<p class="error">Open the invitation link from your email to continue.</p>';
+        return true;
+      }
+
+      renderInviteOnboardingPanel(data, landing || {});
+      return true;
+    }
+
     if (data.accessStatus !== 'active') {
       document.getElementById('menu').textContent = '';
       document.getElementById('output').innerHTML =
@@ -230,6 +323,65 @@
       return true;
     }
     return false;
+  }
+
+  function redirectAfterInviteAccept() {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('invite');
+      window.location.href = url.toString();
+    } catch (error) {
+      window.location.reload();
+    }
+  }
+
+  function confirmAndAcceptInvitation() {
+    const token = getInviteTokenFromUrl();
+    const messageEl = document.getElementById('onboard-message');
+    const submitBtn = document.getElementById('onboard-submit-btn');
+    const displayName = document.getElementById('onboard-displayName').value;
+    const mobilePhone = document.getElementById('onboard-mobilePhone').value;
+    const spamAck = document.getElementById('onboard-spam-ack');
+
+    if (!spamAck || !spamAck.checked) {
+      if (messageEl) {
+        messageEl.textContent = ' Please confirm the Spam/Junk checkbox.';
+      }
+      return;
+    }
+
+    if (messageEl) {
+      messageEl.textContent = ' Saving your profile and accepting invitation...';
+    }
+    if (submitBtn) {
+      submitBtn.disabled = true;
+    }
+
+    google.script.run
+      .withSuccessHandler(function() {
+        google.script.run
+          .withSuccessHandler(function() {
+            redirectAfterInviteAccept();
+          })
+          .withFailureHandler(function(error) {
+            if (submitBtn) submitBtn.disabled = false;
+            showError(error);
+          })
+          .acceptMyInvitation(token);
+      })
+      .withFailureHandler(function(error) {
+        if (submitBtn) submitBtn.disabled = false;
+        if (messageEl) {
+          messageEl.textContent = ' ' +
+            (error && error.message ? error.message : String(error));
+        } else {
+          showError(error);
+        }
+      })
+      .completeInviteOnboarding(token, {
+        displayName: displayName,
+        mobilePhone: mobilePhone
+      });
   }
 
   function loadShellFromEngine() {
@@ -251,12 +403,10 @@
         }
         showWorkspaceNotice('Server connection failed: ' + message);
       })
-      .getDashboardShell();
+      .getDashboardShell(nilavaramSessionKey());
   }
+
   function acceptInvitation() {
-    google.script.run
-      .withSuccessHandler(function() { window.location.reload(); })
-      .withFailureHandler(showError)
-      .acceptMyInvitation();
+    confirmAndAcceptInvitation();
   }
 </script>

@@ -22,6 +22,231 @@ function include(filename) {
 }
 
 /**
+ * Visitor email for login routing only — never falls back to deployer.
+ *
+ * @returns {string}
+ */
+function getActiveVisitorEmailOrEmpty_() {
+  try {
+    return normalizeEmail_(Session.getActiveUser().getEmail());
+  } catch (error) {
+    return '';
+  }
+}
+
+/**
+ * Active web app URL (must match Google Cloud redirect URI).
+ *
+ * @returns {string}
+ */
+function getNilavaramWebAppUrl_() {
+  return String(
+    ScriptApp.getService().getUrl() || getMainUiUrl_() || ''
+  ).trim();
+}
+
+/**
+ * Query params to carry from Login to Dashboard (?workspace=1).
+ *
+ * @param {Object} parameters doGet parameters.
+ * @returns {Object}
+ */
+function buildPreservedLoginQuery_(parameters) {
+  const preserved = {};
+  if (parameters.invite) {
+    preserved.invite = String(parameters.invite);
+  }
+  if (parameters.validateOneDrive === '1') {
+    preserved.validateOneDrive = '1';
+  }
+  if (parameters.validateAkoya === '1') {
+    preserved.validateAkoya = '1';
+  }
+  return preserved;
+}
+
+/**
+ * OAuth state for Google redirect login (returned on callback).
+ *
+ * @param {Object} parameters Login page query params.
+ * @returns {string}
+ */
+function buildGoogleOAuthState_(parameters) {
+  const invite = parameters && parameters.invite
+    ? String(parameters.invite).trim()
+    : '';
+  return invite ? ('login:' + invite) : 'login';
+}
+
+/**
+ * @param {string} state
+ * @returns {{ inviteToken: string }|null}
+ */
+function parseGoogleOAuthState_(state) {
+  const value = String(state || '').trim();
+  if (value === 'login') {
+    return { inviteToken: '' };
+  }
+  if (value.indexOf('login:') === 0) {
+    return { inviteToken: value.slice(6) };
+  }
+  return null;
+}
+
+/**
+ * Google authorization URL (full-page redirect).
+ *
+ * @param {Object} parameters
+ * @param {string} redirectUri
+ * @returns {string}
+ */
+function buildGoogleAuthorizationUrl_(parameters, redirectUri) {
+  const clientId = getGoogleOauthClientId_();
+  const state = buildGoogleOAuthState_(parameters || {});
+  let url =
+    'https://accounts.google.com/o/oauth2/v2/auth?' +
+    'client_id=' + encodeURIComponent(clientId) +
+    '&redirect_uri=' + encodeURIComponent(redirectUri) +
+    '&response_type=code' +
+    '&scope=' + encodeURIComponent('openid email profile') +
+    '&state=' + encodeURIComponent(state) +
+    '&prompt=select_account';
+  const inviteHint = getInvitedEmailHintForToken_(
+    parameters && parameters.invite
+  );
+  if (inviteHint) {
+    url += '&login_hint=' + encodeURIComponent(inviteHint);
+  }
+  return url;
+}
+
+/**
+ * Serves the login page (Sign in with Google redirect).
+ *
+ * @param {Object} parameters doGet parameters.
+ * @returns {GoogleAppsScript.HTML.HtmlOutput}
+ */
+function serveLoginPage_(parameters) {
+  const params = parameters || {};
+  const loginTemplate = HtmlService.createTemplateFromFile('Login');
+  const execUrl = getNilavaramWebAppUrl_();
+
+  loginTemplate.execUrlJson = JSON.stringify(execUrl)
+    .replace(/</g, '\\u003c');
+  loginTemplate.preservedQueryJson = JSON.stringify(
+    buildPreservedLoginQuery_(params)
+  ).replace(/</g, '\\u003c');
+  loginTemplate.invitedEmailHintJson = JSON.stringify(
+    getInvitedEmailHintForToken_(params.invite)
+  ).replace(/</g, '\\u003c');
+  loginTemplate.clientIdJson = JSON.stringify(getGoogleOauthClientId_())
+    .replace(/</g, '\\u003c');
+
+  loginTemplate.loginUrl = buildGoogleAuthorizationUrl_(params, execUrl);
+
+  return loginTemplate.evaluate()
+    .setTitle('Nilavaram — Sign in')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * @returns {string}
+ */
+function getGoogleOauthClientSecret_() {
+  const secret = String(
+    PropertiesService.getScriptProperties().getProperty(
+      'GOOGLE_OAUTH_CLIENT_SECRET'
+    ) || ''
+  ).trim();
+  if (!secret) {
+    throw new Error(
+      'Missing GOOGLE_OAUTH_CLIENT_SECRET in Script properties.'
+    );
+  }
+  return secret;
+}
+
+/**
+ * @param {string} code
+ * @param {string} redirectUri
+ * @returns {Object}
+ */
+function exchangeGoogleAuthCode_(code, redirectUri) {
+  const payload = {
+    code: String(code || ''),
+    client_id: getGoogleOauthClientId_(),
+    client_secret: getGoogleOauthClientSecret_(),
+    redirect_uri: String(redirectUri || ''),
+    grant_type: 'authorization_code'
+  };
+  const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+    method: 'post',
+    contentType: 'application/x-www-form-urlencoded',
+    payload: payload,
+    muteHttpExceptions: true
+  });
+  if (response.getResponseCode() !== 200) {
+    Logger.log('Google token exchange: ' + response.getContentText());
+    throw new Error('Google sign-in exchange failed. Try again.');
+  }
+  const tokens = JSON.parse(response.getContentText());
+  if (!tokens.id_token) {
+    throw new Error('Google did not return an ID token.');
+  }
+  return tokens;
+}
+
+/**
+ * After Google redirects with ?code=...&state=login...
+ *
+ * @param {Object} parameters doGet parameters.
+ * @returns {GoogleAppsScript.HTML.HtmlOutput}
+ */
+function completeGoogleLoginFromOAuthRedirect_(parameters) {
+  const parsed = parseGoogleOAuthState_(parameters.state);
+  if (!parsed) {
+    throw new Error('Invalid sign-in state. Open Nilavaram and sign in again.');
+  }
+  const redirectUri = getNilavaramWebAppUrl_();
+  const tokens = exchangeGoogleAuthCode_(parameters.code, redirectUri);
+  const inviteHint = getInvitedEmailHintForToken_(parsed.inviteToken);
+  const auth = signInWithGoogleIdToken(tokens.id_token, inviteHint);
+  if (!auth.success) {
+    throw new Error(auth.message || 'Sign in was not completed.');
+  }
+  return buildNilavaramSessionHandoffPage_(auth.sessionKey, parsed.inviteToken);
+}
+
+/**
+ * Browser page: save session key, then open workspace.
+ *
+ * @param {string} sessionKey
+ * @param {string} inviteToken
+ * @returns {GoogleAppsScript.HTML.HtmlOutput}
+ */
+function buildNilavaramSessionHandoffPage_(sessionKey, inviteToken) {
+  const base = getNilavaramWebAppUrl_().split('?')[0];
+  let workspaceUrl = base + '?workspace=1';
+  if (inviteToken) {
+    workspaceUrl += '&invite=' + encodeURIComponent(inviteToken);
+  }
+  const keyJson = JSON.stringify(String(sessionKey || ''));
+  const urlJson = JSON.stringify(workspaceUrl);
+  return HtmlService.createHtmlOutput(
+    '<!doctype html><html><head><base target="_top">' +
+    '<meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>Signing in</title></head><body>' +
+    '<p>Signing you in…</p>' +
+    '<script>' +
+    'try{localStorage.setItem("nilavaramSessionKey",' + keyJson + ');}' +
+    'catch(e){}' +
+    'window.location.replace(' + urlJson + ');' +
+    '</script></body></html>'
+  ).setTitle('Nilavaram — Signing in');
+}
+
+/**
  * Web application entry point.
  *
  * @returns {GoogleAppsScript.HTML.HtmlOutput}
@@ -112,7 +337,7 @@ function doGet(e) {
       ).setTitle('OneDrive Recovery Status');
     }
   }
-  
+
   if (parameters.clientBusinessWindow === '1') {
     try {
       authorizePopupWindow_(
@@ -156,7 +381,7 @@ function doGet(e) {
         error
       );
     }
-  
+
     const moduleTemplate = HtmlService.createTemplateFromFile('ModuleWindow');
     moduleTemplate.moduleIdJson = JSON.stringify(String(parameters.moduleId || ''))
       .replace(/</g, '\\u003c');
@@ -299,6 +524,22 @@ function doGet(e) {
     } catch (error) {
       return buildAuthorizationErrorPage_('Users & Invitations', error);
     }
+  }
+
+  if (
+    parameters.code &&
+    parameters.provider !== 'akoya' &&
+    parseGoogleOAuthState_(parameters.state)
+  ) {
+    try {
+      return completeGoogleLoginFromOAuthRedirect_(parameters);
+    } catch (error) {
+      return buildAuthorizationErrorPage_('Nilavaram Sign in', error);
+    }
+  }
+
+  if (parameters.workspace !== '1') {
+    return serveLoginPage_(parameters);
   }
   const template = HtmlService.createTemplateFromFile('Dashboard');
   const validateOneDrive = parameters.validateOneDrive === '1';

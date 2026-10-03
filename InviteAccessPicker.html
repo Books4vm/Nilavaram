@@ -10,6 +10,25 @@
     }
   }
 
+  function groupInviteModulesByMenuGroup(modules) {
+    const groups = {};
+    const order = [];
+    (modules || []).forEach(function(item) {
+      const groupName = String(item.group || 'Other');
+      if (!groups[groupName]) {
+        groups[groupName] = [];
+        order.push(groupName);
+      }
+      groups[groupName].push(item);
+    });
+    return order.map(function(groupName) {
+      return {
+        name: groupName,
+        modules: groups[groupName]
+      };
+    });
+  }
+
   function inviteRoleShowsClientPickers(role) {
     return ['admin', 'reader', 'editor', 'ltd'].indexOf(String(role || '')) !== -1;
   }
@@ -33,7 +52,9 @@
   }
 
   function bindInviteAccessToggleButtons() {
-    document.querySelectorAll('.invite-client-toggle, .invite-entity-toggle').forEach(function(button) {
+    document.querySelectorAll(
+      '.invite-client-toggle, .invite-entity-toggle, .invite-module-toggle'
+    ).forEach(function(button) {
       button.onclick = function() {
         toggleInviteAccessButton(button);
       };
@@ -44,6 +65,7 @@
     role = String(role || 'editor');
     const clients = (accessCatalog && accessCatalog.clients) || [];
     const modules = readInviteModuleCatalog();
+    const moduleGroups = groupInviteModulesByMenuGroup(modules);
     let html = '';
 
     if (inviteRoleShowsClientPickers(role)) {
@@ -52,6 +74,11 @@
           '<legend><b>Clients</b></legend>' +
           '<p class="help-meta">Click client names to restrict access. ' +
             'Leave all unselected to allow every client.</p>' +
+          '<div class="invite-actions">' +
+            '<button type="button" class="secondary-button" id="invite-manage-clients-btn">' +
+              'Manage clients &amp; businesses</button>' +
+            '<span id="invite-manage-clients-msg" class="help-meta"></span>' +
+          '</div>' +
           '<div class="invite-group-caption">Choose client(s)</div>' +
           '<div class="invite-toggle-row">';
 
@@ -105,22 +132,31 @@
     if (inviteRoleShowsModulePickers(role)) {
       let moduleHtml =
         '<fieldset class="invite-access-block" id="invite-module-fieldset">' +
-          '<legend><b>Modules (Ltd role only)</b></legend>' +
-          '<p class="help-meta">Leave all unchecked to allow every Ltd module. ' +
-            'Check to restrict menu access.</p>' +
-          '<div class="invite-check-grid">';
+          '<legend><b>Menu modules (Ltd role only)</b></legend>' +
+          '<p class="help-meta">Click menu items under each group caption. ' +
+            'Leave all unselected to allow every Ltd module.</p>';
 
-      modules.forEach(function(item) {
+      moduleGroups.forEach(function(group) {
         moduleHtml +=
-          '<label class="invite-check-item invite-module-item">' +
-            '<input type="checkbox" class="invite-module-checkbox" ' +
-              'value="' + escapeHtml(item.moduleId) + '"> ' +
-            escapeHtml(item.label) +
-            ' <span class="help-meta">(' + escapeHtml(item.group || 'Other') + ')</span>' +
-          '</label>';
-      });
-      moduleHtml += '</div></fieldset>';
+          '<div class="invite-client-block" data-menu-group="' +
+            escapeHtml(group.name) + '">' +
+            '<div class="invite-group-caption">' + escapeHtml(group.name) + '</div>' +
+            '<div class="invite-toggle-row">';
 
+        (group.modules || []).forEach(function(item) {
+          moduleHtml +=
+            '<button type="button" class="secondary-button invite-toggle-btn invite-module-toggle" ' +
+              'data-module-id="' + escapeHtml(item.moduleId) + '" ' +
+              'aria-pressed="false" aria-label="' +
+              escapeHtml(group.name) + ' module ' + escapeHtml(item.label) + '">' +
+              escapeHtml(item.label) +
+            '</button>';
+        });
+
+        moduleHtml += '</div></div>';
+      });
+
+      moduleHtml += '</fieldset>';
       html += moduleHtml;
     }
 
@@ -145,6 +181,7 @@
     if (!host) return;
     host.innerHTML = renderInviteAccessPickers(catalog, role);
     bindInviteAccessToggleButtons();
+    bindInviteManageClientsButton();
   }
 
   function collectInviteAccessInput(role) {
@@ -163,8 +200,8 @@
     }
 
     if (inviteRoleShowsModulePickers(role)) {
-      document.querySelectorAll('.invite-module-checkbox:checked').forEach(function(box) {
-        allowedModules.push(box.value);
+      document.querySelectorAll('.invite-module-toggle[aria-pressed="true"]').forEach(function(button) {
+        allowedModules.push(button.getAttribute('data-module-id'));
       });
     }
 
@@ -193,8 +230,11 @@
         entityIds.indexOf(button.getAttribute('data-entity-id')) !== -1
       );
     });
-    document.querySelectorAll('.invite-module-checkbox').forEach(function(box) {
-      box.checked = moduleIds.indexOf(box.value) !== -1;
+    document.querySelectorAll('.invite-module-toggle').forEach(function(button) {
+      setInviteAccessButtonState(
+        button,
+        moduleIds.indexOf(button.getAttribute('data-module-id')) !== -1
+      );
     });
   }
 </script>

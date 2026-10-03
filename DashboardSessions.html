@@ -10,6 +10,7 @@
 
   const NILAVARAM_MAX_CLOSED_ROWS = 20;
   const MAIN_WORKSPACE_SESSION_ID = 'main-workspace';
+  const NILAVARAM_IP_LOG_WAIT_MS = 3000;
 
   function markUserActivity() {
     window.nilavaramLastActivityAt = Date.now();
@@ -72,9 +73,18 @@
   }
 
   function getSessionIpAddress(session) {
-    return (session && session.ipAddress) ||
-      window.nilavaramClientIp ||
-      'Pending';
+    if (session && session.ipAddress &&
+        session.ipAddress !== 'Pending' &&
+        session.ipAddress !== 'Unavailable') {
+      return session.ipAddress;
+    }
+    if (window.nilavaramClientIp) {
+      return window.nilavaramClientIp;
+    }
+    if (window.nilavaramClientIpStatus === 'unavailable') {
+      return 'Unavailable';
+    }
+    return (session && session.ipAddress) || 'Pending';
   }
 
   function getSessionIpDisplay(session) {
@@ -144,12 +154,35 @@
       .recordModuleSessionEvent(buildSessionLogPayload(session, 'resumed'));
   }
 
+  function clearMainWorkspaceStartLogTimer() {
+    if (window.nilavaramMainStartLogTimerId) {
+      window.clearTimeout(window.nilavaramMainStartLogTimerId);
+      window.nilavaramMainStartLogTimerId = null;
+    }
+  }
+
+  function scheduleMainWorkspaceSessionLog() {
+    if (window.nilavaramMainStartLogged || window.nilavaramMainStartLogTimerId) {
+      return;
+    }
+    window.nilavaramMainStartLogTimerId = window.setTimeout(function() {
+      window.nilavaramMainStartLogTimerId = null;
+      const session = window.nilavaramModuleSessions[MAIN_WORKSPACE_SESSION_ID];
+      if (!session || window.nilavaramMainStartLogged) {
+        return;
+      }
+      window.nilavaramMainStartLogged = true;
+      persistModuleSessionStart(session);
+    }, NILAVARAM_IP_LOG_WAIT_MS);
+  }
+
   function updateMainWorkspaceIp(ipAddress) {
     const session = window.nilavaramModuleSessions[MAIN_WORKSPACE_SESSION_ID];
     if (!session) return;
     session.ipAddress = ipAddress;
     renderWorkspaceSessions();
     if (!window.nilavaramMainStartLogged) {
+      clearMainWorkspaceStartLogTimer();
       window.nilavaramMainStartLogged = true;
       persistModuleSessionStart(session);
     }
@@ -172,10 +205,13 @@
       openedAt: PAGE_VIEW_STARTED_AT.toISOString()
     });
     if (window.nilavaramClientIp && !window.nilavaramMainStartLogged) {
+      clearMainWorkspaceStartLogTimer();
       window.nilavaramMainStartLogged = true;
       persistModuleSessionStart(
         window.nilavaramModuleSessions[MAIN_WORKSPACE_SESSION_ID]
       );
+    } else if (!window.nilavaramMainStartLogged) {
+      scheduleMainWorkspaceSessionLog();
     }
   }
 
@@ -296,6 +332,7 @@
     }
     showWorkspaceNotice(message);
   }
+
   function hideInactivityExtendPrompt() {
     const panel = document.getElementById('inactivity-extend-panel');
     if (panel) panel.hidden = true;
@@ -458,6 +495,13 @@
     html += '<p class="help-meta">Inactive for ' + idleMinutes +
       ' minute(s). Timeout in ' + remainingMinutes +
       ' minute(s) unless you click YES. Times shown in your local time zone.</p>';
+
+    if (window.nilavaramClientIpStatus === 'unavailable' &&
+        window.nilavaramDashboardInfo &&
+        window.nilavaramDashboardInfo.role === 'admin') {
+      html += '<p class="help-meta">IP lookup was blocked by the browser or network. ' +
+        'Session logs may show Unavailable.</p>';
+    }
 
     if (window.nilavaramDashboardInfo &&
         window.nilavaramDashboardInfo.role !== 'admin') {
