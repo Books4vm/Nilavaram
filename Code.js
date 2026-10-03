@@ -227,23 +227,38 @@ function completeGoogleLoginFromOAuthRedirect_(parameters) {
 function buildNilavaramSessionHandoffPage_(sessionKey, inviteToken) {
   const base = getNilavaramWebAppUrl_().split('?')[0];
   let workspaceUrl = base + '?workspace=1';
+
   if (inviteToken) {
     workspaceUrl += '&invite=' + encodeURIComponent(inviteToken);
   }
+
   const keyJson = JSON.stringify(String(sessionKey || ''));
-  const urlJson = JSON.stringify(workspaceUrl);
+  const safeWorkspaceUrl = String(workspaceUrl)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
   return HtmlService.createHtmlOutput(
-    '<!doctype html><html><head><base target="_top">' +
+    '<!doctype html>' +
+    '<html>' +
+    '<head>' +
+    '<base target="_top">' +
     '<meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<title>Signing in</title></head><body>' +
-    '<p>Signing you in…</p>' +
+    '<title>Signing in</title>' +
+    '</head>' +
+    '<body>' +
+    '<p>Google sign-in completed successfully.</p>' +
+    '<p><a id="continueLink" target="_top" href="' + safeWorkspaceUrl + '">Continue to Nilavaram</a></p>' +
     '<script>' +
-    'try{localStorage.setItem("nilavaramSessionKey",' + keyJson + ');}' +
-    'catch(e){}' +
-    'window.location.replace(' + urlJson + ');' +
-    '</script></body></html>'
-  ).setTitle('Nilavaram — Signing in');
+    'try{' +
+    'localStorage.setItem("nilavaramSessionKey",' + keyJson + ');' +
+    '}catch(e){}' +
+    '</script>' +
+    '</body>' +
+    '</html>'
+  ).setTitle('Nilavaram - Signing in');
 }
 
 /**
