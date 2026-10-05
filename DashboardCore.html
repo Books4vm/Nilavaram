@@ -1,4 +1,5 @@
 <script>
+  let startupTimerId = null;
   function nilavaramSessionKey() {
     try {
       return window.localStorage.getItem('nilavaramSessionKey') || '';

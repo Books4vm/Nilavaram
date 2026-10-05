@@ -256,7 +256,7 @@
           );
         }
       })
-      .getBusinessEntitiesForClient(clientId);
+      .getBusinessEntitiesForClient(clientId, nilavaramSessionKey());
   }
 
   function selectShellBusiness(entityId, entityName) {
@@ -341,7 +341,10 @@
               window.nilavaramShellEntities = entities || [];
               renderContextChangePopup();
             })
-            .getBusinessEntitiesForClient(window.nilavaramSelectedClient.id);
+            .getBusinessEntitiesForClient(
+              window.nilavaramSelectedClient.id,
+              nilavaramSessionKey()
+            );
         } else {
           renderContextChangePopup();
         }
@@ -350,6 +353,6 @@
         document.getElementById('output').innerHTML =
           '<p class="error">' + escapeHtml(error && error.message || error) + '</p>';
       })
-      .getDashboardShell();
+      .getDashboardShell(nilavaramSessionKey());
   }
 </script>

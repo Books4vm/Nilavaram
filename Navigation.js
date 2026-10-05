@@ -65,13 +65,13 @@ function getNavigation(clientId, entityId) {
   return buildNavigationTree_(clientId, entityId);
 }
 
-function getNavigationForShell(clientId, entityId) {
-  requireCurrentUser_();
-  return buildNavigationTree_(clientId, entityId);
+function getNavigationForShell(clientId, entityId, nilavaramSessionKey) {
+  requireCurrentUser_(nilavaramSessionKey);
+  return buildNavigationTree_(clientId, entityId, nilavaramSessionKey);
 }
 
-function buildNavigationTree_(clientId, entityId) {
-  const user = requireCurrentUser_();
+function buildNavigationTree_(clientId, entityId, nilavaramSessionKey) {
+  const user = requireCurrentUser_(nilavaramSessionKey);
   const normalizedClientId = resolveWorkspaceClientId_(clientId, entityId);
   const normalizedEntityId = String(entityId || '').trim();
 

@@ -21,9 +21,12 @@ function getDashboardShell(nilavaramSessionKey) {
 
   if (info.accessStatus === 'active') {
     try {
-      shell.clients = getClientGroupsForShell_();
+      shell.clients = getClientGroupsForShell_(nilavaramSessionKey);
       if (shell.clients.length === 1) {
-        shell.entities = getBusinessEntitiesForShell_(shell.clients[0].name);
+        shell.entities = getBusinessEntitiesForShell_(
+          shell.clients[0].name,
+          nilavaramSessionKey
+        );
       }
     } catch (error) {
       shell.shellError = String(error && error.message || error);

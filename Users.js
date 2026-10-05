@@ -233,8 +233,10 @@ function getUserByEmail_(email) {
   }
 }
 
-function requireCurrentUser_() {
-  const user = getUserByEmail_(getCurrentEmail_());
+function requireCurrentUser_(nilavaramSessionKey) {
+  const user = getUserByEmail_(
+    getCurrentEmail_(nilavaramSessionKey)
+  );
   if (!user || user.status !== 'active' || user.role === 'disabled') {
     throw new Error('Access denied. This Google account has no active invitation.');
   }

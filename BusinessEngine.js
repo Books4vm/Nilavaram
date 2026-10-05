@@ -58,17 +58,17 @@ function readActiveBusinessById_(entityId) {
   return entity;
 }
 
-function filterClientsForCurrentUser_(clients) {
-  const user = requireCurrentUser_();
+function filterClientsForCurrentUser_(clients, user) {
+  const currentUser = user || requireCurrentUser_();
   return (clients || []).filter(function(client) {
-    return canUserAccessClient_(user, client.id);
+    return canUserAccessClient_(currentUser, client.id);
   });
 }
 
-function filterEntitiesForCurrentUser_(entities) {
-  const user = requireCurrentUser_();
+function filterEntitiesForCurrentUser_(entities, user) {
+  const currentUser = user || requireCurrentUser_();
   return (entities || []).filter(function(entity) {
-    return canUserAccessEntity_(user, entity.id);
+    return canUserAccessEntity_(currentUser, entity.id);
   });
 }
 
@@ -157,16 +157,16 @@ function getClientBusinessPageData() {
   };
 }
 
-function getClientGroupsForShell_() {
-  requireCurrentUser_();
+function getClientGroupsForShell_(nilavaramSessionKey) {
+  const user = requireCurrentUser_(nilavaramSessionKey);
   const clients = getActiveClientsFromFirestore_().map(function(client) {
     return { id: client.id, name: client.name };
   });
-  return filterClientsForCurrentUser_(clients);
+  return filterClientsForCurrentUser_(clients, user);
 }
 
-function getBusinessEntitiesForShell_(clientGroupName) {
-  requireCurrentUser_();
+function getBusinessEntitiesForShell_(clientGroupName, nilavaramSessionKey) {
+  const user = requireCurrentUser_(nilavaramSessionKey);
   ensureClientBusinessEntities_();
   const group = String(clientGroupName || NILAVARAM_CLIENT_GROUP);
   const entities = firestoreGetCollection_('entities')
@@ -182,17 +182,17 @@ function getBusinessEntitiesForShell_(clientGroupName) {
     .map(function(entity) {
       return { id: entity.id, name: entity.name };
     });
-  return filterEntitiesForCurrentUser_(entities);
+  return filterEntitiesForCurrentUser_(entities, user);
 }
 
-function getBusinessEntitiesForClient(clientId) {
-  const user = requireCurrentUser_();
+function getBusinessEntitiesForClient(clientId, nilavaramSessionKey) {
+  const user = requireCurrentUser_(nilavaramSessionKey);
   const client = readActiveClientById_(clientId);
   if (!canUserAccessClient_(user, client.id)) {
     throw new Error('Your Nilavaram access does not include the selected client.');
   }
   const entities = getBusinessEntitiesForClientAdmin_(client.id);
-  return filterEntitiesForCurrentUser_(entities);
+  return filterEntitiesForCurrentUser_(entities, user);
 }
 
 /**
