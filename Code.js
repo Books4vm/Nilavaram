@@ -580,21 +580,13 @@ function doGet(e) {
         String(error && error.message || error);
     }
   }
-  let dashboardInfoBootstrap;
-  try {
-    dashboardInfoBootstrap = getDashboardInfo();
-    dashboardInfoBootstrap.bootstrapSource = 'engine-page-load';
-  } catch (error) {
-    dashboardInfoBootstrap = {
-      applicationName: 'Nilavaram',
-      user: '',
-      role: '',
-      accessStatus: 'error',
-      status: 'Access not active',
-      bootstrapSource: 'engine-page-load',
-      bootstrapError: String(error && error.message || error)
-    };
-  }
+  const dashboardInfoBootstrap = {
+    applicationName: 'Nilavaram',
+    user: '',
+    role: '',
+    accessStatus: 'checking',
+    status: 'Checking sign-in'
+  };
   template.dashboardInfoJson = JSON.stringify(
     dashboardInfoBootstrap
   ).replace(/</g, '\\u003c');

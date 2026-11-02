@@ -514,6 +514,59 @@
     .workspace-selection p {
       margin: 0 0 6px;
     }
+    .dashboard-overview {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 12px 0 16px;
+      padding: 16px;
+    }
+    .dashboard-overview-header {
+      align-items: flex-start;
+      display: flex;
+      gap: 16px;
+      justify-content: space-between;
+    }
+    .dashboard-overview-header h2 {
+      margin: 0 0 4px;
+    }
+    .dashboard-overview-header p {
+      margin: 0;
+    }
+    .dashboard-refresh-button {
+      flex: 0 0 auto;
+    }
+    .dashboard-summary-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(2, minmax(240px, 1fr));
+      margin-top: 16px;
+    }
+    .dashboard-summary-card {
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .dashboard-summary-card h3 {
+      margin: 0 0 8px;
+    }
+    .dashboard-summary-card p {
+      min-height: 48px;
+      margin: 0 0 14px;
+    }
+    @media (max-width: 700px) {
+      .dashboard-overview-header {
+        display: block;
+      }
+      .dashboard-refresh-button {
+        margin-top: 12px;
+        width: 100%;
+      }
+      .dashboard-summary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
     .workspace-load-status progress {
       display: block;
       height: 14px;

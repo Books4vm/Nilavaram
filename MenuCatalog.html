@@ -11,30 +11,48 @@
   {"id":"businesses","label":"Businesses","children":[
     {"id":"all-businesses","label":"All Businesses","moduleId":"all-businesses"}
   ]},
-  {"id":"assets-estate","label":"Assets & Estate","children":[
+  {"id":"assets-estate","label":"Assets, Liabilities & Supporting Records","children":[
     {"id":"properties","label":"Properties","moduleId":"properties"},
     {"id":"financial-accounts","label":"Financial Accounts","moduleId":"financial-accounts"},
-    {"id":"trusts-entities","label":"Trusts & Entities","moduleId":"trusts-entities"},
-    {"id":"trust-owned-assets","label":"Trust-Owned Assets","moduleId":"trust-owned-assets"},
-    {"id":"estate-documents","label":"Estate Documents","moduleId":"estate-documents"}
+    {"id":"trusts-entities","label":"Entities & Ownership","moduleId":"trusts-entities"},
+    {"id":"trust-owned-assets","label":"Owned Assets","moduleId":"trust-owned-assets"},
+    {"id":"borrowings-liabilities","label":"Borrowings & Liabilities","moduleId":"borrowings-liabilities"},
+    {"id":"estate-documents","label":"Estate & Planning Records","moduleId":"estate-documents"},
+    {"id":"business-governance-records","label":"Business & Governance Records","moduleId":"business-governance-records"}
   ]},
-  {"id":"transactions","label":"Input","children":[
-    {"id":"input-main","label":"Main Menu","moduleId":"input-main"},
-    {"id":"input-receipt","label":"Receipt","moduleId":"input-receipt"},
-    {"id":"input-payment","label":"Payment","moduleId":"input-payment"},
-    {"id":"input-journal","label":"Journal","moduleId":"input-journal"},
+  {"id":"transactions","label":"Transactions","children":[
+    {"id":"input-data-entry","label":"Data Entry","children":[
+      {"id":"input-receipt","label":"Receipt","moduleId":"input-receipt"},
+      {"id":"input-payment","label":"Payment","moduleId":"input-payment"},
+      {"id":"input-journal","label":"Journal","moduleId":"input-journal"}
+    ]},
     {"id":"input-upload-csv","label":"CSV","moduleId":"input-upload-csv"},
     {"id":"input-upload-pdf","label":"PDF","moduleId":"input-upload-pdf"},
     {"id":"input-upload-image","label":"Image","moduleId":"input-upload-image"},
     {"id":"input-upload-txt","label":"Text Template","moduleId":"input-upload-txt"},
-    {"id":"input-workbench","label":"Workbench","moduleId":"input-workbench"},
+    {"id":"input-workbench","label":"Review Downloaded Transactions","moduleId":"input-workbench"},
     {"id":"input-acode-map","label":"ACODE Map","moduleId":"input-acode-map"},
+    {"id":"wizard-sheet-index","label":"Source Sheet Index","moduleId":"wizard-sheet-index"},
     {"id":"connections","label":"Connections","moduleId":"connections"}
   ]},
   {"id":"accounting","label":"Accounting","children":[
+    {"id":"wizard-accounting-year","label":"Accounting Year","moduleId":"wizard-accounting-year"},
     {"id":"chart-of-accounts","label":"Chart of Accounts","moduleId":"chart-of-accounts"},
+    {"id":"wizard-opening-tb","label":"Opening Trial Balance","moduleId":"wizard-opening-tb"},
+    {"id":"wizard-reconciliation","label":"Reconciliation","moduleId":"reconciliation-validation"},
     {"id":"account-add-new","label":"Add New Account","moduleId":"account-add-new"},
     {"id":"account-batch-edit","label":"Batch Edit Accounts","moduleId":"account-batch-edit"}
+  ]},
+  {"id":"reports","label":"Reports","children":[
+    {"id":"wizard-ledger","label":"General Ledger","moduleId":"wizard-ledger"},
+    {"id":"wizard-trial-balance","label":"Trial Balance","moduleId":"wizard-trial-balance"},
+    {"id":"wizard-profit-loss","label":"Profit and Loss","moduleId":"wizard-profit-loss"},
+    {"id":"wizard-profit-loss-appropriation","label":"Profit and Loss Appropriation","moduleId":"wizard-profit-loss-appropriation"},
+    {"id":"wizard-balance-sheet","label":"Balance Sheet","moduleId":"wizard-balance-sheet"},
+    {"id":"wizard-all-reports","label":"All Reports","moduleId":"wizard-all-reports"},
+    {"id":"wizard-export-csv","label":"Export to CSV","moduleId":"wizard-export-csv"},
+    {"id":"wizard-export-pdf","label":"Export to PDF","moduleId":"wizard-export-pdf"},
+    {"id":"wizard-search","label":"Search Accounting Records","moduleId":"wizard-search"}
   ]},
   {"id":"documents","label":"Documents & Archive","children":[
     {"id":"archive-library","label":"Archive Library","moduleId":"archive-library"},
@@ -46,7 +64,8 @@
   ]},
   {"id":"tasks","label":"Tasks","children":[
     {"id":"alerts","label":"Alerts","moduleId":"alerts"},
-    {"id":"reminders","label":"Reminders","moduleId":"reminders"}
+    {"id":"reminders","label":"Reminders","moduleId":"reminders"},
+    {"id":"wizard-error-check","label":"Accounting Error Check","moduleId":"wizard-error-check"}
   ]},
   {"id":"help","label":"Help","children":[
     {"id":"navigation-guide","label":"Navigation Guide","moduleId":"navigation-guide"},

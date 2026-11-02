@@ -26,16 +26,23 @@ Manages the businesses maintained in Nilavaram.
 - **All Businesses:** Lists active and inactive businesses. Its page will
   provide Add, Edit, Deactivate, Reactivate and safe Delete actions.
 
-## Assets & Estate
+## Assets, Liabilities & Supporting Records
 
-Organizes assets, ownership and related legal records without making legal
-conclusions about asset protection.
+Organizes assets, liabilities, ownership, business governance records and
+references to supporting documents. Large files remain in approved external
+storage; Firestore retains essential metadata, links, permissions and audit
+information.
 
-- **Properties:** Records real estate and significant property.
-- **Financial Accounts:** Records bank, investment, insurance and retirement accounts.
-- **Trusts & Entities:** Records trusts, entities, trustees and beneficiaries.
-- **Trust-Owned Assets:** Links assets to ownership stated in source documents.
-- **Estate Documents:** Organizes estate-planning documents and instructions.
+This is an expandable left-menu group. Each item below is a separate clickable
+destination; the group does not open a combined tabbed popup.
+
+- **Properties:** Records real estate and significant physical property.
+- **Financial Accounts:** Records bank, investment, retirement and other financial accounts.
+- **Entities & Ownership:** Records businesses, entities and ownership relationships.
+- **Owned Assets:** Links assets to the owner identified in source documents.
+- **Borrowings & Liabilities:** Records loans, credit balances, notes payable and related evidence.
+- **Estate & Planning Records:** Organizes estate, succession, beneficiary and planning records.
+- **Business & Governance Records:** Organizes board, shareholder, member and trustee minutes, resolutions and related records.
 
 ## Security
 
@@ -52,22 +59,25 @@ Controls invitations, users, roles and access monitoring.
 
 ## Transactions
 
-Handles transaction entry, review and posting.
+Handles transaction entry, file imports, review and posting.
 
-- **Data Entry**
-  - **New Transaction:** Enters one transaction manually.
-  - **Batch Import:** Imports multiple transactions from CSV or Excel.
-  - **Document Import:** Creates input from bills, invoices or PDFs.
-- **Review & Categorize:** Reviews transactions and assigns accounts.
-- **Posted Transactions:** Shows entries posted to the books.
-- **Locked Transactions:** Shows finalized entries that cannot be edited.
+- **Data Entry:** Records receipts, payments and journal entries.
+- **File Upload:** Imports CSV, PDF, image and text-template source files.
+- **Downloaded Transactions:** Reviews transaction records received from connected accounts or imported sources.
+  - **Review Downloaded Transactions:** Reviews downloaded account batches before reconciliation and further processing.
+  - **Link Online Accounts:** Opens secure online-account connections.
+  - **ACODE Map:** Reviews rule suggestions, assigns ACODEs and creates reusable rules.
 
 ## Accounting
 
 Contains bookkeeping, reconciliation and closing functions.
 
+- **Accounting Year:** Sets the opening date, fiscal year and controlled
+  reporting period.
 - **Chart of Accounts:** Maintains Assets, Liabilities, Equity, Income and
   Expense accounts.
+- **Opening Trial Balance:** Prepares and validates the balanced opening entry
+  before transaction imports.
 - **Journal:** Shows debit-and-credit accounting entries.
 - **Reconciliation:** Compares Nilavaram balances with external statements.
 - **Period Close:** Controls month-end and year-end closing.
@@ -122,8 +132,18 @@ Collects work requiring attention.
 
 Produces financial statements and supporting schedules.
 
-- **Accounting Reports:** General Ledger, Trial Balance, Income Statement,
-  Balance Sheet and Retained Earnings.
+- **General Ledger:** Displays posted journal lines by account and date.
+- **Trial Balance:** Displays balanced debit and credit totals by account.
+- **Profit and Loss:** Reports income and expenses for the selected period.
+- **Profit and Loss Appropriation:** Shows the controlled allocation of
+  current-period results.
+- **Balance Sheet:** Reports assets, liabilities and equity as of a selected
+  date.
+- **All Reports:** Runs the complete validated reporting package for the
+  selected period.
+- **Export:** Exports approved accounting data and reports in CSV or PDF.
+- **Search Accounting Records:** Searches transactions, account codes,
+  evidence and audit references.
 - **Receivable Reports:** Customer Details and Receivable Aging.
 - **Payable Reports:** Vendor Details and Payable Aging.
 - **Closing Reports:** Reconciliation, Month-End Close and Year-End Close.
@@ -174,12 +194,15 @@ Provides expandable user guidance.
 
 ```text
 Dashboard
+↓ Personal & Life
 ↓ Businesses
+↓ Assets, Liabilities & Supporting Records
 ↓ Security
 ↓ Transactions
 ↓ Accounting
 ↓ Customers & Vendors
-↓ Documents
+↓ Private Journal
+↓ Documents & Archive
 ↓ Tasks
 ↓ Reports
 ↓ System

@@ -8,6 +8,47 @@
     }
   }
 
+  function redirectToSignInIfSessionExpired(error) {
+    const message = error && error.message ? error.message : String(error);
+    const sessionExpired =
+      message.indexOf('Your sign-in expired. Please sign in again.') !== -1;
+    const signInRequired =
+      message.indexOf(
+        'Sign in with your Google account and allow Nilavaram when prompted.'
+      ) !== -1;
+    if (!sessionExpired && !signInRequired) {
+      return false;
+    }
+
+    try {
+      window.localStorage.removeItem('nilavaramSessionKey');
+    } catch (storageError) {
+      // Continue to sign-in even when browser storage is unavailable.
+    }
+
+    window.nilavaramDashboardInfo = {
+      applicationName: 'Nilavaram',
+      user: '',
+      role: '',
+      accessStatus: 'expired'
+    };
+    renderStartupLine();
+
+    const menu = document.getElementById('menu');
+    const output = document.getElementById('output');
+    if (menu) menu.textContent = '';
+    if (output) {
+      output.textContent = sessionExpired
+        ? 'Your Nilavaram session expired. Returning to sign-in...'
+        : 'Nilavaram sign-in is required. Returning to sign-in...';
+    }
+
+    const signInUrl = new URL(window.location.href);
+    signInUrl.searchParams.delete('workspace');
+    window.location.replace(signInUrl.toString());
+    return true;
+  }
+
   function applyDashboardInfoBootstrap() {
     const info = (typeof DASHBOARD_INFO_BOOTSTRAP === 'object' &&
       DASHBOARD_INFO_BOOTSTRAP)
@@ -30,16 +71,6 @@
       window.clearInterval(startupTimerId);
     }
     startupTimerId = window.setInterval(renderStartupLine, 1000);
-    if (OPEN_CONNECTIONS_ON_LOAD) {
-      if (typeof showConnections === 'function') {
-        showConnections();
-      }
-    } else if (typeof showDefaultWorkspace === 'function') {
-      showDefaultWorkspace();
-    }
-    if (typeof buildShellSkeleton === 'function') {
-      buildShellSkeleton();
-    }
     if (typeof loadShellFromEngine === 'function') {
       loadShellFromEngine();
     }
@@ -96,6 +127,7 @@
   }
 
   function showError(error) {
+    if (redirectToSignInIfSessionExpired(error)) return;
     const message = error && error.message ? error.message : String(error);
     document.getElementById('output').innerHTML =
       '<p class="error">' + escapeHtml(message) + '</p>';
@@ -135,7 +167,9 @@
     const data = window.nilavaramDashboardInfo || {};
     const started = getUserViewTime(PAGE_VIEW_STARTED_AT);
     const current = getUserViewTime(new Date());
-    const userText = data.bootstrapError
+    const userText = data.accessStatus === 'checking'
+      ? '<b>User:</b> verifying sign-in...'
+      : data.bootstrapError
       ? '<span class="error"><b>User:</b> ' +
         escapeHtml(data.bootstrapError) + '</span>'
       : data.user
@@ -396,11 +430,17 @@
         applyShellFromEngine(shell);
       })
       .withFailureHandler(function(error) {
+        if (redirectToSignInIfSessionExpired(error)) {
+          return;
+        }
         renderStartupLine();
         const message = error && error.message ? error.message : String(error);
         if (loading) {
           loading.hidden = false;
           loading.textContent = 'Connection failed: ' + message;
+        } else {
+          const output = document.getElementById('output');
+          if (output) output.textContent = 'Connection failed: ' + message;
         }
         showWorkspaceNotice('Server connection failed: ' + message);
       })

@@ -124,15 +124,16 @@
       { group: 'Businesses', items: [
         ['All Businesses', 'all-businesses']
       ]},
-      { group: 'Assets & Estate', items: [
+      { group: 'Assets, Liabilities & Supporting Records', items: [
         ['Properties', 'properties'],
         ['Financial Accounts', 'financial-accounts'],
-        ['Trusts & Entities', 'trusts-entities'],
-        ['Trust-Owned Assets', 'trust-owned-assets'],
-        ['Estate Documents', 'estate-documents']
+        ['Entities & Ownership', 'trusts-entities'],
+        ['Owned Assets', 'trust-owned-assets'],
+        ['Borrowings & Liabilities', 'borrowings-liabilities'],
+        ['Estate & Planning Records', 'estate-documents'],
+        ['Business & Governance Records', 'business-governance-records']
       ]},
-      { group: 'Input', items: [
-        ['Main Menu', 'input-main'],
+      { group: 'Transactions', items: [
         ['Receipt', 'input-receipt'],
         ['Payment', 'input-payment'],
         ['Journal', 'input-journal'],
@@ -140,13 +141,28 @@
         ['PDF', 'input-upload-pdf'],
         ['Image', 'input-upload-image'],
         ['Text Template', 'input-upload-txt'],
-        ['Workbench', 'input-workbench'],
-        ['ACODE Map', 'input-acode-map']
+        ['Review Downloaded Transactions', 'input-workbench'],
+        ['ACODE Map', 'input-acode-map'],
+        ['Source Sheet Index', 'wizard-sheet-index']
       ]},
       { group: 'Accounting', items: [
+        ['Accounting Year', 'wizard-accounting-year'],
         ['Chart of Accounts', 'chart-of-accounts'],
+        ['Opening Trial Balance', 'wizard-opening-tb'],
+        ['Reconciliation', 'reconciliation-validation'],
         ['Add New Account', 'account-add-new'],
         ['Batch Edit Accounts', 'account-batch-edit']
+      ]},
+      { group: 'Reports', items: [
+        ['General Ledger', 'wizard-ledger'],
+        ['Trial Balance', 'wizard-trial-balance'],
+        ['Profit and Loss', 'wizard-profit-loss'],
+        ['Profit and Loss Appropriation', 'wizard-profit-loss-appropriation'],
+        ['Balance Sheet', 'wizard-balance-sheet'],
+        ['All Reports', 'wizard-all-reports'],
+        ['Export to CSV', 'wizard-export-csv'],
+        ['Export to PDF', 'wizard-export-pdf'],
+        ['Search Accounting Records', 'wizard-search']
       ]},
       { group: 'Documents & Archive', items: [
         ['Archive Library', 'archive-library'],
@@ -158,7 +174,8 @@
       ]},
       { group: 'Tasks', items: [
         ['Alerts', 'alerts'],
-        ['Reminders', 'reminders']
+        ['Reminders', 'reminders'],
+        ['Accounting Error Check', 'wizard-error-check']
       ]},
       { group: 'Help', items: [
         ['Navigation Guide', 'navigation-guide'],

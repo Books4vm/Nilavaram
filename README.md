@@ -228,6 +228,9 @@ Google account and selects **Accept invitation**.
 - A Ltd user sees only assigned modules.
 - The last active Admin cannot be downgraded or disabled.
 - User invitations and access changes are audited.
+- The workspace displays identity only after its server-side session check
+  succeeds. If that session has expired, the stale browser key is cleared and
+  the user is returned to the sign-in page.
 
 ## Important deployment limitation
 

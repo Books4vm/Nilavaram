@@ -241,6 +241,24 @@
         '<p><b>Client:</b> <span id="workspace-client-name">Not selected</span></p>' +
         '<p><b>Business:</b> <span id="workspace-business-name">Not selected</span></p>' +
       '</section>' +
+      '<section class="dashboard-overview" aria-labelledby="dashboard-overview-title">' +
+        '<div class="dashboard-overview-header">' +
+          '<div>' +
+            '<h2 id="dashboard-overview-title">Dashboard Overview</h2>' +
+            '<p class="help-meta">Choose an area to open its readable detail window.</p>' +
+          '</div>' +
+          '<button type="button" class="secondary-button dashboard-refresh-button" ' +
+            'onclick="refreshDashboardOverview()">Refresh Dashboard</button>' +
+        '</div>' +
+        '<div class="dashboard-summary-grid">' +
+          dashboardSummaryCard_('Payables & Due Dates', 'Open due-date and reminder details.', 'reminders', 'Open Payables & Due Dates') +
+          dashboardSummaryCard_('Reminders', 'Open scheduled personal and shared reminders.', 'reminders', 'Open Reminders') +
+          dashboardSummaryCard_('Alerts', 'Open administrative warnings and notifications.', 'alerts', 'Open Alerts') +
+          dashboardSummaryCard_('Assets', 'Open asset records and supporting references.', 'properties', 'Open Assets') +
+          dashboardSummaryCard_('Net Worth', 'Open the balance-sheet detail window.', 'wizard-balance-sheet', 'Open Net Worth') +
+        '</div>' +
+        '<p id="dashboard-overview-status" class="help-meta" aria-live="polite"></p>' +
+      '</section>' +
       '<div id="workspace-load-status" class="workspace-load-status">' +
         '<p id="workspace-loading" class="help-meta">Connecting securely...</p>' +
         '<div id="workspace-progress-wrap" hidden>' +
@@ -267,6 +285,38 @@
     startWorkspaceSessionPanel();
     startShellInactivityWatch();
     showWorkspaceNotice('Main workspace session started.');
+  }
+
+  function dashboardSummaryCard_(title, description, moduleId, buttonLabel) {
+    return '<article class="dashboard-summary-card">' +
+      '<h3>' + escapeHtml(title) + '</h3>' +
+      '<p>' + escapeHtml(description) + '</p>' +
+      '<button type="button" class="primary-button" ' +
+        'onclick="openDashboardDetailWindow(\'' + escapeHtml(moduleId) +
+        '\', \'' + escapeHtml(title) + '\')">' +
+        escapeHtml(buttonLabel) +
+      '</button>' +
+    '</article>';
+  }
+
+  function openDashboardDetailWindow(moduleId, label) {
+    if (!isShellContextComplete()) {
+      showWorkspaceNotice(
+        'Select client and business before opening dashboard details.'
+      );
+      return;
+    }
+
+    openModule(moduleId, label, true);
+  }
+
+  function refreshDashboardOverview() {
+    const status = document.getElementById('dashboard-overview-status');
+    if (status) {
+      status.textContent =
+        'Dashboard refreshed. Open a detail window to load current records.';
+    }
+    updateWorkspaceSelectionDisplay();
   }
 
   function showInactivityExtendPrompt() {
@@ -322,6 +372,7 @@
   }
 
   function showWorkspaceError(message, detail) {
+    if (redirectToSignInIfSessionExpired(detail || message)) return;
     hideWorkspaceProgress();
     const err = document.getElementById('workspace-error');
     if (err) {

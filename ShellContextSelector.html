@@ -350,6 +350,7 @@
         }
       })
       .withFailureHandler(function(error) {
+        if (redirectToSignInIfSessionExpired(error)) return;
         document.getElementById('output').innerHTML =
           '<p class="error">' + escapeHtml(error && error.message || error) + '</p>';
       })

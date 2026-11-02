@@ -8,7 +8,7 @@ const NILAVARAM_INITIAL_ADMIN_EMAILS = [
   'mangai8100@gmail.com',
   'vm8100@gmail.com'
 ];
-const NILAVARAM_NAVIGATION_VERSION = 23;
+const NILAVARAM_NAVIGATION_VERSION = 25;
 /**
  * Creates or refreshes the Firestore-driven navigation.
  *
@@ -19,10 +19,9 @@ function setupNavigation_() {
     { id: 'dashboard', label: 'Dashboard', description: 'Provides an overview of the selected business, pending work and recent activity.', order: 10, type: 'link', moduleId: 'dashboard', roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'personal-life', label: 'Personal & Life', description: 'Organizes personal history, identity, education, work, business milestones and renewals.', order: 20, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'businesses', label: 'Businesses', description: 'Manages the businesses maintained in Nilavaram.', order: 30, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
-    { id: 'assets-estate', label: 'Assets & Estate', description: 'Organizes properties, accounts, trusts, ownership and estate documents.', order: 40, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'assets-estate', label: 'Assets, Liabilities & Supporting Records', description: 'Organizes assets, liabilities, ownership, governance records and references to supporting documents.', order: 40, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'security', label: 'Security', description: 'Controls users, roles, permissions and access monitoring.', order: 50, type: 'group', roles: ['admin'] },
-    { id: 'transactions', label: 'Input', description: 'Records manual transactions, imports source files, reviews downloads, reconciles accounts and assigns ACODEs.', order: 60, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
-    { id: 'accounting-wizard', label: 'Accounting Wizard', description: 'Guides setup, transaction input, validation, reporting, audit and export work in one place.', order: 65, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'transactions', label: 'Transactions', description: 'Handles transaction entry, file imports, review and posting.', order: 60, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'accounting', label: 'Accounting', description: 'Contains bookkeeping, reconciliation and period-closing functions.', order: 70, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'contacts', label: 'Customers & Vendors', description: 'Manages buyers, suppliers, receivables and payables.', order: 80, type: 'group', roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'private-journal', label: 'Private Journal', description: 'Keeps private decisions, strategy reviews and follow-up dates.', order: 90, type: 'group', roles: ['admin'] },
@@ -41,11 +40,13 @@ function setupNavigation_() {
     { id: 'business-milestones', menuId: 'personal-life', parentId: 'personal-life', level: 2, label: 'Business Milestones', description: 'Links important business events to business records.', moduleId: 'business-milestones', order: 50, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'renewals', menuId: 'personal-life', parentId: 'personal-life', level: 2, label: 'Renewals', description: 'Tracks documents and registrations requiring renewal.', moduleId: 'renewals', order: 60, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'all-businesses', menuId: 'businesses', parentId: 'businesses', level: 2, label: 'All Businesses', description: 'Lists active and inactive businesses and opens business-management actions.', moduleId: 'all-businesses', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
-    { id: 'properties', menuId: 'assets-estate', parentId: 'assets-estate', level: 2, label: 'Properties', description: 'Records real estate and other significant property.', moduleId: 'properties', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
-    { id: 'financial-accounts', menuId: 'assets-estate', parentId: 'assets-estate', level: 2, label: 'Financial Accounts', description: 'Records bank, investment, insurance and retirement accounts.', moduleId: 'financial-accounts', order: 20, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
-    { id: 'trusts-entities', menuId: 'assets-estate', parentId: 'assets-estate', level: 2, label: 'Trusts & Entities', description: 'Records trusts, entities, trustees and beneficiaries.', moduleId: 'trusts-entities', order: 30, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
-    { id: 'trust-owned-assets', menuId: 'assets-estate', parentId: 'assets-estate', level: 2, label: 'Trust-Owned Assets', description: 'Links assets to the ownership stated in trust and title documents.', moduleId: 'trust-owned-assets', order: 40, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
-    { id: 'estate-documents', menuId: 'assets-estate', parentId: 'assets-estate', level: 2, label: 'Estate Documents', description: 'Organizes estate-planning documents and instructions.', moduleId: 'estate-documents', order: 50, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'properties', menuId: 'assets-estate', parentId: 'assets-estate', level: 2, label: 'Properties', description: 'Records real estate and significant physical property with supporting references.', moduleId: 'properties', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'financial-accounts', menuId: 'assets-estate', parentId: 'assets-estate', level: 2, label: 'Financial Accounts', description: 'Records bank, investment, retirement and other financial accounts.', moduleId: 'financial-accounts', order: 20, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'trusts-entities', menuId: 'assets-estate', parentId: 'assets-estate', level: 2, label: 'Entities & Ownership', description: 'Records businesses, entities and ownership relationships supported by source documents.', moduleId: 'trusts-entities', order: 30, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'trust-owned-assets', menuId: 'assets-estate', parentId: 'assets-estate', level: 2, label: 'Owned Assets', description: 'Links assets to the person or entity identified as owner in source documents.', moduleId: 'trust-owned-assets', order: 40, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'borrowings-liabilities', menuId: 'assets-estate', parentId: 'assets-estate', level: 2, label: 'Borrowings & Liabilities', description: 'Records loans, credit balances, notes payable and supporting liability documents.', moduleId: 'borrowings-liabilities', order: 50, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'estate-documents', menuId: 'assets-estate', parentId: 'assets-estate', level: 2, label: 'Estate & Planning Records', description: 'Organizes estate, succession, beneficiary and related planning records.', moduleId: 'estate-documents', order: 60, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'business-governance-records', menuId: 'assets-estate', parentId: 'assets-estate', level: 2, label: 'Business & Governance Records', description: 'Organizes board, shareholder, member and trustee minutes, resolutions and related records.', moduleId: 'business-governance-records', order: 70, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'journal-decisions', menuId: 'private-journal', parentId: 'private-journal', level: 2, label: 'Decisions', description: 'Records private decisions with reasons and version history.', moduleId: 'journal-decisions', order: 10, enabled: true, roles: ['admin'] },
     { id: 'strategy-reviews', menuId: 'private-journal', parentId: 'private-journal', level: 2, label: 'Strategy Reviews', description: 'Reviews and updates private strategies over time.', moduleId: 'strategy-reviews', order: 20, enabled: true, roles: ['admin'] },
     { id: 'journal-follow-ups', menuId: 'private-journal', parentId: 'private-journal', level: 2, label: 'Follow-up Dates', description: 'Tracks dates for reconsidering private decisions.', moduleId: 'journal-follow-ups', order: 30, enabled: true, roles: ['admin'] },
@@ -53,17 +54,18 @@ function setupNavigation_() {
     { id: 'account-add-new', menuId: 'accounting', parentId: 'chart-of-accounts', level: 3, label: 'Add New', description: 'Creates one new ACODE using a simple guided form.', moduleId: 'account-add-new', order: 10, enabled: true, roles: ['admin', 'editor'] },
     { id: 'account-chart-list', menuId: 'accounting', parentId: 'chart-of-accounts', level: 3, label: 'Chart of Accounts', description: 'Displays the account list and opens individual Edit controls.', moduleId: 'chart-of-accounts', order: 20, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
     { id: 'account-batch-edit', menuId: 'accounting', parentId: 'chart-of-accounts', level: 3, label: 'Batch Edit', description: 'Hides or restores multiple selected accounts together.', moduleId: 'account-batch-edit', order: 30, enabled: true, roles: ['admin'] },
-    { id: 'input-main', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Main Menu', description: 'Opens the complete transaction-input workspace.', moduleId: 'input-main', order: 5, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
-    { id: 'input-receipt', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Receipt', description: 'Records a manual receipt with supporting evidence.', moduleId: 'input-receipt', order: 10, enabled: true, roles: ['admin', 'editor'] },
-    { id: 'input-payment', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Payment', description: 'Records a manual payment with supporting evidence.', moduleId: 'input-payment', order: 20, enabled: true, roles: ['admin', 'editor'] },
-    { id: 'input-journal', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Journal', description: 'Records a balanced multi-row journal with evidence and audit notes.', moduleId: 'input-journal', order: 30, enabled: true, roles: ['admin', 'editor'] },
+    { id: 'input-main', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Main Menu', description: 'Retained for compatibility but hidden from the user menu.', moduleId: 'input-main', order: 5, enabled: false, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'input-data-entry', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Data Entry', description: 'Records individual receipts, payments and journal entries.', moduleId: '', type: 'group', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'input-receipt', menuId: 'transactions', parentId: 'input-data-entry', level: 3, label: 'Receipt', description: 'Records a manual receipt with supporting evidence.', moduleId: 'input-receipt', order: 10, enabled: true, roles: ['admin', 'editor'] },
+    { id: 'input-payment', menuId: 'transactions', parentId: 'input-data-entry', level: 3, label: 'Payment', description: 'Records a manual payment with supporting evidence.', moduleId: 'input-payment', order: 20, enabled: true, roles: ['admin', 'editor'] },
+    { id: 'input-journal', menuId: 'transactions', parentId: 'input-data-entry', level: 3, label: 'Journal', description: 'Records a balanced multi-row journal with evidence and audit notes.', moduleId: 'input-journal', order: 30, enabled: true, roles: ['admin', 'editor'] },
     { id: 'input-file-upload', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'File Upload', description: 'Registers source files after the related account is selected.', moduleId: '', type: 'group', order: 40, enabled: true, roles: ['admin', 'editor'] },
     { id: 'input-upload-csv', menuId: 'transactions', parentId: 'input-file-upload', level: 3, label: 'CSV', description: 'Registers a CSV transaction batch for a selected account.', moduleId: 'input-upload-csv', order: 10, enabled: true, roles: ['admin', 'editor'] },
     { id: 'input-upload-pdf', menuId: 'transactions', parentId: 'input-file-upload', level: 3, label: 'PDF', description: 'Registers a PDF statement for a selected account.', moduleId: 'input-upload-pdf', order: 20, enabled: true, roles: ['admin', 'editor'] },
     { id: 'input-upload-image', menuId: 'transactions', parentId: 'input-file-upload', level: 3, label: 'Image', description: 'Registers receipt or invoice images for a selected account.', moduleId: 'input-upload-image', order: 30, enabled: true, roles: ['admin', 'editor'] },
     { id: 'input-upload-txt', menuId: 'transactions', parentId: 'input-file-upload', level: 3, label: 'Txt Template', description: 'Registers a structured text transaction batch.', moduleId: 'input-upload-txt', order: 40, enabled: true, roles: ['admin', 'editor'] },
-    { id: 'input-download-files', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Download Files', description: 'Reviews automatically downloaded transaction sources.', moduleId: '', type: 'group', order: 50, enabled: true, roles: ['admin', 'editor', 'reader'] },
-    { id: 'input-workbench', menuId: 'transactions', parentId: 'input-download-files', level: 3, label: 'Workbench', description: 'Lists downloaded account batches for review and reconciliation.', moduleId: 'input-workbench', order: 10, enabled: true, roles: ['admin', 'editor', 'reader'] },
+    { id: 'input-download-files', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Downloaded Transactions', description: 'Reviews transaction records received from connected accounts or imported sources.', moduleId: '', type: 'group', order: 50, enabled: true, roles: ['admin', 'editor', 'reader'] },
+    { id: 'input-workbench', menuId: 'transactions', parentId: 'input-download-files', level: 3, label: 'Review Downloaded Transactions', description: 'Reviews downloaded account batches before reconciliation and further processing.', moduleId: 'input-workbench', order: 10, enabled: true, roles: ['admin', 'editor', 'reader'] },
     { id: 'input-link-accounts', menuId: 'transactions', parentId: 'input-download-files', level: 3, label: 'Link Online Accounts', description: 'Opens secure online-account connections.', moduleId: 'connections', order: 20, enabled: true, roles: ['admin'] },
     { id: 'input-acode-map', menuId: 'transactions', parentId: 'input-download-files', level: 3, label: 'ACODE Map', description: 'Reviews rule suggestions, assigns ACODEs and creates reusable rules.', moduleId: 'input-acode-map', order: 30, enabled: true, roles: ['admin', 'editor', 'reader'] },
     { id: 'wizard-setup', menuId: 'accounting-wizard', parentId: 'accounting-wizard', level: 2, label: 'Set Up', description: 'Defines the business, accounting period, accounts and opening balances.', moduleId: '', type: 'group', order: 10, enabled: true, roles: ['admin', 'editor', 'reader', 'ltd'] },
@@ -191,6 +193,86 @@ function setupNavigation_() {
       clientIds: item.clientIds || ['vav-group'],
       entityIds: item.entityIds || ['*'],
       schemaVersion: 2,
+      updatedAt: new Date()
+    }));
+  });
+
+  // The Accounting Wizard is retired as a top-level menu. Its unique
+  // destinations are placed in the approved sections below; existing
+  // destinations are not duplicated.
+  firestoreSetDocument_('menus', 'accounting-wizard', toFirestoreFields_({
+    label: 'Accounting Wizard (Retired)',
+    description: 'Retired after its functions were moved to the approved navigation sections.',
+    order: 999,
+    enabled: false,
+    type: 'group',
+    moduleId: '',
+    roles: ['admin'],
+    clientIds: ['vav-group'],
+    entityIds: ['*'],
+    schemaVersion: 2,
+    retiredAt: new Date(),
+    updatedAt: new Date()
+  }));
+
+  [
+    { id: 'wizard-accounting-year', menuId: 'accounting', parentId: 'accounting', level: 2, label: 'Accounting Year', description: 'Sets the opening date, fiscal year and controlled reporting period.', moduleId: 'wizard-accounting-year', order: 40, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'wizard-opening-tb', menuId: 'accounting', parentId: 'accounting', level: 2, label: 'Opening Trial Balance', description: 'Prepares and validates the balanced opening entry before transaction imports.', moduleId: 'wizard-opening-tb', order: 50, roles: ['admin', 'editor', 'reader'] },
+    { id: 'wizard-sheet-index', menuId: 'transactions', parentId: 'transactions', level: 2, label: 'Source Sheet Index', description: 'Indexes statements, CSV files and other imported source batches.', moduleId: 'wizard-sheet-index', order: 60, roles: ['admin', 'editor', 'reader'] },
+    { id: 'wizard-reconciliation', menuId: 'accounting', parentId: 'accounting', level: 2, label: 'Reconciliation', description: 'Matches and arithmetically validates source records before posting.', moduleId: 'reconciliation-validation', order: 60, roles: ['admin', 'editor', 'reader'] },
+    { id: 'wizard-ledger', menuId: 'reports', parentId: 'reports', level: 2, label: 'General Ledger', description: 'Displays posted journal lines by account and date.', moduleId: 'wizard-ledger', order: 10, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'wizard-trial-balance', menuId: 'reports', parentId: 'reports', level: 2, label: 'Trial Balance', description: 'Displays balanced debit and credit totals by account.', moduleId: 'wizard-trial-balance', order: 20, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'wizard-profit-loss', menuId: 'reports', parentId: 'reports', level: 2, label: 'Profit and Loss', description: 'Reports income and expenses for the selected period.', moduleId: 'wizard-profit-loss', order: 30, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'wizard-profit-loss-appropriation', menuId: 'reports', parentId: 'reports', level: 2, label: 'Profit and Loss Appropriation', description: 'Shows the controlled allocation of current-period results.', moduleId: 'wizard-profit-loss-appropriation', order: 40, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'wizard-balance-sheet', menuId: 'reports', parentId: 'reports', level: 2, label: 'Balance Sheet', description: 'Reports assets, liabilities and equity as of a selected date.', moduleId: 'wizard-balance-sheet', order: 50, roles: ['admin', 'editor', 'reader', 'ltd'] },
+    { id: 'wizard-error-check', menuId: 'tasks', parentId: 'tasks', level: 2, label: 'Accounting Error Check', description: 'Lists unbalanced, duplicate, unmapped, missing-evidence and reconciliation exceptions.', moduleId: 'wizard-error-check', order: 30, roles: ['admin', 'editor', 'reader'] },
+    { id: 'wizard-all-reports', menuId: 'reports', parentId: 'reports', level: 2, label: 'All Reports', description: 'Runs the complete validated reporting package for the selected period.', moduleId: 'wizard-all-reports', order: 60, roles: ['admin', 'editor', 'reader'] },
+    { id: 'wizard-export', menuId: 'reports', parentId: 'reports', level: 2, label: 'Export', description: 'Exports approved data and reports in portable formats.', moduleId: '', type: 'group', order: 70, roles: ['admin', 'editor', 'reader'] },
+    { id: 'wizard-export-csv', menuId: 'reports', parentId: 'wizard-export', level: 3, label: 'Export to CSV', description: 'Exports approved tabular accounting data.', moduleId: 'wizard-export-csv', order: 10, roles: ['admin', 'editor', 'reader'] },
+    { id: 'wizard-export-pdf', menuId: 'reports', parentId: 'wizard-export', level: 3, label: 'Export to PDF', description: 'Exports approved financial reports as PDF files.', moduleId: 'wizard-export-pdf', order: 20, roles: ['admin', 'editor', 'reader'] },
+    { id: 'wizard-search', menuId: 'reports', parentId: 'reports', level: 2, label: 'Search Accounting Records', description: 'Searches transactions, account codes, evidence and audit references.', moduleId: 'wizard-search', order: 80, roles: ['admin', 'editor', 'reader', 'ltd'] }
+  ].forEach(function(item) {
+    firestoreSetDocument_('menuItems', item.id, toFirestoreFields_({
+      menuId: item.menuId,
+      parentId: item.parentId,
+      level: item.level,
+      label: item.label,
+      description: item.description,
+      moduleId: item.moduleId || '',
+      type: item.type || 'link',
+      order: item.order,
+      enabled: true,
+      roles: item.roles,
+      clientIds: ['vav-group'],
+      entityIds: ['*'],
+      schemaVersion: 2,
+      updatedAt: new Date()
+    }));
+  });
+
+  [
+    'wizard-setup', 'wizard-business-name', 'wizard-chart-of-accounts',
+    'wizard-add-bank', 'wizard-input', 'wizard-manual-entry',
+    'wizard-file-upload', 'wizard-upload-csv', 'wizard-upload-txt',
+    'wizard-upload-image', 'wizard-upload-pdf', 'wizard-create-acode-map',
+    'wizard-validate-acode-map', 'wizard-output', 'wizard-audit-trail',
+    'wizard-utilities', 'wizard-documentation'
+  ].forEach(function(itemId) {
+    firestoreSetDocument_('menuItems', itemId, toFirestoreFields_({
+      menuId: 'accounting-wizard',
+      parentId: 'accounting-wizard',
+      level: 2,
+      label: 'Retired Accounting Wizard Item',
+      description: 'Retired after Accounting Wizard functions were moved to approved navigation sections.',
+      moduleId: '',
+      type: 'link',
+      order: 999,
+      enabled: false,
+      roles: ['admin'],
+      clientIds: ['vav-group'],
+      entityIds: ['*'],
+      schemaVersion: 2,
+      retiredAt: new Date(),
       updatedAt: new Date()
     }));
   });

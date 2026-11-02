@@ -35,6 +35,10 @@
   }
 
   function applyShellFromEngine(shell) {
+  if (shell && shell.shellError &&
+      redirectToSignInIfSessionExpired(shell.shellError)) {
+    return;
+  }
   const data = shell.info || {};
   window.nilavaramDashboardInfo = data;
   window.nilavaramSessionPolicy = shell.sessionPolicy || {
@@ -65,6 +69,15 @@
 
     const loading = document.getElementById('shell-loading-msg');
     if (loading) loading.hidden = true;
+
+    if (OPEN_CONNECTIONS_ON_LOAD) {
+      if (typeof showConnections === 'function') showConnections();
+    } else if (typeof showDefaultWorkspace === 'function') {
+      showDefaultWorkspace();
+    }
+    if (typeof buildShellSkeleton === 'function') {
+      buildShellSkeleton();
+    }
 
     startShellContextFlow(shell.clients || []);
 
