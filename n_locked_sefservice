@@ -1,0 +1,48 @@
+Apply the locked Nilavaram self-service guidance requirement.
+For every user-facing menu, popup, form, sharing dialog, upload screen, report, connection workflow and destructive action:
+1. Explain the purpose in plain language.
+2. Explain what data is displayed and where it comes from.
+3. Explain every available action, including Add, Edit, Save, Refresh, Share and Revoke.
+4. Explain View versus Edit permissions.
+5. Explain confidentiality and prohibited information.
+6. Explain what happens after saving, sharing or revoking.
+7. Display the instructions inside the popup before the user acts.
+8. Keep the guidance synchronized with server-side authorization and audit behavior.
+9. Make the workflow understandable without training or a support team.
+10. Do not invent data or permissions that the code does not implement.
+
+
+Every module popup now displays a self-service guide containing:
+What this window is for
+Where the information comes from
+What the user will see
+How to use the window
+Learning points
+Do
+Do not
+Current implementation status
+
+
+The guide is automatically shown for:
+
+Life Timeline
+Identity & Immigration
+Education
+Employment
+Business Milestones
+Renewals
+Properties
+Entities & Ownership
+Owned Assets
+Borrowings & Liabilities
+Estate & Planning Records
+Business & Governance Records
+Transactions
+Accounting
+Reports
+Documents
+Tasks
+Security
+Help
+System
+All other menu items

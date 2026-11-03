@@ -101,6 +101,11 @@
 
         if (typeof openModule === 'function') {
           openModule(MODULE_ID, MODULE_LABEL, false);
+          window.setTimeout(function() {
+            if (typeof prependModuleSelfServiceGuide === 'function') {
+              prependModuleSelfServiceGuide(MODULE_ID, MODULE_LABEL);
+            }
+          }, 150);
           return;
         }
         showError({ message: 'Module loader is not available.' });

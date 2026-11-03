@@ -231,6 +231,17 @@ Google account and selects **Accept invitation**.
 - The workspace displays identity only after its server-side session check
   succeeds. If that session has expired, the stale browser key is cleared and
   the user is returned to the sign-in page.
+- Every user-facing popup must include self-service instructions describing its
+  purpose, displayed data, actions, permissions, confidentiality rules and
+  save/revoke results. Users must be able to learn the basic workflow without
+  training or a support team.
+- Returning users receive a server-validated default client, business and
+  accounting year. First-time users must select their context; the Change
+  client / business popup can replace the saved default at any time.
+- The main workspace header includes Refresh / Update. It reloads the current
+  Apps Script page so newly pushed code and current server data can be loaded.
+  It does not sign the user out, clear the session, or delete the saved
+  workspace context.
 
 ## Important deployment limitation
 

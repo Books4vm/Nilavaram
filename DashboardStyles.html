@@ -78,8 +78,31 @@
       grid-template-columns: auto 1fr auto;
     }
     .header-panel-left {
+      align-items: center;
+      display: flex;
+      gap: 14px;
       justify-self: start;
       padding: 0;
+    }
+    .workspace-refresh-button {
+      background: #050505;
+      border: 2px solid #ffffff;
+      border-radius: 6px;
+      color: #ffffff;
+      cursor: pointer;
+      font-size: 0.9em;
+      font-weight: 800;
+      padding: 8px 12px;
+      white-space: nowrap;
+    }
+    .workspace-refresh-button:hover,
+    .workspace-refresh-button:focus {
+      background: #ffffff;
+      color: #050505;
+    }
+    .workspace-refresh-button:disabled {
+      cursor: wait;
+      opacity: 0.7;
     }
     .header-panel-center {
       justify-self: center;
@@ -554,6 +577,73 @@
     .dashboard-summary-card p {
       min-height: 48px;
       margin: 0 0 14px;
+    }
+    .my-access-row {
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      padding: 10px 0;
+    }
+    .module-form {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 16px 0;
+      padding: 16px;
+    }
+    .module-help-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 5px solid var(--primary);
+      border-radius: 8px;
+      margin: 12px 0 16px;
+      padding: 14px 16px;
+    }
+    .module-help-panel h3,
+    .module-help-panel h4 {
+      margin-top: 0;
+    }
+    .module-help-panel li {
+      margin: 6px 0;
+    }
+    .module-form label {
+      display: block;
+      margin: 10px 0;
+    }
+    .module-form input {
+      display: block;
+      max-width: 520px;
+      width: 100%;
+    }
+    .sharing-user-row {
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      gap: 12px;
+      grid-template-columns: auto 1fr auto;
+      padding: 10px 0;
+    }
+    .sharing-user-row input {
+      width: auto;
+    }
+    .sharing-user-row select {
+      min-width: 100px;
+    }
+    .table-wrap {
+      overflow-x: auto;
+    }
+    table {
+      border-collapse: collapse;
+      min-width: 760px;
+      width: 100%;
+    }
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
     }
     @media (max-width: 700px) {
       .dashboard-overview-header {

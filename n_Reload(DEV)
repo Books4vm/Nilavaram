@@ -1,0 +1,14 @@
+Step 1 — Open Chrome and enter your Nilavaram /dev address:
+    https://script.google.com/macros/s/AKfycbwIIwQSPDUz-W960uBrbpgDrB_OdrjziuAd5rYwaEM/dev
+Step 2 — Save it as a bookmark
+    When Nilavaram opens:
+       Press Ctrl + D.
+Step 3 — Reload /dev
+    After pushing the new code with Clasp:
+        Click the Nilavaram DEV bookmark.
+        Wait for the page to open.
+              For a stronger reload (no catch, nothing from the history)
+              Press Ctrl + Shift + R.
+        Sign in if requested.
+              Do not bookmark the /exec address for development testing. 
+              Use the /dev bookmark while we are testing.

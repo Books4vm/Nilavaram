@@ -240,6 +240,15 @@
         '<h3>Current selection</h3>' +
         '<p><b>Client:</b> <span id="workspace-client-name">Not selected</span></p>' +
         '<p><b>Business:</b> <span id="workspace-business-name">Not selected</span></p>' +
+        '<p><b>Accounting year:</b> <span id="workspace-accounting-year-display">2026</span></p>' +
+      '</section>' +
+      '<section class="workspace-selection" aria-labelledby="my-access-title">' +
+        '<h3 id="my-access-title">My accessible businesses</h3>' +
+        '<p class="help-meta">Find a business you can access without remembering which client contains it.</p>' +
+        '<div class="menu-search-wrap"><input id="my-access-search" type="search" ' +
+          'placeholder="Search clients and businesses..." aria-label="Search accessible businesses"></div>' +
+        '<p id="my-access-status" class="help-meta" aria-live="polite">Loading access...</p>' +
+        '<div id="my-access-list"></div>' +
       '</section>' +
       '<section class="dashboard-overview" aria-labelledby="dashboard-overview-title">' +
         '<div class="dashboard-overview-header">' +
@@ -284,7 +293,67 @@
     renderWorkspaceSessions();
     startWorkspaceSessionPanel();
     startShellInactivityWatch();
+    loadMyAccessibleWorkspace_();
     showWorkspaceNotice('Main workspace session started.');
+  }
+
+  function loadMyAccessibleWorkspace_() {
+    const status = document.getElementById('my-access-status');
+    if (status) status.textContent = 'Loading accessible businesses...';
+    google.script.run
+      .withSuccessHandler(function(catalog) {
+        window.nilavaramAccessibleWorkspace = catalog || [];
+        renderMyAccessibleWorkspace_();
+      })
+      .withFailureHandler(function(error) {
+        if (status) {
+          status.textContent = error && error.message
+            ? error.message
+            : String(error);
+          status.className = 'error';
+        }
+      })
+      .getMyAccessibleWorkspace(nilavaramSessionKey());
+    const search = document.getElementById('my-access-search');
+    if (search) search.oninput = renderMyAccessibleWorkspace_;
+  }
+
+  function renderMyAccessibleWorkspace_() {
+    const list = document.getElementById('my-access-list');
+    const status = document.getElementById('my-access-status');
+    if (!list) return;
+    const search = document.getElementById('my-access-search');
+    const query = String(search && search.value || '').toLowerCase().trim();
+    const matches = [];
+    (window.nilavaramAccessibleWorkspace || []).forEach(function(client) {
+      client.entities.forEach(function(entity) {
+        const text = (client.clientName + ' ' + entity.entityName).toLowerCase();
+        if (!query || text.indexOf(query) !== -1) {
+          matches.push({client: client, entity: entity});
+        }
+      });
+    });
+    if (!matches.length) {
+      list.innerHTML = '<p>No accessible businesses match your search.</p>';
+      if (status) status.textContent = 'No matching businesses.';
+      return;
+    }
+    list.innerHTML = matches.map(function(match, index) {
+      return '<div class="my-access-row">' +
+        '<span><b>' + escapeHtml(match.entity.entityName) + '</b><br>' +
+        '<span class="help-meta">' + escapeHtml(match.client.clientName) + '</span></span>' +
+        '<button type="button" class="secondary-button my-access-use" data-index="' +
+          index + '">Use this business</button></div>';
+    }).join('');
+    list.querySelectorAll('.my-access-use').forEach(function(button) {
+      button.onclick = function() {
+        const match = matches[Number(button.getAttribute('data-index'))];
+        saveSelectedClient(match.client.clientId, match.client.clientName);
+        saveSelectedBusiness(match.entity.entityId, match.entity.entityName);
+        onShellContextComplete();
+      };
+    });
+    if (status) status.textContent = matches.length + ' accessible business(es).';
   }
 
   function dashboardSummaryCard_(title, description, moduleId, buttonLabel) {
@@ -330,6 +399,7 @@
   function updateWorkspaceSelectionDisplay() {
     const clientEl = document.getElementById('workspace-client-name');
     const businessEl = document.getElementById('workspace-business-name');
+    const yearEl = document.getElementById('workspace-accounting-year-display');
     if (clientEl) {
       clientEl.textContent = window.nilavaramSelectedClient
         ? window.nilavaramSelectedClient.name
@@ -339,6 +409,9 @@
       businessEl.textContent = window.nilavaramSelectedEntity
         ? window.nilavaramSelectedEntity.name
         : 'Not selected';
+    }
+    if (yearEl) {
+      yearEl.textContent = window.nilavaramSelectedAccountingYear || '2026';
     }
   }
 

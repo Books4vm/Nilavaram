@@ -18,6 +18,17 @@
     } catch (error) {}
   }
 
+  function saveSelectedAccountingYear(accountingYear) {
+    window.nilavaramSelectedAccountingYear =
+      String(accountingYear || '2026');
+    try {
+      sessionStorage.setItem(
+        'nilavaramSelectedAccountingYear',
+        window.nilavaramSelectedAccountingYear
+      );
+    } catch (error) {}
+  }
+
   function isShellContextComplete() {
     return Boolean(
       window.nilavaramSelectedClient && window.nilavaramSelectedClient.id &&
@@ -73,6 +84,7 @@
     updateMainWorkspaceContextSession();
     setMenuPanelEnabled(true);
     renderWorkspaceContextSteps();
+    saveCurrentWorkspaceDefault_();
     if (typeof reloadNavigationForCurrentSelection === 'function') {
       reloadNavigationForCurrentSelection();
     }
@@ -84,12 +96,32 @@
     }
   }
 
-  function startShellContextFlow(clients) {
+  function startShellContextFlow(clients, defaultContext) {
     window.nilavaramShellClients = clients || [];
-    restoreShellContextFromSession();
+    if (defaultContext) {
+      saveSelectedClient(defaultContext.clientId, defaultContext.clientName);
+      saveSelectedBusiness(defaultContext.entityId, defaultContext.entityName);
+      saveSelectedAccountingYear(defaultContext.accountingYear || '2026');
+      window.nilavaramContextRestoredFromServer = true;
+    } else {
+      clearShellContextSelection_();
+    }
     if (isShellContextComplete()) {
       onShellContextComplete();
       return;
+    }
+
+    function clearShellContextSelection_() {
+      window.nilavaramSelectedClient = null;
+      window.nilavaramSelectedEntity = null;
+      window.nilavaramSelectedAccountingYear = '2026';
+      try {
+        sessionStorage.removeItem('nilavaramSelectedClientId');
+        sessionStorage.removeItem('nilavaramSelectedClientName');
+        sessionStorage.removeItem('nilavaramSelectedEntityId');
+        sessionStorage.removeItem('nilavaramSelectedEntityName');
+        sessionStorage.removeItem('nilavaramSelectedAccountingYear');
+      } catch (error) {}
     }
     window.nilavaramContextStep = 'client';
     setMenuPanelEnabled(false);
@@ -102,11 +134,13 @@
     let clientName = '';
     let entityId = '';
     let entityName = '';
+    let accountingYear = '';
     try {
       clientId = sessionStorage.getItem('nilavaramSelectedClientId') || '';
       clientName = sessionStorage.getItem('nilavaramSelectedClientName') || '';
       entityId = sessionStorage.getItem('nilavaramSelectedEntityId') || '';
       entityName = sessionStorage.getItem('nilavaramSelectedEntityName') || '';
+      accountingYear = sessionStorage.getItem('nilavaramSelectedAccountingYear') || '';
     } catch (error) {}
 
     if (clientId && clientName) {
@@ -114,6 +148,9 @@
     }
     if (entityId && entityName) {
       saveSelectedBusiness(entityId, entityName);
+    }
+    if (accountingYear) {
+      saveSelectedAccountingYear(accountingYear);
     }
   }
 
@@ -127,6 +164,11 @@
           '<h3>Working context</h3>' +
           '<p><b>Client:</b> ' + escapeHtml(window.nilavaramSelectedClient.name) + '</p>' +
           '<p><b>Business:</b> ' + escapeHtml(window.nilavaramSelectedEntity.name) + '</p>' +
+          '<p><b>Accounting year:</b> ' +
+            escapeHtml(window.nilavaramSelectedAccountingYear || '2026') + '</p>' +
+          '<label>Default accounting year<input id="workspace-accounting-year" ' +
+            'inputmode="numeric" maxlength="4" pattern="[0-9]{4}" value="' +
+            escapeHtml(window.nilavaramSelectedAccountingYear || '2026') + '"></label>' +
           '<p class="help-meta">Use <b>Change client / business</b> in the left panel to switch context.</p>' +
         '</section>';
       return;
@@ -266,6 +308,30 @@
     onShellContextComplete();
   }
 
+  function saveCurrentWorkspaceDefault_() {
+    if (!isShellContextComplete()) return;
+    google.script.run
+      .withSuccessHandler(function(context) {
+        if (context && context.accountingYear) {
+          saveSelectedAccountingYear(context.accountingYear);
+        }
+      })
+      .withFailureHandler(function(error) {
+        if (typeof showWorkspaceNotice === 'function') {
+          showWorkspaceNotice(
+            'Context selected, but the default could not be saved: ' +
+            (error && error.message ? error.message : String(error))
+          );
+        }
+      })
+      .saveUserDefaultWorkspaceContext(
+        window.nilavaramSelectedClient.id,
+        window.nilavaramSelectedEntity.id,
+        window.nilavaramSelectedAccountingYear || '',
+        nilavaramSessionKey()
+      );
+  }
+
   function openContextChangePopup() {
     const baseUrl = window.location.href.split('?')[0];
     const popup = window.open(
@@ -286,6 +352,7 @@
     output.innerHTML =
       '<h2>Change client / business</h2>' +
       '<p class="help-meta">Choose a client, then a business. The main workspace header and menu will update.</p>' +
+      '<p class="help-meta">The selected client and business become your default for the next login. You can change them here at any time.</p>' +
       '<div id="popup-context-host"></div>' +
       '<div class="shell-context-popup-actions">' +
         '<button type="button" class="primary-button" id="context-popup-apply">Apply</button>' +
@@ -296,6 +363,10 @@
     if (window.nilavaramSelectedClient) {
       host.innerHTML += renderContextBusinessListHtml('popup');
     }
+    host.innerHTML +=
+      '<label>Default accounting year<input id="context-popup-accounting-year" ' +
+      'inputmode="numeric" maxlength="4" pattern="[0-9]{4}" value="' +
+      escapeHtml(window.nilavaramSelectedAccountingYear || '') + '"></label>';
     bindContextListHandlers(host);
     document.getElementById('context-popup-cancel').onclick = function() {
       window.close();
@@ -306,9 +377,19 @@
           '<p class="error">Select both a client and a business before Apply.</p>');
         return;
       }
+      const yearInput = document.getElementById('context-popup-accounting-year');
+      const accountingYear = yearInput ? yearInput.value.trim() : '';
+      if (accountingYear && !/^\d{4}$/.test(accountingYear)) {
+        output.insertAdjacentHTML('beforeend',
+          '<p class="error">Enter the accounting year as four digits.</p>');
+        return;
+      }
+      saveSelectedAccountingYear(accountingYear);
       if (window.opener && !window.opener.closed) {
         window.opener.nilavaramSelectedClient = window.nilavaramSelectedClient;
         window.opener.nilavaramSelectedEntity = window.nilavaramSelectedEntity;
+        window.opener.nilavaramSelectedAccountingYear =
+          window.nilavaramSelectedAccountingYear || '';
         try {
           window.opener.sessionStorage.setItem(
             'nilavaramSelectedClientId', window.nilavaramSelectedClient.id);
@@ -318,9 +399,15 @@
             'nilavaramSelectedEntityId', window.nilavaramSelectedEntity.id);
           window.opener.sessionStorage.setItem(
             'nilavaramSelectedEntityName', window.nilavaramSelectedEntity.name);
+          window.opener.sessionStorage.setItem(
+            'nilavaramSelectedAccountingYear',
+            window.nilavaramSelectedAccountingYear || '');
         } catch (error) {}
         if (typeof window.opener.syncContextHeader === 'function') {
           window.opener.syncContextHeader();
+        }
+        if (typeof window.opener.saveCurrentWorkspaceDefault_ === 'function') {
+          window.opener.saveCurrentWorkspaceDefault_();
         }
         if (typeof window.opener.onShellContextComplete === 'function') {
           window.opener.onShellContextComplete();

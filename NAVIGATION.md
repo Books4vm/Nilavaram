@@ -4,9 +4,80 @@ Nilavaram stores navigation records in Firestore, allowing authorized changes
 to names, order, visibility and nesting. A down arrow opens a menu and an up
 arrow closes it. The interface should normally use no more than three levels.
 
+## Menu data and action contract
+
+### Locked product requirement: self-service guidance
+
+Every user-facing popup must explain its purpose, data displayed, available
+actions, permission differences, confidentiality rules and the result of
+saving or revoking a change. Guidance must appear inside the popup before the
+user performs the action; users must not need a trainer or support team to
+understand the basic workflow. Administrators may provide additional
+explanation, but administrator assistance is not a substitute for in-product
+documentation.
+
+This requirement applies to every current and future menu, including forms,
+sharing dialogs, upload screens, reports, connections, accounting workflows
+and destructive or irreversible actions. Use short headings, numbered steps,
+plain language, warnings before sensitive actions and clear success/error
+messages. Keep the guidance synchronized with the actual permission checks and
+workflow behavior.
+
+Every destination follows the same pattern: the server checks the signed-in
+user, client, business, role and module permission; the page then reads current
+records from Firestore or an approved integration. Each page should expose only
+the actions allowed by the user's role and should record important changes in
+the audit log.
+
+| Menu | Dynamic data source | Helpful actions |
+|---|---|---|
+| Dashboard | Firestore status, tasks, accounting summaries and authorized access catalog | Search accessible businesses, select context, open detail, refresh |
+| Personal & Life | Firestore personal-record metadata and protected document references | Add, edit, link evidence, mark missing, renew, view history |
+| Businesses | Firestore clients and business entities | Add, edit, deactivate, reactivate, select, view related records |
+| Assets, Liabilities & Supporting Records | Firestore metadata plus authorized OneDrive evidence links | Add, edit, search, link owner, attach evidence, view history |
+| Security | Firestore users, roles, permissions, sessions and audits | Invite, change role, disable/reactivate, review access, inspect audit |
+| Transactions | Firestore drafts and indexes; connected imports through approved APIs | Enter, upload, validate, categorize, reconcile, approve, post |
+| Accounting | Firestore chart of accounts, journals and controls | Add/edit accounts, open balances, reconcile, close, review |
+| Customers & Vendors | Firestore contact, invoice, bill and balance records | Add, edit, search, record activity, review receivable/payable status |
+| Private Journal | Firestore records protected by owner and allowed-user rules | Add, edit, schedule follow-up, review history; no broad sharing |
+| Documents & Archive | Firestore metadata and protected OneDrive document references | Upload, link, search, mark missing, renew, archive, open authorized file |
+| Tasks | Firestore alerts, reminders and follow-ups | Add, assign, snooze, complete, filter by due date and status |
+| Reports | Server-calculated accounting and operational records | Filter period, view, validate, export approved output, search |
+| System | Firestore configuration and connection health; Apps Script status | Inspect status, manage approved settings, test connections, manage modules |
+| Help | Versioned Firestore help content and approved project documentation | Search, expand guidance, view navigation and security instructions |
+
+“Planned” or “partial” pages may display their current status instead of
+pretending that a workflow is complete. A menu label is not a promise that its
+data service has already been implemented.
+
 ## Dashboard
 
 Summarizes the selected business, balances, pending work and recent activity.
+The Dashboard also provides **My accessible businesses**, a server-filtered
+search across every client and business the signed-in user may access. Selecting
+an entry sets the working context without requiring the user to remember the
+client name. The list contains only authorized IDs and names; it does not
+reveal another client's records.
+
+Dashboard data is read dynamically from Firestore and approved service
+metadata. It should provide:
+
+- **Open / View:** Opens a readable detail window for the selected context.
+- **Refresh:** Re-reads current data rather than relying on stale browser data.
+- **Search:** Finds an accessible client or business by name.
+- **Use this business:** Sets the authorized client/business context and reloads
+  the role-filtered menu.
+
+For returning users, Nilavaram stores the last confirmed client, business and
+accounting year as a server-validated default on the user's profile. At the
+next login, the system restores that default only if the user still has access
+and the records are still active. First-time users must complete the normal
+selection steps. The **Change client / business** popup remains available at
+any time and saving a new selection replaces the default.
+
+Summary totals must be calculated by server-side accounting services from
+approved records. The interface must not invent totals when a service is not
+implemented.
 
 ## Personal & Life
 
@@ -14,7 +85,12 @@ Organizes the owner's history and the documents that support it.
 
 - **Life Timeline:** Records personal and family events.
 - **Identity & Immigration:** Organizes identity, citizenship and immigration records.
-- **Education:** Records education and certificates.
+- **Education:** Records education and certificates. The same authorized user
+  may find permitted education records from each accessible business for
+  convenience. This does not automatically disclose the records to every user
+  in those businesses; explicit authorization or record sharing remains
+  required. Users can share with selected authorized users and revoke that
+  access when it is no longer needed.
 - **Employment:** Records work history and supporting documents.
 - **Business Milestones:** Includes important businesses as life events.
 - **Renewals:** Tracks documents and registrations that expire.
@@ -44,6 +120,33 @@ destination; the group does not open a combined tabbed popup.
 - **Estate & Planning Records:** Organizes estate, succession, beneficiary and planning records.
 - **Business & Governance Records:** Organizes board, shareholder, member and trustee minutes, resolutions and related records.
 
+### Financial Accounts detail
+
+The Financial Accounts page is scoped to the selected client and business.
+Firestore stores only metadata such as institution name, account label, account
+type, currency, last four digits and a supporting-document reference. It must
+never store passwords, security answers, access tokens or full account numbers.
+The page provides:
+
+- **Add New:** Creates a metadata record after server-side validation.
+- **Edit:** Updates the selected record only within the authorized business.
+- **Refresh:** Reloads the current records from Firestore.
+- **Source reference:** Links the record to approved evidence metadata; the
+  actual large document remains in OneDrive.
+- **Audit:** Records create and update actions with the user and scoped record
+  identifiers.
+- **Manage sharing:** The owner can select active users who already have access
+  to the same business and grant **View** or **Edit** permission. Saving the
+  list revokes any user removed from the list. A newly invited user can be
+  selected after that user becomes active and has business access.
+
+The server checks the signed-in user, client access, business access, menu
+permission and editor role before writes. Readers can view authorized records
+but cannot add or modify them. Record-level sharing does not bypass the user's
+normal client, business or module permission. Admins can manage sharing for
+administrative recovery; they cannot use sharing to expose a business the
+recipient is not already authorized to access.
+
 ## Security
 
 Controls invitations, users, roles and access monitoring.
@@ -56,6 +159,11 @@ Controls invitations, users, roles and access monitoring.
 - **Login Sessions:** Shows available user-session information.
 - **Access Review:** Supports periodic permission reviews.
 - **Audit Log:** Records invitations, role changes and important actions.
+
+User access is the primary navigation scope. A user who manages multiple
+businesses should use Dashboard → **My accessible businesses** rather than
+opening an unscoped repository view. Client, business, role and module checks
+remain server-side; hiding a button is not an authorization control.
 
 ## Transactions
 
@@ -119,6 +227,14 @@ Preserves available documents while tracking missing and expiring records.
 - **Unlinked Documents:** Shows documents not connected to a transaction.
 - **Archived Documents:** Retains inactive documents for history.
 - **Backup Status:** Shows planned and completed backup protection.
+
+Documents are displayed through Firestore metadata and authorization-aware
+links. OneDrive is the approved location for large evidence files. Nilavaram
+must not list the entire central OneDrive repository to every user. A document
+link is shown only when its metadata is associated with an authorized client,
+business, user or workflow. Opening a document should use a short-lived,
+server-created link or the existing protected application flow; passwords,
+tokens and private repository paths are never displayed.
 
 ## Tasks
 

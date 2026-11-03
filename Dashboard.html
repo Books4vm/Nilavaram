@@ -21,6 +21,13 @@
           </svg>
           <h1>Nilavaram</h1>
         </div>
+        <button type="button" id="workspace-refresh-button"
+          class="workspace-refresh-button"
+          title="Reload the latest Nilavaram code and data"
+          aria-label="Refresh and update Nilavaram"
+          onclick="refreshMainWorkspace()">
+          Refresh / Update
+        </button>
       </div>
   
       <div class="header-panel header-panel-center">
@@ -79,7 +86,16 @@
     const CONNECTIONS_BOOTSTRAP = <?!= connectionsBootstrapJson ?>;
     const OPEN_CONNECTIONS_ON_LOAD = <?!= openConnectionsOnLoadJson ?>;
     const IS_MAIN_WORKSPACE = true;
-  </script>
+
+    function refreshMainWorkspace() {
+      const button = document.getElementById('workspace-refresh-button');
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Refreshing...';
+      }
+      window.location.reload();
+    }
+    </script>
   <?!= include('ClientIpCapture') ?>
   <?!= include('DashboardCore') ?>
   <?!= include('DashboardSessions') ?>

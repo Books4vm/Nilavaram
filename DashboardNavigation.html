@@ -79,7 +79,7 @@
       buildShellSkeleton();
     }
 
-    startShellContextFlow(shell.clients || []);
+    startShellContextFlow(shell.clients || [], shell.defaultContext || null);
 
     showWorkspaceNotice(
       'Complete Step 1 and Step 2 in the workspace, then choose a menu item.'
@@ -176,7 +176,20 @@
       }
     })
       .withFailureHandler(function(error) {
-        showWorkspaceError(
+      const browse = document.getElementById('menu-browse-panel');
+      const results = document.getElementById('menu-search-results');
+      const section = document.getElementById('menu-section');
+      if (section) section.hidden = false;
+      if (results) results.hidden = true;
+      if (browse) {
+        browse.innerHTML =
+          '<p class="error"><b>Menu could not be loaded.</b><br>' +
+          escapeHtml(error && error.message ? error.message : String(error)) +
+          '</p>' +
+          '<button type="button" class="secondary-button" ' +
+          'onclick="reloadNavigationForCurrentSelection()">Try again</button>';
+      }
+      showWorkspaceError(
           'Menu load failed.',
           (error && error.message ? error.message : String(error)) +
             '\nCall: getNavigationForShell("' + clientId + '", "' + entityId + '")' +
@@ -320,6 +333,16 @@
     document.getElementById('output').textContent = 'Loading ' + label + '...';
 
     if (moduleId === 'all-businesses') {
+      if (typeof IS_MODULE_WINDOW !== 'undefined' && IS_MODULE_WINDOW) {
+        showModuleSelfServiceGuide(moduleId, label);
+        document.getElementById('output').insertAdjacentHTML(
+          'beforeend',
+          '<p class="help-meta">Business administration is managed from the ' +
+          'main workspace. Close this window and use the main workspace ' +
+          'context controls to switch client or business.</p>'
+        );
+        return;
+      }
       openClientBusinessWindow();
       return;
     }
@@ -378,6 +401,10 @@
       showChartOfAccounts('list');
       return;
     }
+    if (moduleId === 'financial-accounts') {
+      showFinancialAccounts();
+      return;
+    }
     if (moduleId === 'account-add-new') {
       showChartOfAccounts('add');
       return;
@@ -422,12 +449,418 @@
       return;
     }
 
+    showModuleSelfServiceGuide(moduleId, label);
+  }
+
+  function showModuleSelfServiceGuide(moduleId, label) {
+    document.getElementById('output').innerHTML =
+      buildModuleSelfServiceGuideHtml_(moduleId, label);
+  }
+
+  function prependModuleSelfServiceGuide(moduleId, label) {
+    const output = document.getElementById('output');
+    if (!output ||
+        output.querySelector('.module-self-service-guide') ||
+        (moduleId === 'financial-accounts' &&
+          output.querySelector('.module-help-panel'))) return;
+    output.insertAdjacentHTML(
+      'afterbegin',
+      buildModuleSelfServiceGuideHtml_(moduleId, label)
+    );
+  }
+
+  function buildModuleSelfServiceGuideHtml_(moduleId, label) {
+    const id = String(moduleId || '');
+    const title = String(label || moduleId || 'Nilavaram module');
+    const guide = getModuleGuide_(id, title);
+    return '<section class="module-help-panel module-self-service-guide" ' +
+      'aria-labelledby="module-purpose-title">' +
+      '<h2>' + escapeHtml(title) + '</h2>' +
+        '<h3 id="module-purpose-title">What this window is for</h3>' +
+        '<p>' + escapeHtml(guide.purpose) + '</p>' +
+        '<h3>Where the information comes from</h3>' +
+        '<p>' + escapeHtml(guide.source) + '</p>' +
+        '<h3>What you will see</h3>' +
+        '<p>' + escapeHtml(guide.display) + '</p>' +
+        '<h3>How to use this window</h3>' +
+        '<ol>' + guide.steps.map(function(step) {
+          return '<li>' + escapeHtml(step) + '</li>';
+        }).join('') + '</ol>' +
+        '<h3>Learning points</h3>' +
+        '<ul>' + guide.learn.map(function(point) {
+          return '<li>' + escapeHtml(point) + '</li>';
+        }).join('') + '</ul>' +
+        '<h3>Do</h3>' +
+        '<ul>' + guide.dos.map(function(point) {
+          return '<li>' + escapeHtml(point) + '</li>';
+        }).join('') + '</ul>' +
+        '<h3>Do not</h3>' +
+        '<ul>' + guide.donts.map(function(point) {
+          return '<li>' + escapeHtml(point) + '</li>';
+        }).join('') + '</ul>' +
+        '<p class="help-meta"><b>Current status:</b> ' +
+          escapeHtml(guide.status) + '</p>' +
+      '</section>';
+  }
+
+  function getModuleGuide_(id, title) {
+    const text = {
+      purpose: 'This window is the authorized workspace for ' + title +
+        ' in the selected client and business.',
+      source: 'The page will read current, authorized records from Firestore. ' +
+        'Supporting large files remain in approved OneDrive storage and are ' +
+        'shown only through authorized metadata or protected links.',
+      display: 'Records belonging to the selected client and business, ' +
+        'including their status, dates, responsible users, source references ' +
+        'and audit history when available.',
+      steps: [
+        'Read the purpose and current status before entering information.',
+        'Use Add New, Edit, Search, Filter, Refresh or Open only when those actions are displayed.',
+        'Save only after checking the selected client, business and entered values.',
+        'Refresh after a change to confirm the current server data.'
+      ],
+      learn: [
+        'Nilavaram displays the current authorized status; it does not guess missing information.',
+        'A visible menu item does not mean every future data-entry or report service is complete.',
+        'Permissions are checked on the server, not only by hiding buttons.'
+      ],
+      dos: [
+        'Use clear names, dates, source references and responsible-person details.',
+        'Report missing or incorrect information to an Admin or authorized Editor.',
+        'Use the selected business context shown in the header.'
+      ],
+      donts: [
+        'Do not enter passwords, security answers, OAuth tokens, private keys or full payment-card/account secrets.',
+        'Do not assume that access to one business gives access to another.',
+        'Do not share confidential files outside the approved workflow.'
+      ],
+      status: 'This menu guide is available now. Live data actions are enabled only when the corresponding verified module is implemented.'
+    };
+    if (id.indexOf('upload') !== -1 || id.indexOf('document') !== -1 ||
+        id.indexOf('archive') !== -1 || id.indexOf('source') !== -1) {
+      text.purpose = 'Use this window to register, find, review or preserve source documents and their relationship to the selected business.';
+      text.source = 'Firestore supplies document metadata, permissions, workflow status and audit references. OneDrive stores approved large source files.';
+      text.display = 'Document name, type, date, business relationship, source status, missing/expired state and an authorized file reference.';
+      text.dos.push('Check that the file belongs to the selected business before linking it.');
+      text.donts.push('Do not upload duplicate, unrelated or confidential files to the wrong business.');
+    } else if (id.indexOf('report') !== -1 || id.indexOf('ledger') !== -1 ||
+        id.indexOf('trial') !== -1 || id.indexOf('balance') !== -1 ||
+        id.indexOf('profit') !== -1) {
+      text.purpose = 'Use this window to review a controlled accounting or management report for the selected business and period.';
+      text.source = 'The report must be calculated server-side from approved, posted and authorized Firestore accounting records.';
+      text.display = 'Selected period, filters, report totals, validation status, source references and generation time.';
+      text.steps = [
+        'Select the reporting period and any available filters.',
+        'Review validation messages and investigate exceptions.',
+        'Refresh after approved postings or corrections.',
+        'Export only an approved report when the export action is available.'
+      ];
+      text.donts.push('Do not treat a draft, unbalanced or unvalidated report as final.');
+    } else if (id.indexOf('user') !== -1 || id.indexOf('permission') !== -1 ||
+        id.indexOf('security') !== -1 || id.indexOf('access') !== -1) {
+      text.purpose = 'Use this window to review or manage authorized Nilavaram users, roles and access to the selected work.';
+      text.source = 'Firestore supplies active users, roles, client/business assignments, module permissions and audit records.';
+      text.display = 'User identity, status, role, assigned scope, permitted modules and relevant audit information.';
+      text.dos.push('Grant the minimum access needed for the person’s work and review it regularly.');
+      text.donts.push('Do not share passwords or bypass the invitation and authorization process.');
+    } else if (id.indexOf('transaction') !== -1 || id.indexOf('input') !== -1 ||
+        id.indexOf('journal') !== -1 || id.indexOf('acode') !== -1) {
+      text.purpose = 'Use this window to enter, import, review, categorize or prepare transaction information before controlled posting.';
+      text.source = 'Firestore supplies drafts, source indexes, account rules and audit records. Connected imports use approved permissioned integrations.';
+      text.display = 'Source batch, dates, descriptions, amounts, proposed accounts, evidence references, review status and exceptions.';
+      text.donts.push('Do not post an entry without checking evidence, account coding, balance and approval status.');
+    } else if (id === 'education') {
+      text.purpose = 'In this menu, record education details and preserve the related lifelong historical records safely and securely.';
+      text.source = 'Firestore displays the structured education details, dates, institutions, qualifications and authorized document metadata. Original documents remain in approved secure storage such as OneDrive.';
+      text.display = 'Education history, institution, qualification, dates, notes, document status and protected links to supporting records for the selected business context.';
+      text.steps = [
+        'Select Add New to record an education entry and its dates.',
+        'Upload or link the supporting document through the approved document workflow.',
+        'Review the entry and source reference before saving.',
+        'Use Refresh to load the latest authorized records.',
+        'Use Manage sharing, when available, to share only with selected authorized users and revoke access when it is no longer needed.'
+      ];
+      text.learn = [
+        'This menu preserves a reliable education history; it does not replace the original document.',
+        'The same authorized user may find their permitted education records from each accessible business for convenience.',
+        'A record is not automatically disclosed to every user in those businesses. Each user must have appropriate authorization or an explicit share.',
+        'Changes and sharing decisions should be reviewed because access may be revoked later.'
+      ];
+      text.dos = [
+        'Enter accurate institution, qualification and date information.',
+        'Link the correct supporting document and check that it belongs to the record.',
+        'Share only with users who need the information for their work.',
+        'Revoke sharing when the work requirement ends.'
+      ];
+      text.donts = [
+        'Do not upload unrelated, duplicate or incorrect documents.',
+        'Do not enter passwords, security answers, access tokens or private keys.',
+        'Do not assume that access to one business permits access to another person’s private records.',
+        'Do not share a document outside Nilavaram’s approved access workflow.'
+      ];
+      text.status = 'The Education guidance is available now. Record and document actions are enabled only when the corresponding verified workflow is available.';
+    }
+    return text;
+  }
+
+  function showFinancialAccounts() {
+    const output = document.getElementById('output');
+    output.innerHTML =
+      '<h2>Financial Accounts</h2>' +
+      '<section class="module-help-panel" aria-labelledby="financial-account-help-title">' +
+        '<h3 id="financial-account-help-title">How Financial Accounts works</h3>' +
+        '<p>Use this page to record safe reference information about a bank, investment or retirement account for the selected business.</p>' +
+        '<ul>' +
+          '<li><b>Add New:</b> record the institution, account name, account type, currency and only the last four digits.</li>' +
+          '<li><b>Edit:</b> correct or update an account that you are allowed to edit.</li>' +
+          '<li><b>Refresh:</b> reload the latest information from Nilavaram.</li>' +
+          '<li><b>Source reference:</b> identify the approved supporting document. Do not enter a password, security answer, access token or full account number.</li>' +
+          '<li><b>Manage sharing:</b> give selected active users View or Edit access to this record.</li>' +
+        '</ul>' +
+        '<p><b>View</b> allows a user to read the record. <b>Edit</b> allows a user to change the record. ' +
+          'The record owner can manage sharing. An Admin can assist when appropriate. ' +
+          'Unchecking a user and saving revokes that user&#39;s access.</p>' +
+        '<p class="help-meta">Sharing never gives access to another business. Each user must already be authorized for this client, business and module.</p>' +
+      '</section>' +
+      '<p class="help-meta">Accounts are shown only for the selected business. ' +
+      'Store identification details, not passwords or full account numbers.</p>' +
+      '<div class="button-row">' +
+        '<button id="financial-account-add" class="primary-button" type="button">' +
+          'Add New</button>' +
+        '<button id="financial-account-refresh" class="secondary-button" type="button">' +
+          'Refresh</button>' +
+      '</div>' +
+      '<section id="financial-account-form" class="module-form" hidden></section>' +
+      '<section id="financial-account-sharing" class="module-form" hidden></section>' +
+      '<p id="financial-account-status" class="help-meta" aria-live="polite">' +
+        'Loading accounts...</p>' +
+      '<div id="financial-account-list"></div>';
+
+    document.getElementById('financial-account-add').onclick =
+      function() { renderFinancialAccountForm_(); };
+    document.getElementById('financial-account-refresh').onclick =
+      loadFinancialAccounts_;
+    loadFinancialAccounts_();
+  }
+
+  function financialAccountValue_(account, key) {
+    return account && account[key] ? escapeHtml(account[key]) : '';
+  }
+
+  function renderFinancialAccountForm_(account) {
+    const formHost = document.getElementById('financial-account-form');
+    if (!formHost) return;
+    const item = account || {};
+    formHost.hidden = false;
+    formHost.innerHTML =
+      '<h3>' + (item.id ? 'Edit Financial Account' : 'Add Financial Account') + '</h3>' +
+      '<form id="financial-account-edit-form">' +
+        '<input type="hidden" name="id" value="' + financialAccountValue_(item, 'id') + '">' +
+        '<label>Institution name<input name="institutionName" required maxlength="120" value="' +
+          financialAccountValue_(item, 'institutionName') + '"></label>' +
+        '<label>Account name<input name="accountName" required maxlength="120" value="' +
+          financialAccountValue_(item, 'accountName') + '"></label>' +
+        '<label>Account type<input name="accountType" required maxlength="60" placeholder="Bank, investment, retirement" value="' +
+          financialAccountValue_(item, 'accountType') + '"></label>' +
+        '<label>Last four digits only<input name="lastFour" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" value="' +
+          financialAccountValue_(item, 'lastFour') + '"></label>' +
+        '<label>Currency<input name="currency" maxlength="3" value="' +
+          (financialAccountValue_(item, 'currency') || 'USD') + '"></label>' +
+        '<label>Source document reference<input name="sourceDocumentId" maxlength="200" value="' +
+          financialAccountValue_(item, 'sourceDocumentId') + '"></label>' +
+        '<div class="button-row">' +
+          '<button class="primary-button" type="submit">Save</button>' +
+          '<button class="secondary-button" type="button" id="financial-account-cancel">Cancel</button>' +
+        '</div>' +
+      '</form>';
+    document.getElementById('financial-account-cancel').onclick =
+      function() { formHost.hidden = true; };
+    document.getElementById('financial-account-edit-form').onsubmit =
+      function(event) {
+        event.preventDefault();
+        const values = {};
+        new FormData(event.target).forEach(function(value, key) {
+          values[key] = String(value);
+        });
+        setFinancialAccountStatus_('Saving...');
+        google.script.run
+          .withSuccessHandler(function() {
+            formHost.hidden = true;
+            setFinancialAccountStatus_('Financial account saved.');
+            loadFinancialAccounts_();
+          })
+          .withFailureHandler(function(error) {
+            setFinancialAccountStatus_(
+              error && error.message ? error.message : String(error), true
+            );
+          })
+          .saveFinancialAccount(
+            CLIENT_ID,
+            ENTITY_ID,
+            values
+          );
+      };
+  }
+
+  function setFinancialAccountStatus_(message, isError) {
+    const status = document.getElementById('financial-account-status');
+    if (!status) return;
+    status.textContent = message;
+    status.className = isError ? 'error' : 'help-meta';
+  }
+
+  function loadFinancialAccounts_() {
+    setFinancialAccountStatus_('Loading accounts...');
     google.script.run
-      .withSuccessHandler(function(result) {
-        document.getElementById('output').textContent = result.message;
+      .withSuccessHandler(function(accounts) {
+        const list = document.getElementById('financial-account-list');
+        if (!list) return;
+        if (!accounts.length) {
+          list.innerHTML = '<p>No financial accounts have been recorded for this business.</p>';
+          setFinancialAccountStatus_('No accounts found.');
+          return;
+        }
+        list.innerHTML = '<div class="table-wrap"><table><thead><tr>' +
+          '<th>Institution</th><th>Account</th><th>Type</th><th>Last four</th>' +
+          '<th>Currency</th><th>Source</th><th>Action</th></tr></thead><tbody>' +
+          accounts.map(function(account) {
+            return '<tr><td>' + financialAccountValue_(account, 'institutionName') +
+              '</td><td>' + financialAccountValue_(account, 'accountName') +
+              '</td><td>' + financialAccountValue_(account, 'accountType') +
+              '</td><td>**** ' + financialAccountValue_(account, 'lastFour') +
+              '</td><td>' + financialAccountValue_(account, 'currency') +
+              '</td><td>' + financialAccountValue_(account, 'sourceDocumentId') +
+              '</td><td>' +
+              (account.canEdit ? '<button type="button" class="secondary-button financial-account-edit" data-id="' +
+                financialAccountValue_(account, 'id') + '">Edit</button> ' : '') +
+              (account.canShare ? '<button type="button" class="secondary-button financial-account-share" data-id="' +
+                financialAccountValue_(account, 'id') + '">Manage sharing</button>' : '') +
+              '</td></tr>';
+          }).join('') + '</tbody></table></div>';
+        list.querySelectorAll('.financial-account-edit').forEach(function(button) {
+          button.onclick = function() {
+            const account = accounts.find(function(item) {
+              return item.id === button.getAttribute('data-id');
+            });
+            renderFinancialAccountForm_(account);
+          };
+        });
+        list.querySelectorAll('.financial-account-share').forEach(function(button) {
+          button.onclick = function() {
+            renderFinancialAccountSharing_(
+              button.getAttribute('data-id'),
+              accounts.find(function(item) {
+                return item.id === button.getAttribute('data-id');
+              })
+            );
+          };
+        });
+        setFinancialAccountStatus_(accounts.length + ' account(s) loaded.');
       })
-      .withFailureHandler(showError)
-      .openModule(moduleId);
+      .withFailureHandler(function(error) {
+        setFinancialAccountStatus_(
+          error && error.message ? error.message : String(error), true
+        );
+      })
+      .getFinancialAccounts(CLIENT_ID, ENTITY_ID);
+  }
+
+  function renderFinancialAccountSharing_(recordId, account) {
+    const host = document.getElementById('financial-account-sharing');
+    if (!host) return;
+    host.hidden = false;
+    host.innerHTML =
+      '<h3>Manage sharing: ' + financialAccountValue_(account, 'accountName') + '</h3>' +
+      '<section class="module-help-panel">' +
+        '<h4>Sharing instructions</h4>' +
+        '<ol>' +
+          '<li>Select an active user who already has access to this business.</li>' +
+          '<li>Choose <b>View</b> if the user only needs to read the information.</li>' +
+          '<li>Choose <b>Edit</b> if the user must update the information.</li>' +
+          '<li>To revoke access, uncheck the user and click <b>Save sharing</b>.</li>' +
+        '</ol>' +
+        '<p>Only share information needed for the user&#39;s work. Do not use this page to share passwords, security answers, tokens or full account numbers.</p>' +
+      '</section>' +
+      '<p class="help-meta">Choose active users who already have access to this business. ' +
+      'Revoking access removes it immediately on the next read.</p>' +
+      '<p id="financial-account-sharing-status" class="help-meta">Loading users...</p>' +
+      '<div id="financial-account-sharing-users"></div>' +
+      '<div class="button-row">' +
+        '<button id="financial-account-sharing-save" class="primary-button" type="button">Save sharing</button>' +
+        '<button id="financial-account-sharing-cancel" class="secondary-button" type="button">Cancel</button>' +
+      '</div>';
+    document.getElementById('financial-account-sharing-cancel').onclick =
+      function() { host.hidden = true; };
+    google.script.run
+      .withSuccessHandler(function(candidates) {
+        const users = document.getElementById('financial-account-sharing-users');
+        if (!users) return;
+        if (!candidates.length) {
+          users.innerHTML = '<p>No other active users currently have access to this business.</p>';
+        } else {
+          users.innerHTML = candidates.map(function(user, index) {
+            return '<label class="sharing-user-row">' +
+              '<input type="checkbox" data-share-index="' + index + '"' +
+                (user.permission ? ' checked' : '') + '>' +
+              '<span><b>' + escapeHtml(user.displayName) + '</b><br>' +
+                '<span class="help-meta">' + escapeHtml(user.email) + '</span></span>' +
+              '<select data-permission-index="' + index + '">' +
+                '<option value="view"' + (user.permission !== 'edit' ? ' selected' : '') +
+                  '>View</option>' +
+                '<option value="edit"' + (user.permission === 'edit' ? ' selected' : '') +
+                  '>Edit</option></select></label>';
+          }).join('');
+        }
+        host.dataset.candidates = JSON.stringify(candidates);
+        const status = document.getElementById('financial-account-sharing-status');
+        if (status) status.textContent = 'Select users and permission, then save.';
+      })
+      .withFailureHandler(function(error) {
+        const status = document.getElementById('financial-account-sharing-status');
+        if (status) {
+          status.textContent = error && error.message ? error.message : String(error);
+          status.className = 'error';
+        }
+      })
+      .getFinancialAccountShareCandidates(CLIENT_ID, ENTITY_ID, recordId);
+    document.getElementById('financial-account-sharing-save').onclick =
+      function() {
+        const candidates = JSON.parse(host.dataset.candidates || '[]');
+        const shares = candidates.filter(function(user, index) {
+          const checkbox = host.querySelector(
+            '[data-share-index="' + index + '"]'
+          );
+          return checkbox && checkbox.checked;
+        }).map(function(user, index) {
+          const select = host.querySelector(
+            '[data-permission-index="' + index + '"]'
+          );
+          return {
+            email: user.email,
+            permission: select ? select.value : 'view'
+          };
+        });
+        const status = document.getElementById('financial-account-sharing-status');
+        if (status) status.textContent = 'Saving sharing...';
+        google.script.run
+          .withSuccessHandler(function() {
+            host.hidden = true;
+            setFinancialAccountStatus_('Sharing updated.');
+            loadFinancialAccounts_();
+          })
+          .withFailureHandler(function(error) {
+            if (status) {
+              status.textContent = error && error.message ? error.message : String(error);
+              status.className = 'error';
+            }
+          })
+          .updateFinancialAccountSharing(
+            CLIENT_ID,
+            ENTITY_ID,
+            recordId,
+            shares
+          );
+      };
   }
 
   function openModuleWindow(moduleId, label) {
