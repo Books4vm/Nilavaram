@@ -1,0 +1,93 @@
+﻿<script>
+  /* Registry of the 80 source-controlled menu-window files. */
+  const NILAVARAM_SOURCE_GUIDES = {};
+  <?!= include('DashboardModule') ?>
+  <?!= include('LifeTimeline') ?>
+  <?!= include('BusinessRecords') ?>
+  <?!= include('JournalDecisions') ?>
+  <?!= include('StrategyReviews') ?>
+  <?!= include('JournalFollowUps') ?>
+  <?!= include('AccountAddNew') ?>
+  <?!= include('AccountChartList') ?>
+  <?!= include('AccountBatchEdit') ?>
+  <?!= include('InputMain') ?>
+  <?!= include('InputReceipt') ?>
+  <?!= include('InputPayment') ?>
+  <?!= include('InputJournal') ?>
+  <?!= include('InputUploadCsv') ?>
+  <?!= include('InputUploadPdf') ?>
+  <?!= include('InputUploadImage') ?>
+  <?!= include('InputUploadTxt') ?>
+  <?!= include('InputWorkbench') ?>
+  <?!= include('InputLinkAccounts') ?>
+  <?!= include('InputAcodeMap') ?>
+  <?!= include('WizardBusinessName') ?>
+  <?!= include('WizardChartOfAccounts') ?>
+  <?!= include('WizardAddBank') ?>
+  <?!= include('WizardManualEntry') ?>
+  <?!= include('WizardUploadCsv') ?>
+  <?!= include('WizardUploadTxt') ?>
+  <?!= include('WizardUploadImage') ?>
+  <?!= include('WizardUploadPdf') ?>
+  <?!= include('WizardCreateAcodeMap') ?>
+  <?!= include('WizardValidateAcodeMap') ?>
+  <?!= include('WizardAuditTrail') ?>
+  <?!= include('WizardDocumentation') ?>
+  <?!= include('ArchiveLibrary') ?>
+  <?!= include('UploadDocuments') ?>
+  <?!= include('MissingDocuments') ?>
+  <?!= include('ExpiringDocuments') ?>
+  <?!= include('UnlinkedDocuments') ?>
+  <?!= include('ArchivedDocuments') ?>
+  <?!= include('BackupStatus') ?>
+  <?!= include('NavigationGuide') ?>
+  <?!= include('ProjectStart') ?>
+  <?!= include('NilavaramCore') ?>
+  <?!= include('GettingStarted') ?>
+  <?!= include('UsersAccessGuide') ?>
+  <?!= include('AccountingGuide') ?>
+  <?!= include('AccountingOperatingRules') ?>
+  <?!= include('DocumentsImportsGuide') ?>
+  <?!= include('InactivitySignIn') ?>
+  <?!= include('ProjectArchitecture') ?>
+  <?!= include('Faq') ?>
+  <?!= include('AboutVersionHistory') ?>
+  <?!= include('AlertsWindow') ?>
+  <?!= include('RemindersWindow') ?>
+  <?!= include('Configuration') ?>
+  <?!= include('SystemStatus') ?>
+  <?!= include('Connections') ?>
+  <?!= include('Modules') ?>
+  <?!= include('Menus') ?>
+  <?!= include('PendingFeatures') ?>
+  <?!= include('AdminTechnicalGuide') ?>
+  <?!= include('UsersWindow') ?>
+  <?!= include('Roles') ?>
+  <?!= include('Permissions') ?>
+  <?!= include('Sessions') ?>
+  <?!= include('AccessReview') ?>
+  <?!= include('AuditLog') ?>
+  <?!= include('WizardAccountingYear') ?>
+  <?!= include('WizardOpeningTb') ?>
+  <?!= include('WizardSheetIndex') ?>
+  <?!= include('WizardReconciliation') ?>
+  <?!= include('WizardLedger') ?>
+  <?!= include('WizardTrialBalance') ?>
+  <?!= include('WizardProfitLoss') ?>
+  <?!= include('WizardProfitLossAppropriation') ?>
+  <?!= include('WizardBalanceSheet') ?>
+  <?!= include('WizardErrorCheck') ?>
+  <?!= include('WizardAllReports') ?>
+  <?!= include('WizardExportCsv') ?>
+  <?!= include('WizardExportPdf') ?>
+  <?!= include('WizardSearch') ?>
+  <?!= include('PermanentRecords') ?>
+  function getSourceModuleGuide_(moduleId) {
+    const guide = NILAVARAM_SOURCE_GUIDES[String(moduleId || '')];
+    return guide && guide.sourceReady === true
+      ? JSON.parse(JSON.stringify(guide))
+      : null;
+  }
+</script>
+
+

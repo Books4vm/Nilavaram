@@ -293,35 +293,60 @@
         'Loading code change history from GitHub...';
       google.script.run
         .withSuccessHandler(renderCodeChangeHistory)
-        .withFailureHandler(showError)
+        .withFailureHandler(renderCodeChangeHistoryError)
         .getCodeChangeHistory();
+    }
+
+    function renderCodeChangeHistoryError(error) {
+      const output = document.getElementById('output');
+      output.innerHTML =
+        '<h2>About and Version History</h2>' +
+        buildAboutVersionHistoryPanel_() +
+        '<section class="about-history-panel about-history-list">' +
+        '<h3>Version History</h3>' +
+        '<p>The dynamic GitHub history could not be loaded.</p>' +
+        '<p class="help-meta">' + escapeHtml(
+          error && error.message
+            ? error.message
+            : 'The GitHub history service returned an unknown error.'
+        ) + '</p>' +
+        '<p>After the API limit is restored or the GitHub configuration is ' +
+        'corrected, select this menu again.</p></section>';
     }
 
     function renderCodeChangeHistory(data) {
       const output = document.getElementById('output');
       output.innerHTML =
         '<h2>About and Version History</h2>' +
-        '<p>This page lists code commits that were successfully pushed to the GitHub <b>main</b> branch. A local-only commit does not appear here.</p>';
+        buildAboutVersionHistoryPanel_();
 
       if (!data.commits.length) {
-        output.innerHTML += '<p>No pushed commits were found.</p>';
+        output.innerHTML +=
+          '<section class="about-history-panel about-history-list">' +
+          '<h3>Version History</h3><p>No pushed commits were found.</p></section>';
         return;
       }
 
+      const historyPanel = document.createElement('section');
+      historyPanel.className = 'about-history-panel about-history-list';
+      historyPanel.innerHTML = '<h3>Version History</h3>';
       const table = document.createElement('table');
       const head = document.createElement('thead');
       head.innerHTML =
-        '<tr><th>Date and time</th><th>Change</th><th>Commit</th><th>Author</th></tr>';
+        '<tr><th>Version #</th><th>Pacific date/time</th><th>Brief note</th><th>Commit</th><th>Author</th></tr>';
       table.appendChild(head);
       const body = document.createElement('tbody');
 
       data.commits.forEach(function(commit) {
         const row = document.createElement('tr');
-        const dateCell = document.createElement('td');
-        const pacific = getPacificViewTime(new Date(commit.committedAt));
-        dateCell.textContent =
-          pacific.date + ' ' + pacific.weekday + ' ' +
-          pacific.time + ' Pacific Time';
+        const versionCell = document.createElement('td');
+        versionCell.textContent = 'V' + String(commit.versionNumber || '');
+
+        const pacificCell = document.createElement('td');
+        pacificCell.textContent = formatHistoryDateTime(
+          commit.committedAt,
+          'America/Los_Angeles'
+        );
 
         const messageCell = document.createElement('td');
         messageCell.textContent = commit.message;
@@ -337,14 +362,54 @@
         const authorCell = document.createElement('td');
         authorCell.textContent = commit.authorName;
 
-        row.appendChild(dateCell);
+        row.appendChild(versionCell);
+        row.appendChild(pacificCell);
         row.appendChild(messageCell);
         row.appendChild(commitCell);
         row.appendChild(authorCell);
         body.appendChild(row);
       });
       table.appendChild(body);
-      output.appendChild(table);
+      const tableWrap = document.createElement('div');
+      tableWrap.className = 'table-wrap';
+      tableWrap.appendChild(table);
+      historyPanel.appendChild(tableWrap);
+      output.appendChild(historyPanel);
+    }
+
+    function buildAboutVersionHistoryPanel_() {
+      return '<section class="about-history-panel about-history-about">' +
+        '<h3>About</h3>' +
+        '<p>This application is Nilavaram, an invitation-only Personal, ' +
+        'Family and Business Information System.</p>' +
+        '<p>This window records important releases, completed features and ' +
+        'user-facing changes that have been pushed to the GitHub <b>main</b> ' +
+        'branch.</p>' +
+        '<ul>' +
+        '<li>VS Code is the source of truth for the application code.</li>' +
+        '<li><code>clasp push</code> synchronizes the reviewed Apps Script ' +
+        'source to the Apps Script project.</li>' +
+        '<li>The <code>/dev</code> deployment is used for testing before ' +
+        'production deployment.</li>' +
+        '<li>Firestore stores application data, permissions, navigation and ' +
+        'audit information.</li>' +
+        '<li>A local-only Git commit does not appear in this history until ' +
+        'it is pushed to GitHub <b>main</b>.</li>' +
+        '</ul></section>';
+    }
+
+    function formatHistoryDateTime(value, timeZone) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Unavailable';
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: timeZone,
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      }).format(date);
     }
 
     function renderHelpArticle(article) {

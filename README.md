@@ -194,6 +194,87 @@ ending in `/dev`. After another `clasp push`, refresh that page to test the
 latest code. A production `/exec` deployment only needs to be updated after the
 test succeeds.
 
+## Editing popup guidance and navigation
+
+Static popup guidance is source-controlled in one menu-named HTML file per
+menu item. `ModuleGuideSources.html` is only the registry that includes the
+individual files. Examples:
+
+- `LifeTimeline.html` controls Life Timeline.
+- `BusinessRecords.html` controls Business Records.
+- `PermanentRecords.html` controls the compatibility guide for Permanent
+  Records. Its stable internal compatibility ID remains
+  `identity-immigration`.
+- `AccountAddNew.html` controls Add New.
+- `InputPayment.html` controls Payment.
+
+The complete menu-to-file mapping is in `MenuFileCatalog.html`.
+
+The guide file contains the title supplied by the menu, purpose, source,
+display description, steps, learning points, Do, Do not and current status.
+User-entered HTML is not used; the popup renders these values as escaped text.
+Do not place passwords, tokens, private keys or uploaded document contents in
+the source file.
+
+To publish a source edit safely:
+
+1. Edit the HTML file whose name matches the menu item in
+   `MenuFileCatalog.html`.
+2. Save the file and review the diff.
+3. Run the focused syntax checks described below.
+4. Run `clasp push`.
+5. Open **Deploy → Test deployments** and use the `/dev` URL.
+6. Open the relevant left-menu item and confirm the popup.
+7. Test the affected role and selected client/business context.
+8. Update the production deployment only after `/dev` testing succeeds.
+
+The live application does not fetch executable or rendered popup HTML from
+OneDrive. OneDrive remains the approved storage location for uploaded source
+documents and evidence. Firestore retains access controls, menu records,
+document metadata, protected links, hashes and audit history.
+
+The About and Version History popup reads pushed commits from the public
+GitHub API. If GitHub returns HTTP 403 because its unauthenticated rate limit
+has been reached, the popup reports the cause explicitly. An Admin may add a
+GitHub token as the Apps Script Project Property `GITHUB_TOKEN`; the token is
+read at runtime and must never be placed in source code, documentation or
+Firestore. A rejected or exhausted configured token is also reported
+explicitly.
+
+The source of truth for left-menu structure is `Setup.js`, specifically the
+`menus` and `menuItems` definitions in `setupNavigation_()`. To change a menu
+item in VS Code:
+
+1. Edit its `label`, `description`, `order`, `parentId`, `level`, `roles`,
+   `enabled` or `moduleId` in `Setup.js`.
+2. Keep the existing stable `id` and `moduleId` unless a deliberate migration
+   is required.
+3. Use a new `order` value to move an item within its parent.
+4. Change `parentId` and `level` to move it to another group or submenu.
+5. Remove an item from the current source definition only after adding an
+   explicit disabled retirement record in the setup/reset path; Firestore
+   rewrites do not delete stale documents automatically.
+6. Increase `NILAVARAM_NAVIGATION_VERSION`.
+7. Push with `clasp push`.
+8. Run the owner-only `resetNavigationOnly()` or
+   `rewriteNavigationInFirestore()` in Apps Script, then reload `/dev`.
+
+The existing owner-only Developer Console can inspect and save Firestore
+`menus` and `menuItems` records for controlled testing, but those direct
+Firestore edits are not the VS Code source of truth. If a change is kept,
+copy it back into `Setup.js`, push again and run the navigation rewrite.
+
+The current visible menu destinations have individual menu-named HTML files.
+Files with `sourceReady: false` are editable templates and do not replace
+existing module renderers until their text is reviewed. To activate one,
+complete its module-specific content and change `sourceReady` to `true`.
+
+`MenuFileCatalog.html` lists every current `Setup.js` menu item, its visible
+label, stable module ID and source filename. The cleaned definition contains
+80 unique menu-item rows and 71 distinct popup modules. The remaining
+nine-row difference is intentional shared-module routing, not stale duplicate
+menu items.
+
 ## Inviting a user
 
 1. Sign in as an Admin.

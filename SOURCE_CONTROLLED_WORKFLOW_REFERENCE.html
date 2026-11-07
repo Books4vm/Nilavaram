@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nilavaram Source-Controlled Workflow Reference</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1f2937;
+      --muted: #52606d;
+      --line: #d9e2ec;
+      --panel: #f7fafc;
+      --accent: #0b5cab;
+      --accent-soft: #e8f1fb;
+      --warning: #fff7e6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 42px 56px;
+      color: var(--ink);
+      background: white;
+      font: 16px/1.55 "Segoe UI", Arial, sans-serif;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      color: var(--accent);
+      font-size: 2rem;
+    }
+
+    h2 {
+      margin: 32px 0 10px;
+      padding-bottom: 5px;
+      border-bottom: 2px solid var(--line);
+      color: #174a73;
+      font-size: 1.35rem;
+    }
+
+    h3 {
+      margin: 22px 0 6px;
+      color: #245b7d;
+      font-size: 1.05rem;
+    }
+
+    p {
+      margin: 8px 0;
+    }
+
+    ul,
+    ol {
+      margin-top: 6px;
+      padding-left: 26px;
+    }
+
+    li {
+      margin: 5px 0;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 3px;
+      background: #eef2f6;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 10px 0 14px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #f8fafc;
+      font: 14px/1.45 Consolas, "Courier New", monospace;
+    }
+
+    .summary,
+    .note,
+    .warning {
+      margin: 16px 0;
+      padding: 14px 18px;
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .note {
+      border-left-color: #3b82a0;
+      background: var(--panel);
+    }
+
+    .warning {
+      border-left-color: #c27c0e;
+      background: var(--warning);
+    }
+
+    .columns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px 34px;
+    }
+
+    .columns > section {
+      min-width: 0;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding: 22px 18px 40px;
+      }
+
+      .columns {
+        display: block;
+      }
+    }
+
+    @media print {
+      body {
+        padding: 0;
+        font-size: 11pt;
+      }
+
+      h2 {
+        break-after: avoid;
+      }
+
+      pre,
+      .summary,
+      .note,
+      .warning {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Nilavaram Source-Controlled Workflow Reference</h1>
+    <p class="small">Keep this page open on one monitor while editing the project in VS Code on the other monitor.</p>
+  </header>
+
+  <div class="summary">
+    <strong>Prepared implementation:</strong>
+    Popup guidance is source-controlled in VS Code. Apps Script receives the
+    changes through <code>clasp push</code>. Firestore remains responsible for
+    live controls and audit information, while OneDrive stores uploaded
+    documents and evidence.
+  </div>
+
+  <h2>Quick summary</h2>
+  <ul>
+    <li>Edit guidance in the separate menu-named HTML file for that window.</li>
+    <li><code>ModuleGuideSources.html</code> is only the registry that includes the separate menu-named files.</li>
+    <li>Prepared source-controlled guides with reviewed content are Life Timeline, Business Records and Permanent Records.</li>
+    <li>Every current visible menu item now has a separate menu-named HTML template.</li>
+    <li>Template files remain inactive until their content is reviewed and <code>sourceReady</code> is changed to <code>true</code>; existing fallback guidance is preserved meanwhile.</li>
+    <li>The internal ID <code>identity-immigration</code> is retained for compatibility but displays Permanent Records.</li>
+    <li>The existing hardcoded guidance remains as a fallback, so existing content is not lost.</li>
+    <li>Edit the left-side menu in <code>Setup.js</code>, inside <code>setupNavigation_()</code>.</li>
+    <li>Keep stable IDs and module IDs unless a deliberate migration is required.</li>
+    <li>Use <code>clasp push</code> to send VS Code changes to Apps Script.</li>
+    <li>Test in the Apps Script <code>/dev</code> deployment before production.</li>
+    <li>Apps Script or Firestore edits do not automatically return to VS Code.</li>
+    <li>Copy any temporary live change back into the source files if it should be kept.</li>
+    <li>Do not place passwords, tokens, private keys or uploaded document contents in source files.</li>
+  </ul>
+
+  <h2>Popup guidance editing</h2>
+  <p>For the complete list of current left-menu entries, stable module IDs,
+  shared-popup relationships and filenames, open
+  <code>MenuFileCatalog.html</code>. The cleaned catalog contains 80
+  unique menu-item entries and 71 distinct popup modules. Fourteen exact
+  duplicate source definitions were removed from the retired Accounting
+  Wizard block.</p>
+  <p>Edit the separate menu-named guide file for the window in VS Code:</p>
+  <ul>
+    <li><code>LifeTimeline.html</code></li>
+    <li><code>BusinessRecords.html</code></li>
+    <li><code>PermanentRecords.html</code></li>
+  </ul>
+  <p><code>ModuleGuideSources.html</code> is the include registry. Normally you do not edit it when changing popup text.</p>
+
+  <h3>Available guide IDs</h3>
+  <ul>
+    <li><code>life-timeline</code> — Life Timeline</li>
+    <li><code>business-records</code> — Business Records</li>
+    <li><code>identity-immigration</code> — compatibility ID that displays Permanent Records</li>
+  </ul>
+  <p>For the other current menu destinations, open the matching file listed in <code>MenuFileCatalog.html</code>. Complete its module-specific text, review it, and change <code>sourceReady: false</code> to <code>sourceReady: true</code> only when it is ready to replace the fallback.</p>
+
+  <h3>Editable fields in each guide</h3>
+  <ul>
+    <li><code>purpose</code> — what the window is for</li>
+    <li><code>source</code> — where information and documents come from</li>
+    <li><code>display</code> — what the user will see</li>
+    <li><code>steps</code> — numbered use instructions</li>
+    <li><code>learn</code> — important explanations and rules</li>
+    <li><code>dos</code> — recommended actions</li>
+    <li><code>donts</code> — warnings and prohibited actions</li>
+    <li><code>status</code> — current implementation status</li>
+  </ul>
+
+  <h3>Popup editing steps</h3>
+  <ol>
+    <li>Open the related menu-named HTML file in VS Code.</li>
+    <li>Find the guide object for the popup.</li>
+    <li>Edit only the text or list items that need to change.</li>
+    <li>Save the file.</li>
+    <li>Review the VS Code diff.</li>
+    <li>Run the focused syntax checks.</li>
+    <li>Run <code>clasp push</code>.</li>
+    <li>Open the Apps Script <code>/dev</code> test deployment.</li>
+    <li>Open the relevant left-menu item and check the popup.</li>
+    <li>Test the affected role and selected client/business authorization context.</li>
+    <li>Update production only after the <code>/dev</code> test succeeds.</li>
+  </ol>
+
+  <h2>Left-side menu editing</h2>
+  <p>The source of truth is:</p>
+  <p><code>Setup.js</code> → <code>setupNavigation_()</code></p>
+
+  <h3>Menu properties that may be edited</h3>
+  <ul>
+    <li><code>label</code> — visible menu name</li>
+    <li><code>description</code> — menu explanation</li>
+    <li><code>order</code> — position within the parent</li>
+    <li><code>parentId</code> — parent group or submenu</li>
+    <li><code>level</code> — menu depth</li>
+    <li><code>roles</code> — permitted roles</li>
+    <li><code>enabled</code> — whether the item is shown</li>
+    <li><code>moduleId</code> — module opened by the item</li>
+  </ul>
+
+  <h3>Rename a menu item</h3>
+  <p>Change the visible label:</p>
+  <pre>label: 'Business Records'</pre>
+  <p>For example:</p>
+  <pre>label: 'Business Information'</pre>
+  <ul>
+    <li>Keep the existing internal <code>id</code>.</li>
+    <li>Keep the existing <code>moduleId</code> unless a deliberate migration is required.</li>
+    <li>Keep the popup title and menu label consistent.</li>
+  </ul>
+
+  <h3>Move a menu item</h3>
+  <p>Update the item's parent, depth and position:</p>
+  <pre>parentId: 'assets-estate',
+level: 2,
+order: 30</pre>
+  <ul>
+    <li>Change <code>parentId</code> to select another parent group.</li>
+    <li>Change <code>level</code> to match the new menu depth.</li>
+    <li>Change <code>order</code> to place the item correctly among its siblings.</li>
+  </ul>
+
+  <h3>Hide or retire a menu item</h3>
+  <div class="warning">
+    Do not simply delete the old Firestore document. Stale navigation
+    documents are not automatically deleted during a rewrite.
+  </div>
+  <ol>
+    <li>Remove the item from the active source definition.</li>
+    <li>Add an explicit disabled retirement record in the setup/reset path.</li>
+    <li>Set <code>enabled: false</code>.</li>
+    <li>Increase <code>NILAVARAM_NAVIGATION_VERSION</code>.</li>
+    <li>Run <code>clasp push</code>.</li>
+    <li>Run the owner-only navigation reset or rewrite in Apps Script.</li>
+    <li>Reload the <code>/dev</code> deployment and verify the menu.</li>
+  </ol>
+
+  <h3>Four requested menu tasks</h3>
+  <ol>
+    <li><strong>Rename:</strong> edit the item's <code>label</code> in <code>Setup.js</code>.</li>
+    <li><strong>Delete/retire:</strong> disable the item with <code>enabled: false</code> and keep an explicit retirement record; do not silently delete its Firestore document.</li>
+    <li><strong>Re-position:</strong> edit <code>order</code>; to move it to another group also edit <code>parentId</code> and <code>level</code>.</li>
+    <li><strong>Save:</strong> save <code>Setup.js</code> in VS Code, increase <code>NILAVARAM_NAVIGATION_VERSION</code>, run <code>clasp push</code>, and run the owner-only navigation rewrite so Firestore receives the source definition.</li>
+  </ol>
+  <p>There is no technical mechanism for Apps Script or Firestore to write files back into your VS Code workspace automatically. If you make a temporary live edit in the Developer Console, copy the final values back into <code>Setup.js</code> before treating the change as permanent.</p>
+
+  <h2>VS Code to Apps Script workflow</h2>
+  <pre>VS Code
+  ↓
+Review and syntax-check
+  ↓
+clasp push
+  ↓
+Apps Script /dev test deployment
+  ↓
+Role and authorization testing
+  ↓
+Production deployment</pre>
+
+  <h3>Recommended commands</h3>
+  <pre>node --check Setup.js
+node --check Code.js
+node --check Development.js
+clasp push</pre>
+
+  <ul>
+    <li>Run the checks from the repository folder.</li>
+    <li>Review the changed files before pushing.</li>
+    <li>Use the <code>/dev</code> deployment for testing.</li>
+    <li>Do not deploy to production until the affected popup and menu have been tested.</li>
+  </ul>
+
+  <h2>How Apps Script changes get back into VS Code</h2>
+  <ul>
+    <li>Apps Script changes do not automatically synchronize back to VS Code.</li>
+    <li>Direct Developer Console or Firestore edits should be treated as temporary testing changes.</li>
+    <li>Copy the final menu values back into <code>Setup.js</code>.</li>
+    <li>Copy the final window text back into the related menu-named HTML file.</li>
+    <li>Save the files in VS Code.</li>
+    <li>Run <code>clasp push</code> again.</li>
+    <li>VS Code remains the permanent source of truth.</li>
+  </ul>
+
+  <h2>Storage responsibilities</h2>
+  <div class="columns">
+    <section>
+      <h3>OneDrive</h3>
+      <ul>
+        <li>Uploaded source documents</li>
+        <li>Scans and certificates</li>
+        <li>Business records</li>
+        <li>Supporting evidence</li>
+        <li>Backups and archives</li>
+      </ul>
+    </section>
+    <section>
+      <h3>Firestore</h3>
+      <ul>
+        <li>Access controls</li>
+        <li>Roles and permissions</li>
+        <li>Menu records</li>
+        <li>Document metadata</li>
+        <li>Protected OneDrive references</li>
+        <li>Hashes and audit history</li>
+        <li>Workflow status</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="note">
+    <strong>OneDrive decision:</strong>
+    Popup HTML is not fetched live from OneDrive. Static guidance stays in
+    source-controlled Apps Script HTML files. OneDrive is used for uploaded
+    documents and evidence, not executable or rendered popup code.
+  </div>
+
+  <h2>Validation already completed</h2>
+  <ul>
+    <li>JavaScript syntax checks passed for <code>Setup.js</code>, <code>Code.js</code> and <code>Development.js</code>.</li>
+    <li>The editable popup source was extracted and syntax-checked successfully.</li>
+    <li>The source guide is included in the module popup.</li>
+    <li>The existing fallback guidance remains available.</li>
+    <li><code>git diff --check</code> passed.</li>
+    <li>No Apps Script deployment was performed as part of this reference page.</li>
+  </ul>
+
+  <h2>Important safety rules</h2>
+  <ul>
+    <li>Never put passwords, OAuth tokens, private keys or service-account secrets in source files.</li>
+    <li>Never put uploaded document contents in popup guide source.</li>
+    <li>Static popup guidance is not an authorization mechanism.</li>
+    <li>Apps Script server-side authorization remains authoritative.</li>
+    <li>Keep the selected client and business as authorization context where the application requires it.</li>
+    <li>Preserve audit logging and the existing role and permission model.</li>
+  </ul>
+</body>
+</html>

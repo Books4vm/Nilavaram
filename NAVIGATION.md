@@ -33,7 +33,7 @@ the audit log.
 |---|---|---|
 | Dashboard | Firestore status, tasks, accounting summaries and authorized access catalog | Search accessible businesses, select context, open detail, refresh |
 | Personal & Life | Firestore personal-record metadata and protected document references | Add, edit, link evidence, mark missing, renew, view history |
-| Businesses | Firestore clients and business entities | Add, edit, deactivate, reactivate, select, view related records |
+| Main Workspace business selector | Firestore clients and business entities | Search accessible businesses, select context, view related records |
 | Assets, Liabilities & Supporting Records | Firestore metadata plus authorized OneDrive evidence links | Add, edit, search, link owner, attach evidence, view history |
 | Security | Firestore users, roles, permissions, sessions and audits | Invite, change role, disable/reactivate, review access, inspect audit |
 | Transactions | Firestore drafts and indexes; connected imports through approved APIs | Enter, upload, validate, categorize, reconcile, approve, post |
@@ -83,24 +83,40 @@ implemented.
 
 Organizes the owner's history and the documents that support it.
 
-- **Life Timeline:** Records personal and family events.
-- **Identity & Immigration:** Organizes identity, citizenship and immigration records.
-- **Education:** Records education and certificates. The same authorized user
-  may find permitted education records from each accessible business for
-  convenience. This does not automatically disclose the records to every user
-  in those businesses; explicit authorization or record sharing remains
-  required. Users can share with selected authorized users and revoke that
-  access when it is no longer needed.
-- **Employment:** Records work history and supporting documents.
-- **Business Milestones:** Includes important businesses as life events.
-- **Renewals:** Tracks documents and registrations that expire.
+- **Life Timeline:** The single user-owned workspace for:
+  1. All Timeline Entries — personal events, memories, education and employment milestones, publications and important life events. Formal Business Milestones belong under Business Records.
+  2. Permanent Records — identity documents, birth date and birth time,
+     horoscope details, Aadhaar, health insurance, PCP and specialist details,
+     and professional licenses.
+  3. Education & Qualifications.
+  4. Employment & Professional History.
+  5. Publications.
+  6. Renewals & Expirations — including passport, visa, OCI, license and insurance dates.
+  7. Property & Ownership — property held by inheritance, self-acquisition or
+     joint ownership, with optional relationships to one or more businesses.
+  8. Personal Retirement Accounts — user-owned retirement accounts that are
+     not business-specific by default.
 
-## Businesses
+  All sections are saved once, with large documents in approved OneDrive
+  storage, and are displayed through authorized metadata or protected links
+  from each business context the user may access. The selected business is
+  authorization context only; it does not create a separate copy. The future
+  workflow will support Add, Edit, Update, Attachments, Search, Sort, Filter,
+  audit history, View/Edit permissions and controlled sharing/revocation.
 
-Manages the businesses maintained in Nilavaram.
+## Client and business selection
 
-- **All Businesses:** Lists active and inactive businesses. Its page will
-  provide Add, Edit, Deactivate, Reactivate and safe Delete actions.
+The main Workspace is the single place to select a client and business. Its
+**My accessible businesses** panel shows the authorized client and business
+names that were previously repeated by the left-menu **All Businesses**
+window. It provides search and **Use this business** to set the working
+context. The duplicate left-menu destination and its empty Businesses heading
+are intentionally removed; the client and business names remain visible in
+the main Workspace and application header.
+
+The server filters this list for the signed-in user. Selecting a business
+changes the working context; it does not grant access to another business or
+create a duplicate copy of any record.
 
 ## Assets, Liabilities & Supporting Records
 
@@ -112,20 +128,31 @@ information.
 This is an expandable left-menu group. Each item below is a separate clickable
 destination; the group does not open a combined tabbed popup.
 
-- **Properties:** Records real estate and significant physical property.
-- **Financial Accounts:** Records bank, investment, retirement and other financial accounts.
-- **Entities & Ownership:** Records businesses, entities and ownership relationships.
-- **Owned Assets:** Links assets to the owner identified in source documents.
-- **Borrowings & Liabilities:** Records loans, credit balances, notes payable and related evidence.
-- **Estate & Planning Records:** Organizes estate, succession, beneficiary and planning records.
-- **Business & Governance Records:** Organizes board, shareholder, member and trustee minutes, resolutions and related records.
+- **Business Records:** One workspace for business bank and investment accounts,
+  Business Milestones,
+  Entities & Ownership, Owned Assets,
+  Borrowings & Liabilities, Estate & Planning Records, and Business &
+  Governance Records. These records may relate to a business but are not
+  automatically business-owned. Ownership, entity relationship, tax identity
+  and legal responsibility remain separate facts supported by user input and
+  source documents.
 
-### Financial Accounts detail
+  Large supporting documents are stored once in approved OneDrive storage and
+  displayed through authorized metadata or protected links. The same
+  authorized record may be viewed from each client/business context available
+  to the user without creating duplicate records.
 
-The Financial Accounts page is scoped to the selected client and business.
+  Business Milestones may be organized by user-defined titles and subtitles.
+  Uploaded source documents are organized under those labels in approved
+  OneDrive storage; Firestore retains essential metadata, protected links,
+  file hashes, permissions and audit references.
+
+Business bank and investment account details are part of Business Records and
+are scoped to the selected client and business.
 Firestore stores only metadata such as institution name, account label, account
-type, currency, last four digits and a supporting-document reference. It must
-never store passwords, security answers, access tokens or full account numbers.
+type, currency, last four digits and a supporting-document reference. Personal
+retirement account details belong in Life Timeline. Firestore must never store
+passwords, security answers, access tokens or full account numbers.
 The page provides:
 
 - **Add New:** Creates a metadata record after server-side validation.
@@ -311,7 +338,6 @@ Provides expandable user guidance.
 ```text
 Dashboard
 ↓ Personal & Life
-↓ Businesses
 ↓ Assets, Liabilities & Supporting Records
 ↓ Security
 ↓ Transactions
@@ -325,6 +351,5 @@ Dashboard
 ↓ Help
 ```
 
-Firestore hierarchy records use `parentId` and `level`. For example,
-`all-businesses` has `parentId: "businesses"` and `level: 2`. Future third-level
+Firestore hierarchy records use `parentId` and `level`. Future third-level
 records will use the submenu item as `parentId` and `level: 3`.

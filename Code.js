@@ -384,23 +384,27 @@ function doGet(e) {
       .setTitle('Nilavaram — Change context');
   }
   if (parameters.moduleWindow === '1') {
+    const requestedModuleId = String(parameters.moduleId || '');
+    const requestedModuleLabel = requestedModuleId === 'identity-immigration'
+      ? 'Permanent Records'
+      : String(parameters.moduleLabel || requestedModuleId || 'Module');
     try {
       authorizeModuleWindowLoad_(
         parameters.clientId,
         parameters.entityId,
-        parameters.moduleId
+        requestedModuleId
       );
     } catch (error) {
       return buildAuthorizationErrorPage_(
-        String(parameters.moduleLabel || parameters.moduleId || 'Module'),
+        requestedModuleLabel,
         error
       );
     }
 
     const moduleTemplate = HtmlService.createTemplateFromFile('ModuleWindow');
-    moduleTemplate.moduleIdJson = JSON.stringify(String(parameters.moduleId || ''))
+    moduleTemplate.moduleIdJson = JSON.stringify(requestedModuleId)
       .replace(/</g, '\\u003c');
-    moduleTemplate.moduleLabelJson = JSON.stringify(String(parameters.moduleLabel || ''))
+    moduleTemplate.moduleLabelJson = JSON.stringify(requestedModuleLabel)
       .replace(/</g, '\\u003c');
     moduleTemplate.clientIdJson = JSON.stringify(String(parameters.clientId || ''))
       .replace(/</g, '\\u003c');
@@ -417,7 +421,7 @@ function doGet(e) {
     moduleTemplate.userRoleJson = JSON.stringify(String(parameters.userRole || ''))
       .replace(/</g, '\\u003c');
     return moduleTemplate.evaluate().setTitle(
-      'Nilavaram — ' + String(parameters.moduleLabel || parameters.moduleId || 'Module')
+      'Nilavaram — ' + requestedModuleLabel
     );
   }
   if (parameters.reviewWindow === 'acode') {

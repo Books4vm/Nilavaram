@@ -12,6 +12,21 @@
       NILAVARAM_MENU_STATUS.planned;
   }
 
+  function visibleNavigationForMenu(navigation) {
+    return (navigation || []).filter(function(section) {
+      return section.id !== 'dashboard' &&
+        section.moduleId !== 'dashboard';
+    });
+  }
+
+  function countVisibleMenuItems(navigation) {
+    return collectMenuLeaves(
+      visibleNavigationForMenu(navigation),
+      [],
+      []
+    ).length;
+  }
+
   function menuStorageKey(id) {
     return 'nilavaramMenuExpanded_' + id;
   }
@@ -229,6 +244,33 @@
     return button;
   }
 
+  function renderMenuStatusSummary(summary, leaves, prefix) {
+    summary.textContent = '';
+
+    const total = document.createElement('span');
+    total.textContent = prefix + leaves.length +
+      ' menu items (groups excluded)';
+    summary.appendChild(total);
+
+    const counts = {};
+    leaves.forEach(function(item) {
+      const status = NILAVARAM_MENU_STATUS[item.wiringStatus]
+        ? item.wiringStatus
+        : 'planned';
+      counts[status] = (counts[status] || 0) + 1;
+    });
+
+    Object.keys(NILAVARAM_MENU_STATUS).forEach(function(status) {
+      const count = counts[status] || 0;
+      const statusText = document.createElement('span');
+      statusText.className = 'menu-status-count';
+      statusText.title = NILAVARAM_MENU_STATUS[status][1];
+      statusText.textContent = ' ' + NILAVARAM_MENU_STATUS[status][0] +
+        ' ' + count;
+      summary.appendChild(statusText);
+    });
+  }
+
   function renderMenuPickerPanel(navigation, searchText) {
     const browse = document.getElementById('menu-browse-panel');
     const results = document.getElementById('menu-search-results');
@@ -269,10 +311,10 @@
       });
       return;
     }
-
     results.hidden = true;
     browse.hidden = false;
-    summary.textContent = leaves.length + ' menu items';
+    browse.hidden = false;
+    renderMenuStatusSummary(summary, leaves, '');
 
     navigation.forEach(function(section) {
       if (menuHasMatch(section, '', [section.label])) {
@@ -297,12 +339,11 @@
   }
 
   function applyNavigationToMenu(navigation) {
-    const visibleNavigation = (navigation || []).filter(function(section) {
-      return section.id !== 'dashboard' &&
-        section.moduleId !== 'dashboard';
-    });
+    const visibleNavigation = visibleNavigationForMenu(navigation);
 
     window.nilavaramNavigation = visibleNavigation;
+    window.nilavaramVisibleMenuCount =
+      countVisibleMenuItems(visibleNavigation);
     renderMenuPickerPanel(visibleNavigation, '');
     updateMenuSelectorState(true);
   }

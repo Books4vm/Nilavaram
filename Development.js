@@ -26,11 +26,9 @@ function createDevelopmentTaskIfMissing_(taskId, task) {
 
 function setupProjectIntentTasks_() {
   const personalTasks = [
-    ['personal-life-timeline', 'Build Life Timeline', 'Create private life-event records with linked available or missing documents.'],
-    ['identity-immigration', 'Organize Identity & Immigration', 'Track identity, citizenship, immigration documents and renewals.'],
+    ['personal-life-timeline', 'Build Life Timeline', 'Create one user-owned workspace for memories, permanent records, education, employment, publications and renewals with protected documents.'],
     ['education-history', 'Organize Education History', 'Record education events and available or missing certificates.'],
     ['employment-history', 'Organize Employment History', 'Record work history and supporting documents.'],
-    ['business-milestones', 'Organize Business Milestones', 'Link important business names and events to the life timeline.'],
     ['renewal-system', 'Build Renewal Tracking', 'Track expiry and renewal dates for documents and registrations.']
   ];
 
@@ -94,6 +92,17 @@ function setupProjectIntentTasks_() {
       'Record trusts, trustees, beneficiaries and stated ownership',
       'Link documents from OneDrive one at a time',
       'Do not make legal conclusions about asset protection'
+    ]
+  });
+
+  createDevelopmentTaskIfMissing_('business-milestones-records', {
+    title: 'Organize Business Milestones in Business Records',
+    dueDate: '',
+    requirements: [
+      'Keep formal business milestones outside the personal Life Timeline',
+      'Allow the user to define milestone titles and subtitles',
+      'Organize uploaded source documents under those labels in OneDrive',
+      'Retain only essential document metadata, protected links, hashes and audit references in Firestore'
     ]
   });
 

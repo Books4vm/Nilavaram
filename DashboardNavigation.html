@@ -159,13 +159,16 @@
           );
           return;
         }
-        let moduleCount = 0;
-        menus.forEach(function(section) {
-          moduleCount += countNavigationModules(section);
+        const visibleMenus = typeof visibleNavigationForMenu === 'function'
+          ? visibleNavigationForMenu(menus)
+          : menus;
+        let visibleCount = 0;
+        visibleMenus.forEach(function(section) {
+          visibleCount += countNavigationModules(section);
         });
-        applyNavigationToMenu(menus);
+        applyNavigationToMenu(visibleMenus);
         showWorkspaceNotice(
-          'Menu loaded: ' + moduleCount + ' item(s) for ' +
+          'Menu loaded: ' + visibleCount + ' item(s) for ' +
             clientName + ' / ' + entityName + '.'
         );
       } catch (error) {
@@ -504,6 +507,12 @@
   }
 
   function getModuleGuide_(id, title) {
+    const sourceGuide = typeof getSourceModuleGuide_ === 'function'
+      ? getSourceModuleGuide_(id)
+      : null;
+    if (sourceGuide) {
+      return sourceGuide;
+    }
     const text = {
       purpose: 'This window is the authorized workspace for ' + title +
         ' in the selected client and business.',
@@ -563,12 +572,107 @@
       text.display = 'User identity, status, role, assigned scope, permitted modules and relevant audit information.';
       text.dos.push('Grant the minimum access needed for the person’s work and review it regularly.');
       text.donts.push('Do not share passwords or bypass the invitation and authorization process.');
+    } else if (id === 'business-records' || id === 'business-milestones' ||
+        id === 'trusts-entities' ||
+        id === 'trust-owned-assets' || id === 'borrowings-liabilities' ||
+        id === 'estate-documents' || id === 'business-governance-records') {
+      text.purpose = 'Use Business Records as one organized workspace for important entity, ownership, asset, liability, estate, planning and governance information. The workspace may contain records related to a business, but the menu is a convenient organization of authorized records and does not by itself decide legal ownership.';
+      text.source = 'When these workflows are implemented, Firestore will hold essential structured metadata, permissions, source references and audit history. Large supporting documents will remain once in approved OneDrive storage and will be shown through authorized metadata or protected links. The selected client and business provide access context; they do not require duplicate copies of a record.';
+      text.display = 'Business Records will contain seven areas: Business Financial Accounts (bank and investment accounts); Business Milestones; Entities & Ownership; Owned Assets; Borrowings & Liabilities; Estate & Planning Records; and Business & Governance Records. Business Milestones may include formations, registrations, acquisitions, launches, expansions, major contracts, ownership changes, financing events, closures and other business events.';
+      text.steps = [
+        'Choose the appropriate Business Records area when the detailed workflow is available.',
+        'For Business Milestones, create the title and subtitle that best describe the event, then enter its date, status, description, business relationship and source references.',
+        'Organize uploaded source documents under the user-selected milestone title and subtitle in the approved OneDrive structure. Firestore retains only essential metadata, permissions, links, hashes and audit references.',
+        'Review the client, business context, ownership information and access settings before saving.',
+        'Use Search, Filter and Refresh to find current authorized records. Use Add, Edit or Update only when those actions are displayed and permitted.'
+      ];
+      text.learn = [
+        'Business Records is one menu item that groups seven related record areas; it does not mean every record is owned by a business.',
+        'Business Milestones are business records, not personal Life Timeline entries.',
+        'Bank and investment accounts associated with a specific business belong in Business Records. User-owned retirement accounts belong in Life Timeline and are not business-specific by default.',
+        'An asset, liability, estate or governance record may belong to a person, entity, trust, estate or multiple owners according to its source documents.',
+        'A business relationship, ownership relationship, tax identity and legal responsibility are separate facts and must not be inferred from the menu location.',
+        'The same authorized record can be displayed from each client/business context the user may access without creating duplicate records.',
+        'View permission allows reading authorized metadata and protected links. Edit permission allows changes only when the verified workflow and role permit it.'
+      ];
+      text.dos = [
+        'Record the owner, entity, relationship, dates, milestone title, subtitle and source evidence accurately.',
+        'Use clear user-selected titles and subtitles so uploaded source documents can be organized consistently in OneDrive.',
+        'Keep estate, planning, liability and governance records linked to the correct people or entities.',
+        'Use approved OneDrive storage for large supporting documents.',
+        'Use the audit and sharing workflow when access is changed.'
+      ];
+      text.donts = [
+        'Do not assume that a record is business-owned merely because it appears under Business Records.',
+        'Do not enter passwords, security answers, OAuth tokens, private keys or full financial-account secrets.',
+        'Do not create a second copy simply because the same record is viewed from another authorized business.',
+        'Do not treat stored records as legal, tax, estate, lending or governance advice.'
+      ];
+      text.status = 'The consolidated Business Records explanation is available now. Detailed record entry, user-defined milestone titles/subtitles, OneDrive document organization, editing, sharing, search and audit workflows will be enabled only after their verified implementation is complete.';
+    } else if (id === 'all-businesses') {
+      text.purpose = 'Use the main Nilavaram Workspace to find and select an authorized client and business. The same searchable business list is already displayed there, so All Businesses is not repeated as a separate left-menu destination.';
+      text.source = 'The main Workspace reads the current client and business access catalog from the authorized server data. It shows only the clients and businesses available to the signed-in user.';
+      text.display = 'The main Workspace shows the client name, each accessible business name, a search box and a Use this business action. Selecting a business changes the working context for the application.';
+      text.steps = [
+        'Return to the main Workspace instead of opening a duplicate All Businesses menu window.',
+        'Search the client or business name in My accessible businesses.',
+        'Select Use this business to set the authorized working context.',
+        'Confirm the client and business shown in the header before opening another module.'
+      ];
+      text.learn = [
+        'The main Workspace is the single place for the accessible client and business list.',
+        'The list is server-filtered; seeing one business does not grant access to another.',
+        'Changing the selected business changes the working context but does not copy or move records.'
+      ];
+      text.dos = [
+        'Use the client name and business name shown in the main Workspace and header.',
+        'Refresh the Workspace when access or business information may have changed.'
+      ];
+      text.donts = [
+        'Do not assume that a business name appearing in another context is accessible without server authorization.',
+        'Do not treat this selection list as a business record-editing page.'
+      ];
+      text.status = 'The main Workspace business selector is available now. The separate All Businesses left-menu destination has been removed to avoid duplicate navigation.';
     } else if (id.indexOf('transaction') !== -1 || id.indexOf('input') !== -1 ||
         id.indexOf('journal') !== -1 || id.indexOf('acode') !== -1) {
       text.purpose = 'Use this window to enter, import, review, categorize or prepare transaction information before controlled posting.';
       text.source = 'Firestore supplies drafts, source indexes, account rules and audit records. Connected imports use approved permissioned integrations.';
       text.display = 'Source batch, dates, descriptions, amounts, proposed accounts, evidence references, review status and exceptions.';
       text.donts.push('Do not post an entry without checking evidence, account coding, balance and approval status.');
+    } else if (id === 'life-timeline' || id === 'identity-immigration') {
+      text.purpose = 'Use Life Timeline as your personal history workspace. It brings memories, achievements, identity records, education, employment, publications, licenses, health information and renewal dates together in one user-owned place. It is not a business-owned record system.';
+      text.source = 'When this feature is implemented, structured personal details and protected document metadata will be managed through Nilavaram, while large uploaded documents will be stored once in the approved OneDrive location. The selected client and business confirm that you may open this window; they do not create a separate copy of your personal information.';
+      text.display = 'The Life Timeline workspace will contain eight sections: All Timeline Entries; Permanent Records; Education & Qualifications; Employment & Professional History; Publications; Renewals & Expirations; Property & Ownership; and Personal Retirement Accounts. Records may include personal events and memories, identity documents, birth date and birth time, horoscope details, Aadhaar, health insurance, PCP and specialist details, CPA and medical-practice licenses, other professional licenses, publication details, property records, user-owned retirement accounts and protected supporting documents. Business Milestones belong in Business Records.';
+      text.steps = [
+        'Choose the appropriate Life Timeline section: All Timeline Entries, Permanent Records, Education & Qualifications, Employment & Professional History, Publications, Renewals & Expirations, Property & Ownership, or Personal Retirement Accounts. Open Business Records for business milestones.',
+        'When Add, Edit, Update and Attachments are available, enter accurate dates, titles, descriptions, status, expiration or renewal dates, contact details and notes.',
+        'Upload or link supporting documents through the approved workflow. Each document is stored once in OneDrive and displayed through authorized metadata or protected links.',
+        'Use Search, Sort and Filter to find entries. Sorting or filtering changes the view; it does not change the stored record.',
+        'Review the record, document reference and access settings before saving. Use Refresh after a save or update to load current authorized data.'
+      ];
+      text.learn = [
+        'All eight sections belong to the user, not to a business, and are saved once in the backend.',
+        'Personal retirement accounts belong in Life Timeline. A retirement account should not be treated as a business account merely because contributions or employment history relate to a business.',
+        'A personal achievement may be recorded as a personal event, but a formal Business Milestone belongs in Business Records and is not a personal Life Timeline entry.',
+        'Property & Ownership records may identify inheritance, self-acquisition or joint ownership. The recorded ownership source is information supplied by the user or supporting documents, not an automatic business rule.',
+        'A property may relate to one or more businesses without becoming a business-owned record. Ownership, tax identity and legal responsibility must be kept distinct.',
+        'The selected client and business are authorization context only. The same authorized personal records can be displayed from every business the user may access.',
+        'View permission allows reading authorized records and protected links. Edit permission allows adding or changing records and documents when the workflow is enabled.',
+        'Sharing and revoking access will be limited to authorized users and recorded by the approved access and audit workflow.'
+      ];
+      text.dos = [
+        'Keep permanent identity, birth, horoscope, health, license, publication, renewal, property and ownership details accurate and current.',
+        'Use the appropriate section and include a date or best-known time period.',
+        'Link only supporting documents that belong to the record and use the approved OneDrive workflow.',
+        'Share sensitive personal information only with authorized users who need it.'
+      ];
+      text.donts = [
+        'Do not use Life Timeline for accounting transactions or business operating records.',
+        'Do not enter passwords, security answers, OAuth tokens, private keys or unnecessary full financial-account secrets.',
+        'Do not create duplicate entries because you opened the workspace from another authorized business.',
+        'Do not treat a stored publication, license, health record, property record or credential as legal, medical, tax or professional advice.'
+      ];
+      text.status = 'The combined Life Timeline explanation is available now. Personal record storage, Add/Edit/Update, attachments, search, sorting, filtering, sharing, expiration tracking and publication workflows will be enabled only after their verified user-owned implementation is complete.';
     } else if (id === 'education') {
       text.purpose = 'In this menu, record education details and preserve the related lifelong historical records safely and securely.';
       text.source = 'Firestore displays the structured education details, dates, institutions, qualifications and authorized document metadata. Original documents remain in approved secure storage such as OneDrive.';
@@ -609,7 +713,7 @@
       '<h2>Financial Accounts</h2>' +
       '<section class="module-help-panel" aria-labelledby="financial-account-help-title">' +
         '<h3 id="financial-account-help-title">How Financial Accounts works</h3>' +
-        '<p>Use this page to record safe reference information about a bank, investment or retirement account for the selected business.</p>' +
+        '<p>Business bank and investment account details belong in Business Records. Personal retirement accounts belong in Life Timeline and are not business-specific by default.</p>' +
         '<ul>' +
           '<li><b>Add New:</b> record the institution, account name, account type, currency and only the last four digits.</li>' +
           '<li><b>Edit:</b> correct or update an account that you are allowed to edit.</li>' +
@@ -622,7 +726,7 @@
           'Unchecking a user and saving revokes that user&#39;s access.</p>' +
         '<p class="help-meta">Sharing never gives access to another business. Each user must already be authorized for this client, business and module.</p>' +
       '</section>' +
-      '<p class="help-meta">Accounts are shown only for the selected business. ' +
+      '<p class="help-meta">Business bank and investment accounts are shown only for the selected business. ' +
       'Store identification details, not passwords or full account numbers.</p>' +
       '<div class="button-row">' +
         '<button id="financial-account-add" class="primary-button" type="button">' +
