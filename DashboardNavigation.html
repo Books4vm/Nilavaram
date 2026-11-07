@@ -159,14 +159,15 @@
           );
           return;
         }
-        const visibleMenus = typeof visibleNavigationForMenu === 'function'
-          ? visibleNavigationForMenu(menus)
-          : menus;
-        let visibleCount = 0;
-        visibleMenus.forEach(function(section) {
-          visibleCount += countNavigationModules(section);
-        });
+        const visibleMenus = visibleNavigationForMenu(menus);
+
+        // Render the sidebar using the filtered Firestore navigation.
         applyNavigationToMenu(visibleMenus);
+
+        // Use the exact count produced by the sidebar renderer.
+        const visibleCount = window.nilavaramVisibleMenuCount;
+
+        // Display the same total in the workspace.
         showWorkspaceNotice(
           'Menu loaded: ' + visibleCount + ' item(s) for ' +
             clientName + ' / ' + entityName + '.'

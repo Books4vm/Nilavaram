@@ -20,8 +20,7 @@
   }
 
   function countVisibleMenuItems(navigation) {
-    return collectMenuLeaves(
-      visibleNavigationForMenu(navigation),
+    return collectMenuLeaves(navigation,
       [],
       []
     ).length;
@@ -339,12 +338,11 @@
   }
 
   function applyNavigationToMenu(navigation) {
-    const visibleNavigation = visibleNavigationForMenu(navigation);
-
-    window.nilavaramNavigation = visibleNavigation;
-    window.nilavaramVisibleMenuCount =
-      countVisibleMenuItems(visibleNavigation);
-    renderMenuPickerPanel(visibleNavigation, '');
+    window.nilavaramNavigation = navigation;
+    const count = countVisibleMenuItems(navigation);
+    console.log('DEBUG DashboardMenuPicker: count from countVisibleMenuItems =', count);
+    window.nilavaramVisibleMenuCount = count;
+    renderMenuPickerPanel(navigation, '');
     updateMenuSelectorState(true);
   }
 

@@ -112,9 +112,17 @@ function buildNavigationTree_(clientId, entityId, nilavaramSessionKey) {
   }
 
   function countModules(tree) {
+    // Count every node that has moduleId, excluding dashboard
     return tree.reduce(function(total, menu) {
+      // Skip dashboard entries
+      if (menu.id === 'dashboard' || menu.moduleId === 'dashboard') {
+        return total;
+      }
       function countChildren(children) {
         return (children || []).reduce(function(count, child) {
+          if (child.id === 'dashboard' || child.moduleId === 'dashboard') {
+            return count; // Skip dashboard
+          }
           return count + (child.moduleId ? 1 : 0) + countChildren(child.children);
         }, 0);
       }
