@@ -380,7 +380,7 @@ function doGet(e) {
     }
   }
   if (parameters.contextWindow === '1') {
-    return HtmlService.createHtmlOutputFromFile('ContextWindow')
+    return HtmlService.createTemplateFromFile('ContextWindow').evaluate()
       .setTitle('Nilavaram — Change context');
   }
   if (parameters.moduleWindow === '1') {

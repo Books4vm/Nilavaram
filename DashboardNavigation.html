@@ -35,6 +35,7 @@
       '</div>';
     menu.appendChild(tools);
     bindMenuPickerEvents();
+    bindCustomizeMenuButton();
   }
 
   function applyShellFromEngine(shell) {
@@ -165,16 +166,7 @@
         const visibleMenus = visibleNavigationForMenu(menus);
 
         // Load user preferences and apply them
-        loadAndApplyMenuPreferences(visibleMenus);
-
-        // Use the exact count produced by the sidebar renderer.
-        const visibleCount = window.nilavaramVisibleMenuCount;
-
-        // Display the same total in the workspace.
-        showWorkspaceNotice(
-          'Menu loaded: ' + visibleCount + ' item(s) for ' +
-            clientName + ' / ' + entityName + '.'
-        );
+        loadAndApplyMenuPreferences(visibleMenus, clientName, entityName);
       } catch (error) {
         showWorkspaceError(
           'Menu load failed in browser.',
@@ -1165,7 +1157,7 @@
   // Menu Customization: Load, Apply, and UI Functions
   // ========================================================================
 
-  function loadAndApplyMenuPreferences(navigation) {
+  function loadAndApplyMenuPreferences(navigation, clientName, entityName) {
     const sessionKey = nilavaramSessionKey();
     const userEmail = (window.nilavaramDashboardInfo || {}).user || '';
 
@@ -1178,6 +1170,13 @@
         const filtered = applyMenuPreferencesFilter(navigation, preferences);
         applyNavigationToMenu(filtered);
         updateCustomizeMenuButtonVisibility();
+
+        // Display workspace notice after menu is rendered and count is available
+        const visibleCount = window.nilavaramVisibleMenuCount;
+        showWorkspaceNotice(
+          'Menu loaded: ' + visibleCount + ' item(s) for ' +
+            clientName + ' / ' + entityName + '.'
+        );
       })
       .withFailureHandler(function(error) {
         console.log('Menu preferences load failed (using defaults):', error);
@@ -1185,6 +1184,13 @@
         window.nilavaramOriginalNavigation = navigation;
         applyNavigationToMenu(navigation);
         updateCustomizeMenuButtonVisibility();
+
+        // Display workspace notice after menu is rendered and count is available
+        const visibleCount = window.nilavaramVisibleMenuCount;
+        showWorkspaceNotice(
+          'Menu loaded: ' + visibleCount + ' item(s) for ' +
+            clientName + ' / ' + entityName + '.'
+        );
       })
       .getUserMenuPreferences(sessionKey);
   }
