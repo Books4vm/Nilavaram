@@ -20,6 +20,9 @@
       '<p id="shell-loading-msg" class="help-meta">Connecting securely...</p>' +
       '<button type="button" id="context-change-button" class="secondary-button context-change-button">' +
         'Change client / business</button>' +
+      '<button type="button" id="customize-menu-button" class="secondary-button context-change-button" ' +
+        'style="margin-top: 8px; display: none;">' +
+        'Customize My Menu</button>' +
       '<div id="menu-section" hidden>' +
         '<label class="sidebar-search-label" for="menu-search">3. Menu</label>' +
         '<div class="menu-search-wrap">' +
@@ -161,8 +164,8 @@
         }
         const visibleMenus = visibleNavigationForMenu(menus);
 
-        // Render the sidebar using the filtered Firestore navigation.
-        applyNavigationToMenu(visibleMenus);
+        // Load user preferences and apply them
+        loadAndApplyMenuPreferences(visibleMenus);
 
         // Use the exact count produced by the sidebar renderer.
         const visibleCount = window.nilavaramVisibleMenuCount;
@@ -1156,5 +1159,135 @@
       '<p class="help-meta">A visible menu item does not mean that live ' +
       'posting or final reporting has been enabled. Nilavaram will label ' +
       'each function accurately until verification is complete.</p>';
+  }
+
+  // ========================================================================
+  // Menu Customization: Load, Apply, and UI Functions
+  // ========================================================================
+
+  function loadAndApplyMenuPreferences(navigation) {
+    const sessionKey = nilavaramSessionKey();
+    const userEmail = (window.nilavaramDashboardInfo || {}).user || '';
+
+    google.script.run
+      .withSuccessHandler(function(preferences) {
+        window.nilavaramMenuPreferences = preferences || { items: [] };
+        window.nilavaramOriginalNavigation = navigation;
+
+        // Apply preferences to filter/reorder the menu
+        const filtered = applyMenuPreferencesFilter(navigation, preferences);
+        applyNavigationToMenu(filtered);
+        updateCustomizeMenuButtonVisibility();
+      })
+      .withFailureHandler(function(error) {
+        console.log('Menu preferences load failed (using defaults):', error);
+        window.nilavaramMenuPreferences = { items: [] };
+        window.nilavaramOriginalNavigation = navigation;
+        applyNavigationToMenu(navigation);
+        updateCustomizeMenuButtonVisibility();
+      })
+      .getUserMenuPreferences(sessionKey);
+  }
+
+  function applyMenuPreferencesFilter(navigation, preferences) {
+    if (!preferences || !preferences.items || !preferences.items.length) {
+      return navigation;
+    }
+
+    const prefsMap = {};
+    preferences.items.forEach(function(pref) {
+      prefsMap[String(pref.id)] = pref;
+    });
+
+    function filterAndReorder(nodes) {
+      return nodes
+        .map(function(node) {
+          const pref = prefsMap[String(node.id)];
+          const visible = !pref || pref.visible !== false;
+
+          if (!visible) {
+            return null;
+          }
+
+          const filtered = {
+            id: node.id,
+            label: node.label,
+            description: node.description || '',
+            type: node.type || 'link',
+            moduleId: node.moduleId || '',
+            wiringStatus: node.wiringStatus || 'planned',
+            children: filterAndReorder(node.children || [])
+          };
+
+          if (pref && pref.order !== undefined) {
+            filtered._preferenceOrder = pref.order;
+          }
+
+          return filtered;
+        })
+        .filter(function(node) {
+          return node !== null;
+        })
+        .sort(function(a, b) {
+          const orderA = a._preferenceOrder !== undefined ? a._preferenceOrder : 999999;
+          const orderB = b._preferenceOrder !== undefined ? b._preferenceOrder : 999999;
+          return orderA - orderB;
+        });
+    }
+
+    return filterAndReorder(navigation);
+  }
+
+  function updateCustomizeMenuButtonVisibility() {
+    const btn = document.getElementById('customize-menu-button');
+    if (btn) {
+      btn.style.display = isShellContextComplete() ? 'block' : 'none';
+    }
+  }
+
+  function openMenuCustomizer() {
+    if (!isShellContextComplete()) {
+      showWorkspaceError(
+        'Select client and business first.',
+        'Choose a client and business before customizing the menu.'
+      );
+      return;
+    }
+
+    const navigation = window.nilavaramOriginalNavigation || [];
+    const preferences = window.nilavaramMenuPreferences || { items: [] };
+    const userEmail = (window.nilavaramDashboardInfo || {}).user || '';
+    const sessionKey = nilavaramSessionKey();
+
+    // Create and open MenuCustomizer popup
+    if (typeof menuCustomizerOpen === 'function') {
+      menuCustomizerOpen(navigation, preferences, userEmail, sessionKey);
+    }
+  }
+
+  function reloadMenuCustomization() {
+    const clientId = window.nilavaramSelectedClient &&
+      window.nilavaramSelectedClient.id;
+    const entityId = window.nilavaramSelectedEntity &&
+      window.nilavaramSelectedEntity.id;
+
+    if (clientId && entityId) {
+      reloadNavigationForCurrentSelection();
+    }
+  }
+
+  // Bind customize menu button event
+  function bindCustomizeMenuButton() {
+    const btn = document.getElementById('customize-menu-button');
+    if (btn) {
+      btn.onclick = openMenuCustomizer;
+    }
+  }
+
+  // Call on page load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindCustomizeMenuButton);
+  } else {
+    bindCustomizeMenuButton();
   }
 </script>

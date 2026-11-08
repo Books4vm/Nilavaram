@@ -1,0 +1,136 @@
+RelativePath,Filename,FileType,Status,Category,Purpose,RelatedModule,Evidence
+Dashboard.html,Dashboard.html,HTML,PARTIAL,Dashboard & Core Framework,Main user workspace and navigation hub,dashboard,Framework present; end-to-end testing incomplete
+DashboardCore.html,DashboardCore.html,HTML,PARTIAL,Dashboard & Core Framework,Initialization and core logic for dashboard,dashboard,Core functions present; behaviors untested
+DashboardModule.html,DashboardModule.html,HTML,PARTIAL,Dashboard & Core Framework,Dashboard module entry point,dashboard,Entry point defined; full functionality unverified
+DashboardMenuPicker.html,DashboardMenuPicker.html,HTML,PARTIAL,Dashboard & Core Framework,Sidebar menu renderer and selection handler,dashboard,Sidebar renders 70 items; scroll behavior fixed in /dev
+DashboardNavigation.html,DashboardNavigation.html,HTML,PARTIAL,Dashboard & Core Framework,Workspace header and module loader,dashboard,Header displays menu count; behavior changes in /dev not pushed
+DashboardOperations.html,DashboardOperations.html,HTML,PARTIAL,Dashboard & Core Framework,Admin operations panel,dashboard,Panel structure exists; operation handlers unverified
+DashboardSessions.html,DashboardSessions.html,HTML,DOCUMENTATION,Dashboard & Core Framework,Active session display and management,dashboard,Guidance content only; no backend operations
+DashboardStyles.html,DashboardStyles.html,HTML,UNVERIFIED,Dashboard & Core Framework,CSS and styling for dashboard components,dashboard,CSS file; functionality not independently verified
+ModuleWindow.html,ModuleWindow.html,HTML,PARTIAL,Module Loading & Context Management,Standardized popup wrapper for all 70 menu destinations,module-window,Framework deployed; authorization and content loading verified
+ModuleWindowCore.html,ModuleWindowCore.html,HTML,PARTIAL,Module Loading & Context Management,Authorization gate and module dispatch logic,module-window,Dispatch logic present; shared module routing untested
+ModuleGuideSources.html,ModuleGuideSources.html,HTML,FUNCTIONAL,Module Loading & Context Management,Master registry of all 80+ module HTML includes,nilavaram-core,All 80 modules registered; NILAVARAM_SOURCE_GUIDES confirmed active
+ShellContextSelector.html,ShellContextSelector.html,HTML,PARTIAL,Module Loading & Context Management,Client/entity context picker for workspace,shell-context,Selector UI present; role-based filtering partially implemented
+ContextWindow.html,ContextWindow.html,HTML,DOCUMENTATION,Module Loading & Context Management,Context information and switching interface,shell-context,Guidance content; no active context operations
+ClientBusinessWindow.html,ClientBusinessWindow.html,HTML,UNVERIFIED,Module Loading & Context Management,Client/entity picker with role-based filtering,context-select,Picker structure exists; authorization logic untested
+Menus.html,Menus.html,HTML,DOCUMENTATION,Navigation & Core Guidance,User guide for 'Menus' module; registers NILAVARAM_SOURCE_GUIDES,menus,Guidance registered; implementation status=sourceReady:false
+NavigationGuide.html,NavigationGuide.html,HTML,DOCUMENTATION,Navigation & Core Guidance,Guidance for menu navigation and module selection,navigation,Guidance content only
+LoadingMenu.html,LoadingMenu.html,HTML,PLACEHOLDER,Navigation & Core Guidance,Loading indicator during module initialization,loading,Placeholder file; minimal content
+NilavaramCore.html,NilavaramCore.html,HTML,PARTIAL,Navigation & Core Guidance,Core initialization and onOpen() handler,nilavaram-core,Initialization logic present; end-to-end testing incomplete
+ProjectStart.html,ProjectStart.html,HTML,DOCUMENTATION,Navigation & Core Guidance,Application startup and initialization guide,startup,Guidance content; no startup operations
+Login.html,Login.html,HTML,PARTIAL,User Sessions Access & Permissions,OAuth2 login and authentication screen,auth,Login flow partially implemented; token handling untested
+InactivitySignIn.html,InactivitySignIn.html,HTML,PARTIAL,User Sessions Access & Permissions,Re-authentication after inactivity timeout,auth,Re-auth screen present; timeout logic untested
+Sessions.html,Sessions.html,HTML,DOCUMENTATION,User Sessions Access & Permissions,Active session management and display,sessions,Guidance content; no session operations
+Permissions.html,Permissions.html,HTML,DOCUMENTATION,User Sessions Access & Permissions,Permission and authorization explanations,permissions,Guidance content; authorization logic in backend
+Roles.html,Roles.html,HTML,DOCUMENTATION,User Sessions Access & Permissions,Role definitions and access levels guide,roles,Guidance content; role definitions in Setup.js
+UsersAccessGuide.html,UsersAccessGuide.html,HTML,DOCUMENTATION,User Sessions Access & Permissions,Instructions for user access management,users,Guidance content only
+UsersWindow.html,UsersWindow.html,HTML,DOCUMENTATION,User & Invite Management,User account management interface,users,Interface structure present; backend operations unverified
+InviteWindow.html,InviteWindow.html,HTML,UNVERIFIED,User & Invite Management,Invite workflow and UI,invites,Invite UI present; workflow logic untested
+InviteWindowCore.html,InviteWindowCore.html,HTML,UNVERIFIED,User & Invite Management,Core logic for invite processing,invites,Core functions present; end-to-end testing incomplete
+InviteAccessPicker.html,InviteAccessPicker.html,HTML,UNVERIFIED,User & Invite Management,Role/access level selector for invites,invites,Selector UI present; permission checks untested
+InviteModuleCatalog.html,InviteModuleCatalog.html,HTML,DOCUMENTATION,User & Invite Management,Module access picker for invitations,invites,Catalog present; no dynamic filtering verified
+AccountChartList.html,AccountChartList.html,HTML,DOCUMENTATION,Accounting: Chart of Accounts,Displays Chart of Accounts hierarchy (module: chart-of-accounts),chart-of-accounts,UI structure present; Firestore queries untested
+AccountAddNew.html,AccountAddNew.html,HTML,DOCUMENTATION,Accounting: Chart of Accounts,Add new account to Chart of Accounts,account-add-new,Form structure present; validation logic untested
+AccountBatchEdit.html,AccountBatchEdit.html,HTML,DOCUMENTATION,Accounting: Chart of Accounts,Batch edit accounts,account-batch-edit,Batch UI present; bulk operations untested
+AccountWindow.html,AccountWindow.html,HTML,DOCUMENTATION,Accounting: Chart of Accounts,Single account detail editor,account-window,Editor structure present; save/update logic untested
+WizardChartOfAccounts.html,WizardChartOfAccounts.html,HTML,DOCUMENTATION,Accounting: Chart of Accounts,Setup wizard for Chart of Accounts (shares chart-of-accounts module),chart-of-accounts,Wizard UI present; wizard flow untested
+InputMain.html,InputMain.html,HTML,DOCUMENTATION,Accounting: Transaction Input,Transaction input hub and entry method selector,input-main,Hub structure present; method selection untested
+InputReceipt.html,InputReceipt.html,HTML,DOCUMENTATION,Accounting: Transaction Input,Receipt entry form,input-receipt,Form structure present; validation and posting untested
+InputPayment.html,InputPayment.html,HTML,DOCUMENTATION,Accounting: Transaction Input,Payment entry form,input-payment,Form structure present; validation and posting untested
+InputJournal.html,InputJournal.html,HTML,DOCUMENTATION,Accounting: Transaction Input,Manual journal entry form,input-journal,Form structure present; validation and posting untested
+InputUploadCsv.html,InputUploadCsv.html,HTML,DOCUMENTATION,Accounting: Transaction Input,CSV file upload and parsing,input-upload-csv,Upload handler present; parsing logic untested
+InputUploadPdf.html,InputUploadPdf.html,HTML,DOCUMENTATION,Accounting: Transaction Input,PDF document upload,input-upload-pdf,Upload handler present; parsing logic untested
+InputUploadImage.html,InputUploadImage.html,HTML,DOCUMENTATION,Accounting: Transaction Input,Image/receipt upload,input-upload-image,Upload handler present; OCR/parsing untested
+InputUploadTxt.html,InputUploadTxt.html,HTML,DOCUMENTATION,Accounting: Transaction Input,Text template upload,input-upload-txt,Upload handler present; parsing logic untested
+InputWorkbench.html,InputWorkbench.html,HTML,DOCUMENTATION,Accounting: Transaction Input,Review and reconcile downloaded transactions,input-workbench,Review UI present; reconciliation logic untested
+WizardManualEntry.html,WizardManualEntry.html,HTML,DOCUMENTATION,Accounting: Wizards & Setup,Manual transaction entry wizard (module: source-input),source-input,Wizard UI present; posting workflow untested
+WizardUploadCsv.html,WizardUploadCsv.html,HTML,DOCUMENTATION,Accounting: Wizards & Setup,CSV import wizard (shares source-input module),source-input,Wizard UI present; CSV parsing untested
+WizardUploadTxt.html,WizardUploadTxt.html,HTML,DOCUMENTATION,Accounting: Wizards & Setup,Text template wizard (shares source-input module),source-input,Wizard UI present; parsing untested
+WizardUploadImage.html,WizardUploadImage.html,HTML,DOCUMENTATION,Accounting: Wizards & Setup,Image/receipt wizard (shares source-input module),source-input,Wizard UI present; OCR untested
+WizardUploadPdf.html,WizardUploadPdf.html,HTML,DOCUMENTATION,Accounting: Wizards & Setup,PDF import wizard (shares source-input module),source-input,Wizard UI present; parsing untested
+WizardCreateAcodeMap.html,WizardCreateAcodeMap.html,HTML,DOCUMENTATION,Accounting: Wizards & Setup,Create Chart of Accounts code mapping,wizard-create-acode-map,Mapping UI present; validation untested
+WizardValidateAcodeMap.html,WizardValidateAcodeMap.html,HTML,DOCUMENTATION,Accounting: Wizards & Setup,Validate Chart of Accounts mapping,wizard-validate-acode-map,Validation UI present; checks untested
+WizardBusinessName.html,WizardBusinessName.html,HTML,DOCUMENTATION,Accounting: Wizards & Setup,Set business name (module: all-businesses),all-businesses,Setup UI present; data persistence untested
+WizardAccountingYear.html,WizardAccountingYear.html,HTML,DOCUMENTATION,Accounting: Wizards & Setup,Configure accounting year and periods,wizard-accounting-year,Config UI present; period setup untested
+WizardErrorCheck.html,WizardErrorCheck.html,HTML,DOCUMENTATION,Accounting: Wizards & Setup,System validation and error checking,wizard-error-check,Validation UI present; checks untested
+WizardSearch.html,WizardSearch.html,HTML,DOCUMENTATION,Accounting: Wizards & Setup,Search interface for wizards/reports,wizard-search,Search UI present; indexing/queries untested
+WizardDocumentation.html,WizardDocumentation.html,HTML,DOCUMENTATION,Accounting: Wizards & Setup,Accounting documentation and help (module: accounting-guide),accounting-guide,Documentation content registered; no functional features
+WizardLedger.html,WizardLedger.html,HTML,DOCUMENTATION,Accounting: Reports & Queries,General Ledger report (module: general-ledger),general-ledger,Report UI structure present; GL query functions exist in Transactions.js; end-to-end untested
+WizardTrialBalance.html,WizardTrialBalance.html,HTML,DOCUMENTATION,Accounting: Reports & Queries,Trial Balance report,wizard-trial-balance,Report UI present; TB calculation logic exists; end-to-end untested
+WizardBalanceSheet.html,WizardBalanceSheet.html,HTML,DOCUMENTATION,Accounting: Reports & Queries,Balance Sheet report,wizard-balance-sheet,Report UI present; calculation logic needed
+WizardProfitLoss.html,WizardProfitLoss.html,HTML,DOCUMENTATION,Accounting: Reports & Queries,Profit & Loss statement,wizard-profit-loss,Report UI present; P&L calculation logic exists; end-to-end untested
+WizardProfitLossAppropriation.html,WizardProfitLossAppropriation.html,HTML,DOCUMENTATION,Accounting: Reports & Queries,P&L with appropriation detail,wizard-profit-loss-appropriation,Report UI present; appropriation logic untested
+WizardAllReports.html,WizardAllReports.html,HTML,DOCUMENTATION,Accounting: Reports & Queries,Report menu and selector,wizard-all-reports,Report menu structure present; report dispatch untested
+WizardSheetIndex.html,WizardSheetIndex.html,HTML,DOCUMENTATION,Accounting: Reports & Queries,Financial statement index,wizard-sheet-index,Index structure present; statement references untested
+WizardAuditTrail.html,WizardAuditTrail.html,HTML,DOCUMENTATION,Accounting: Reports & Queries,Audit trail report (module: audit-log),audit-log,Audit UI present; audit query functions exist; end-to-end untested
+WizardReconciliation.html,WizardReconciliation.html,HTML,DOCUMENTATION,Accounting: Reports & Queries,Bank reconciliation report,wizard-reconciliation,Reconciliation UI present; matching logic untested
+InputLinkAccounts.html,InputLinkAccounts.html,HTML,DOCUMENTATION,Connections & Integration,Link online banking accounts (module: connections),connections,Account linking UI present; OAuth flow untested
+WizardAddBank.html,WizardAddBank.html,HTML,DOCUMENTATION,Connections & Integration,Add bank feed (shares connections module),connections,Bank setup UI present; feed integration untested
+Connections.html,Connections.html,HTML,DOCUMENTATION,Connections & Integration,Manage banking/API connections,connections,Connection management UI present; lifecycle untested
+UploadDocuments.html,UploadDocuments.html,HTML,DOCUMENTATION,Document Management,Upload/manage supporting documents,upload-documents,Upload UI present; OneDrive integration untested
+DocumentsImportsGuide.html,DocumentsImportsGuide.html,HTML,DOCUMENTATION,Document Management,Guide for importing documents from OneDrive,documents-imports,Guidance content; no import operations
+ExpiringDocuments.html,ExpiringDocuments.html,HTML,DOCUMENTATION,Document Management,Track documents with expiration dates,expiring-documents,Tracking UI present; expiration logic untested
+MissingDocuments.html,MissingDocuments.html,HTML,DOCUMENTATION,Document Management,Identify missing required documents,missing-documents,Query UI present; validation logic untested
+ArchivedDocuments.html,ArchivedDocuments.html,HTML,DOCUMENTATION,Document Management,Archive and restore documents,archived-documents,Archive UI present; lifecycle untested
+UnlinkedDocuments.html,UnlinkedDocuments.html,HTML,DOCUMENTATION,Document Management,Find documents not linked to entities,unlinked-documents,Search UI present; linking logic untested
+PermanentRecords.html,PermanentRecords.html,HTML,DOCUMENTATION,Document Management,Permanent record storage and retrieval,permanent-records,Storage UI present; retention untested
+LifeTimeline.html,LifeTimeline.html,HTML,DOCUMENTATION,Personal Records & Timeline,Personal life timeline and milestones (module: life-timeline),life-timeline,Timeline UI present; data persistence untested
+JournalFollowUps.html,JournalFollowUps.html,HTML,DOCUMENTATION,Personal Records & Timeline,Follow-up dates and reminders,journal-follow-ups,Calendar UI present; reminder integration untested
+BusinessRecords.html,BusinessRecords.html,HTML,DOCUMENTATION,Business Records & Decisions,Business records and milestones (module: business-records),business-records,Guidance registered; implementation status=sourceReady:false
+JournalDecisions.html,JournalDecisions.html,HTML,DOCUMENTATION,Business Records & Decisions,Decision log (module: journal-decisions),journal-decisions,Log UI present; data persistence untested
+StrategyReviews.html,StrategyReviews.html,HTML,DOCUMENTATION,Business Records & Decisions,Strategy and planning reviews,strategy-reviews,Review UI present; review workflow untested
+AlertsWindow.html,AlertsWindow.html,HTML,DOCUMENTATION,Alerts & Reminders,Alerts and notifications management,alerts,Alert management UI present; delivery untested
+RemindersWindow.html,RemindersWindow.html,HTML,DOCUMENTATION,Alerts & Reminders,Reminder scheduling and display,reminders,Reminder UI present; scheduling untested
+Configuration.html,Configuration.html,HTML,DOCUMENTATION,Administration & Configuration,System configuration and settings,configuration,Settings UI present; persistence untested
+AdminTechnicalGuide.html,AdminTechnicalGuide.html,HTML,DOCUMENTATION,Administration & Configuration,Technical administration guide,admin-tech,Guidance content only
+DeveloperConsole.html,DeveloperConsole.html,HTML,UNVERIFIED,Administration & Configuration,Developer console and debugging tools,developer-console,Console structure present; debugging functions untested
+ReviewWindow.html,ReviewWindow.html,HTML,DOCUMENTATION,Administration & Configuration,Admin review and approval queue,review-queue,Queue UI present; approval workflow untested
+BackupStatus.html,BackupStatus.html,HTML,DOCUMENTATION,Administration & Configuration,Backup status and recovery options,backup-status,Status display present; recovery procedures untested
+SystemStatus.html,SystemStatus.html,HTML,DOCUMENTATION,Administration & Configuration,System health and diagnostics,system-status,Diagnostics UI present; health checks untested
+AccessReview.html,AccessReview.html,HTML,DOCUMENTATION,Administration & Configuration,Access and permission audit,access-review,Audit UI present; permission queries untested
+AboutVersionHistory.html,AboutVersionHistory.html,HTML,DOCUMENTATION,Administration & Configuration,Version history and change log,about-version,History display present; version tracking untested
+ProjectArchitecture.html,ProjectArchitecture.html,HTML,DOCUMENTATION,Project Documentation & Architecture,Application architecture documentation,architecture-doc,Architecture documentation; guidance content
+GettingStarted.html,GettingStarted.html,HTML,DOCUMENTATION,Project Documentation & Architecture,Getting started guide for new users,getting-started,User guide; guidance content
+Faq.html,Faq.html,HTML,DOCUMENTATION,Project Documentation & Architecture,Frequently asked questions,faq-help,FAQ content; guidance only
+SOURCE_CONTROLLED_WORKFLOW_REFERENCE.html,SOURCE_CONTROLLED_WORKFLOW_REFERENCE.html,HTML,DOCUMENTATION,Project Documentation & Architecture,Development workflow reference,dev-workflow,Workflow documentation; guidance content
+StandaloneMenuTest.html,StandaloneMenuTest.html,HTML,PLACEHOLDER,Project Documentation & Architecture,Menu testing utility (for development),menu-test-dev,Test file; development only
+ClientIpCapture.html,ClientIpCapture.html,HTML,UNVERIFIED,Framework & Helpers,IP address capture for security logging,client-ip-capture,IP capture logic present; security implications untested
+InviteEmailEngine.html,InviteEmailEngine.html,HTML,UNVERIFIED,Framework & Helpers,Email invitation template and handler,invite-email,Template present; email delivery untested
+PendingFeatures.html,PendingFeatures.html,HTML,DOCUMENTATION,Informational/Reference,List of planned features,pending-features,Feature list; guidance content
+Code.js,Code.js,JS,PARTIAL,Core Framework & Initialization,Apps Script entry point and global initialization,nilavaram-core,Entry point defined; handler functions verified; integration untested
+NilavaramAuth.js,NilavaramAuth.js,JS,PARTIAL,Core Framework & Initialization,OAuth2 authentication and session management,auth,OAuth2 flow partially implemented; token handling in progress
+Navigation.js,Navigation.js,JS,PARTIAL,Core Framework & Initialization,Menu navigation logic and module routing,navigation,Routing logic defined; dispatch verified; module loading tested
+Setup.js,Setup.js,JS,PARTIAL,Core Framework & Initialization,Authoritative source of menu structure groups and module IDs,navigation,Menu definitions locked; 70-item count verified; role-based filtering partial
+Users.js,Users.js,JS,PARTIAL,User & Session Management,User account management and role assignment,users,User model defined; role assignment partial; queries unverified
+SessionLogging.js,SessionLogging.js,JS,PARTIAL,User & Session Management,Session creation tracking and audit logging,sessions,Session logging functions exist; audit trail untested
+ShellEngine.js,ShellEngine.js,JS,PARTIAL,User & Session Management,Workspace shell rendering and context management,shell,Shell rendering logic present; context switching untested
+UI.js,UI.js,JS,PARTIAL,User & Session Management,Common UI utilities and dialog handlers,ui-common,Common functions defined; dialog handling partial
+Accounts.js,Accounts.js,JS,PARTIAL,Accounting & Financial Processing,Chart of Accounts management ACODE validation hierarchy,accounting,CoA functions 23; ACODE validation works; hierarchy untested
+Transactions.js,Transactions.js,JS,PARTIAL,Accounting & Financial Processing,Journal entry posting GL queries trial balance,accounting,GL and TB functions present; posting logic untested
+FinancialAccounts.js,FinancialAccounts.js,JS,PARTIAL,Accounting & Financial Processing,Bank account integration and reconciliation,accounting,Bank model functions present; reconciliation untested
+InputWorkflow.js,InputWorkflow.js,JS,PARTIAL,Accounting & Financial Processing,Transaction input validation and evidence attachment,input-workflow,Input validators present; evidence attachment untested
+TransactionWorkbench.js,TransactionWorkbench.js,JS,UNVERIFIED,Accounting & Financial Processing,Downloaded transaction review and posting,transaction-review,Workbench functions present; review logic untested
+BusinessEngine.js,BusinessEngine.js,JS,UNVERIFIED,Accounting & Financial Processing,Business entity and record management,business-records,Business functions present; CRUD operations untested
+Firestore.js,Firestore.js,JS,PARTIAL,Accounting & Financial Processing,Firestore database read/write and collection access,firestore,Firestore access functions defined; queries untested
+NilavaramAuth.js,NilavaramAuth.js,JS,PARTIAL,Authentication & Authorization,OAuth2 and service-account authentication,auth,OAuth2 flow partial; tokens untested
+PopupSecurityEngine.js,PopupSecurityEngine.js,JS,UNVERIFIED,Authentication & Authorization,Module-level authorization gates,permissions,Security gates defined; enforcement untested
+Permissions.js,Permissions.js,JS,PARTIAL,Authentication & Authorization,Role-based access control and permission checks,permissions,Permission model defined; checks partial
+Roles.js,Roles.js,JS,PARTIAL,Authentication & Authorization,Role definition and membership management,roles,Role definitions exist in Setup.js; membership untested
+MicrosoftGraph.js,MicrosoftGraph.js,JS,PARTIAL,Integrations,Microsoft Graph API for OneDrive and email,onedrive,Microsoft Graph calls present; error handling partial
+OneDriveStorage.js,OneDriveStorage.js,JS,UNVERIFIED,Integrations,OneDrive document management and retrieval,onedrive,OneDrive functions present; lifecycle untested
+AkoyaIntegration.js,AkoyaIntegration.js,JS,UNVERIFIED,Integrations,Akoya API for financial data aggregation,akoya,Akoya calls present; authentication untested
+GeminiEngine.js,GeminiEngine.js,JS,UNVERIFIED,Integrations,Google Gemini AI integration for analysis,gemini,Gemini API present; prompt engineering untested
+Alerts.js,Alerts.js,JS,PARTIAL,Alerts & Notifications,Alert generation and delivery,alerts,Alert functions present; delivery channels untested
+Reminders.js,Reminders.js,JS,UNVERIFIED,Alerts & Notifications,Reminder scheduling and notification,reminders,Reminder functions present; scheduling logic untested
+AppConfigEngine.js,AppConfigEngine.js,JS,UNVERIFIED,Administration & Tooling,Application configuration management,config,Configuration functions present; persistence untested
+DeveloperEngine.js,DeveloperEngine.js,JS,UNVERIFIED,Administration & Tooling,Developer utilities and debugging tools,developer,Utilities present; debugging functions untested
+ContextEngine.js,ContextEngine.js,JS,UNVERIFIED,Administration & Tooling,Business context and entity management,context,Context functions present; switching untested
+Help.js,Help.js,JS,PARTIAL,Administration & Tooling,Help content delivery and guidance system,help,Help delivery functions present; content indexing untested
+GitHubHistory.js,GitHubHistory.js,JS,UNVERIFIED,Specialized Utilities,GitHub commit history and version tracking,github,GitHub functions present; history parsing untested
+InviteEmailEngine.js,InviteEmailEngine.js,JS,UNVERIFIED,Specialized Utilities,Email invitation generation and tracking,invites,Email generation present; tracking untested
+Development.js,Development.js,JS,UNVERIFIED,Development & Support,Development mode utilities and logging,dev-tools,Development utilities present; logging untested
+EnsureSuperAdmins.js,EnsureSuperAdmins.js,JS,UNVERIFIED,Development & Support,Super admin provisioning and recovery,dev-admin,Admin provisioning functions present; recovery untested
+ResetNavigationOnly.js,ResetNavigationOnly.js,JS,PLACEHOLDER,Development & Support,Navigation reset utility (dev only),dev-reset,Development utility; placeholder
+ResetShellDataOnly.js,ResetShellDataOnly.js,JS,PLACEHOLDER,Development & Support,Shell data reset utility (dev only),dev-reset,Development utility; placeholder
+appsscript.json,appsscript.json,JSON,UNVERIFIED,Configuration,Apps Script manifest (runtime libraries dependencies scopes),apps-script,Manifest structure present; runtime behavior untested
+assets/nilavaram-akoya-logo.png,nilavaram-akoya-logo.png,PNG,UNVERIFIED,Assets,Nilavaram/Akoya branding logo,assets,Logo file present; display context untested

@@ -1,0 +1,15 @@
+﻿# Exclude backup directories
+.backup_*
+
+# Exclude common development directories
+.git
+.github
+.vscode
+node_modules
+
+# Exclude documentation and config files
+*.md
+*.txt
+*.docx
+.clasp.json
+.gitignore

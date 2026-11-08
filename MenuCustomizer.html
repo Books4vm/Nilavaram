@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('DashboardStyles') ?>
+  <style>
+    .menu-customizer-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .menu-customizer-dialog {
+      background: var(--background);
+      border-radius: 8px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      color: var(--text-primary);
+    }
+
+    .menu-customizer-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .menu-customizer-header h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .menu-customizer-header p {
+      margin: 4px 0 0 0;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .menu-customizer-items {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .menu-customizer-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: var(--panel-background, #f5f5f5);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .menu-customizer-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .menu-customizer-item-label {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .menu-customizer-item-name {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .menu-customizer-item-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .menu-customizer-item-controls {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .menu-customizer-item-controls button {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 1px solid var(--border);
+      background: var(--button-background, #fff);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+    }
+
+    .menu-customizer-item-controls button:hover {
+      background: var(--button-hover, #f0f0f0);
+      color: var(--text-primary);
+    }
+
+    .menu-customizer-item-controls button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .menu-customizer-footer {
+      padding: 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      flex-shrink: 0;
+    }
+
+    .menu-customizer-footer button {
+      padding: 10px 16px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .menu-customizer-footer button.primary {
+      background: var(--primary-button-bg, #0b5cab);
+      color: white;
+      border-color: var(--primary-button-bg, #0b5cab);
+    }
+
+    .menu-customizer-footer button.primary:hover {
+      background: var(--primary-button-hover, #093d80);
+    }
+
+    .menu-customizer-footer button.secondary {
+      background: var(--secondary-button-bg, #f5f5f5);
+      color: var(--text-primary);
+    }
+
+    .menu-customizer-footer button.secondary:hover {
+      background: var(--secondary-button-hover, #e8e8e8);
+    }
+
+    .menu-customizer-footer button.danger {
+      background: var(--danger-bg, #fce8e8);
+      color: var(--danger-text, #d32f2f);
+      border-color: var(--danger-border, #f5c6c6);
+    }
+
+    .menu-customizer-footer button.danger:hover {
+      background: var(--danger-hover, #f9d5d5);
+    }
+
+    .menu-customizer-footer button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .menu-customizer-empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .menu-item-indent-group {
+      padding-left: 20px;
+      border-left: 2px solid var(--border);
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body style="background: transparent; margin: 0; padding: 0;">
+
+<div id="menu-customizer-overlay" class="menu-customizer-overlay" style="display: none;">
+  <div class="menu-customizer-dialog">
+    <div class="menu-customizer-header">
+      <h2>Customize My Menu</h2>
+      <p>Show, hide, and reorder menu items. Your preferences are saved automatically.</p>
+    </div>
+
+    <div id="menu-customizer-items-list" class="menu-customizer-items">
+      <p class="menu-customizer-empty">Loading menu items...</p>
+    </div>
+
+    <div class="menu-customizer-footer">
+      <button type="button" id="menu-customizer-restore-btn" class="secondary danger">
+        Restore Defaults
+      </button>
+      <button type="button" id="menu-customizer-cancel-btn" class="secondary">
+        Cancel
+      </button>
+      <button type="button" id="menu-customizer-save-btn" class="primary">
+        Save Preferences
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.MENU_CUSTOMIZER_STATE = {
+    open: false,
+    navigation: null,
+    preferences: { items: [] },
+    workingItems: [],
+    userEmail: '',
+    sessionKey: ''
+  };
+
+  function menuCustomizerGetAllMenuItems(navigation) {
+    const items = [];
+
+    function traverse(nodes, depth, parentId) {
+      (nodes || []).forEach(function(node) {
+        if (node.moduleId) {
+          items.push({
+            id: node.id,
+            label: node.label,
+            description: node.description || '',
+            moduleId: node.moduleId,
+            depth: depth,
+            parentId: parentId || null,
+            visible: true,
+            order: items.length
+          });
+        }
+        if (node.children && node.children.length) {
+          traverse(node.children, depth + 1, node.id);
+        }
+      });
+    }
+
+    traverse(navigation, 0, null);
+    return items;
+  }
+
+  function menuCustomizerLoadPreferences(navigation, preferences) {
+    const allItems = menuCustomizerGetAllMenuItems(navigation);
+    const prefsMap = {};
+    (preferences.items || []).forEach(function(pref) {
+      prefsMap[String(pref.id)] = pref;
+    });
+
+    window.MENU_CUSTOMIZER_STATE.workingItems = allItems.map(function(item) {
+      const pref = prefsMap[String(item.id)] || {};
+      return {
+        id: item.id,
+        label: item.label,
+        description: item.description,
+        moduleId: item.moduleId,
+        depth: item.depth,
+        visible: pref.visible !== false,
+        order: pref.order !== undefined ? pref.order : item.order
+      };
+    });
+
+    window.MENU_CUSTOMIZER_STATE.workingItems.sort(function(a, b) {
+      return a.order - b.order;
+    });
+  }
+
+  function menuCustomizerRenderItems() {
+    const list = document.getElementById('menu-customizer-items-list');
+    const items = window.MENU_CUSTOMIZER_STATE.workingItems;
+
+    list.textContent = '';
+
+    if (!items.length) {
+      const empty = document.createElement('p');
+      empty.className = 'menu-customizer-empty';
+      empty.textContent = 'No menu items available.';
+      list.appendChild(empty);
+      return;
+    }
+
+    items.forEach(function(item, index) {
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'menu-customizer-item';
+      if (item.depth > 0) {
+        itemDiv.className += ' menu-item-indent-group';
+      }
+      itemDiv.dataset.itemId = item.id;
+      itemDiv.dataset.itemIndex = index;
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = item.visible;
+      checkbox.onchange = function() {
+        const idx = Number(itemDiv.dataset.itemIndex);
+        window.MENU_CUSTOMIZER_STATE.workingItems[idx].visible = checkbox.checked;
+      };
+
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'menu-customizer-item-label';
+
+      const nameSpan = document.createElement('div');
+      nameSpan.className = 'menu-customizer-item-name';
+      nameSpan.textContent = item.label;
+
+      const descSpan = document.createElement('div');
+      descSpan.className = 'menu-customizer-item-desc';
+      descSpan.textContent = item.description || item.moduleId;
+
+      labelDiv.appendChild(nameSpan);
+      labelDiv.appendChild(descSpan);
+
+      const controlsDiv = document.createElement('div');
+      controlsDiv.className = 'menu-customizer-item-controls';
+
+      const upBtn = document.createElement('button');
+      upBtn.type = 'button';
+      upBtn.textContent = '↑';
+      upBtn.title = 'Move up';
+      upBtn.disabled = index === 0;
+      upBtn.onclick = function() {
+        menuCustomizerMoveItem(index, -1);
+      };
+
+      const downBtn = document.createElement('button');
+      downBtn.type = 'button';
+      downBtn.textContent = '↓';
+      downBtn.title = 'Move down';
+      downBtn.disabled = index === items.length - 1;
+      downBtn.onclick = function() {
+        menuCustomizerMoveItem(index, 1);
+      };
+
+      controlsDiv.appendChild(upBtn);
+      controlsDiv.appendChild(downBtn);
+
+      itemDiv.appendChild(checkbox);
+      itemDiv.appendChild(labelDiv);
+      itemDiv.appendChild(controlsDiv);
+
+      list.appendChild(itemDiv);
+    });
+  }
+
+  function menuCustomizerGetSubtreeSize(items, fromIndex) {
+    // Returns the number of items in the subtree rooted at fromIndex
+    // (item itself + all descendants)
+    const rootItem = items[fromIndex];
+    let size = 1;
+    let descendantDepth = rootItem.depth + 1;
+
+    for (var i = fromIndex + 1; i < items.length; i++) {
+      const item = items[i];
+      if (item.depth < descendantDepth) {
+        // We've left the subtree
+        break;
+      }
+      if (item.depth >= descendantDepth) {
+        size++;
+      }
+    }
+    return size;
+  }
+
+  function menuCustomizerFindNextSiblingIndex(items, fromIndex, direction) {
+    // Find the index of the next (direction=1) or previous (direction=-1) sibling
+    // of the item at fromIndex. Returns -1 if no sibling exists in that direction.
+    const fromItem = items[fromIndex];
+    const subtreeSize = menuCustomizerGetSubtreeSize(items, fromIndex);
+
+    if (direction === 1) {
+      // Looking for next sibling: skip this subtree and find next same-parent item
+      var nextIndex = fromIndex + subtreeSize;
+      while (nextIndex < items.length) {
+        var item = items[nextIndex];
+        if (item.depth < fromItem.depth) {
+          // We've gone up levels; no sibling exists
+          return -1;
+        }
+        if (item.depth === fromItem.depth && item.parentId === fromItem.parentId) {
+          // Found next sibling
+          return nextIndex;
+        }
+        if (item.depth === fromItem.depth) {
+          // Same depth but different parent; shouldn't happen but skip
+          nextIndex++;
+        } else if (item.depth > fromItem.depth) {
+          // Descendant of next item; skip subtree
+          var tempSize = menuCustomizerGetSubtreeSize(items, nextIndex);
+          nextIndex += tempSize;
+        } else {
+          nextIndex++;
+        }
+      }
+      return -1;
+    } else if (direction === -1) {
+      // Looking for previous sibling: search backward
+      var prevIndex = fromIndex - 1;
+      while (prevIndex >= 0) {
+        var item = items[prevIndex];
+        if (item.depth === fromItem.depth && item.parentId === fromItem.parentId) {
+          // Found previous sibling
+          return prevIndex;
+        }
+        if (item.depth < fromItem.depth) {
+          // We've gone up levels; no sibling exists
+          return -1;
+        }
+        prevIndex--;
+      }
+      return -1;
+    }
+    return -1;
+  }
+
+  function menuCustomizerMoveItem(fromIndex, direction) {
+    const items = window.MENU_CUSTOMIZER_STATE.workingItems;
+    const fromItem = items[fromIndex];
+
+    // Find the next/previous sibling
+    var sibling = menuCustomizerFindNextSiblingIndex(items, fromIndex, direction);
+    if (sibling === -1) {
+      return;
+    }
+
+    // Get subtree sizes
+    const fromSubtreeSize = menuCustomizerGetSubtreeSize(items, fromIndex);
+    const siblingSubtreeSize = menuCustomizerGetSubtreeSize(items, sibling);
+
+    // Extract both subtrees
+    const fromSubtree = items.splice(fromIndex, fromSubtreeSize);
+    const adjustedSiblingIndex = sibling > fromIndex ? sibling - fromSubtreeSize : sibling;
+    const siblingSubtree = items.splice(adjustedSiblingIndex, siblingSubtreeSize);
+
+    // Re-insert in swapped order
+    if (direction === 1) {
+      // Moving down: sibling comes first, then from
+      items.splice.apply(items, [adjustedSiblingIndex, 0].concat(siblingSubtree));
+      items.splice.apply(items, [adjustedSiblingIndex + siblingSubtreeSize, 0].concat(fromSubtree));
+    } else {
+      // Moving up: from comes first, then sibling
+      items.splice.apply(items, [adjustedSiblingIndex, 0].concat(fromSubtree));
+      items.splice.apply(items, [adjustedSiblingIndex + fromSubtreeSize, 0].concat(siblingSubtree));
+    }
+
+    // Update order values
+    items.forEach(function(item, idx) {
+      item.order = idx;
+    });
+
+    menuCustomizerRenderItems();
+  }
+
+  function menuCustomizerOpen(navigation, preferences, userEmail, sessionKey) {
+    window.MENU_CUSTOMIZER_STATE.open = true;
+    window.MENU_CUSTOMIZER_STATE.navigation = navigation;
+    window.MENU_CUSTOMIZER_STATE.preferences = preferences;
+    window.MENU_CUSTOMIZER_STATE.userEmail = userEmail;
+    window.MENU_CUSTOMIZER_STATE.sessionKey = sessionKey;
+
+    menuCustomizerLoadPreferences(navigation, preferences);
+    menuCustomizerRenderItems();
+
+    const overlay = document.getElementById('menu-customizer-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  }
+
+  function menuCustomizerClose() {
+    window.MENU_CUSTOMIZER_STATE.open = false;
+    const overlay = document.getElementById('menu-customizer-overlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
+  function menuCustomizerSave() {
+    const items = window.MENU_CUSTOMIZER_STATE.workingItems;
+    const saveData = items.map(function(item) {
+      return {
+        id: item.id,
+        visible: item.visible,
+        order: item.order
+      };
+    });
+
+    const btn = document.getElementById('menu-customizer-save-btn');
+    if (btn) btn.disabled = true;
+
+    google.script.run
+      .withSuccessHandler(function() {
+        if (btn) btn.disabled = false;
+        menuCustomizerClose();
+        if (typeof reloadMenuCustomization === 'function') {
+          reloadMenuCustomization();
+        }
+      })
+      .withFailureHandler(function(error) {
+        if (btn) btn.disabled = false;
+        alert('Error saving preferences: ' + (error.message || error));
+      })
+      .saveUserMenuPreferences(saveData, window.MENU_CUSTOMIZER_STATE.sessionKey);
+  }
+
+  function menuCustomizerRestoreDefaults() {
+    if (!confirm('Restore all menu items to default visibility and order?')) {
+      return;
+    }
+
+    const btn = document.getElementById('menu-customizer-restore-btn');
+    if (btn) btn.disabled = true;
+
+    google.script.run
+      .withSuccessHandler(function() {
+        if (btn) btn.disabled = false;
+        menuCustomizerLoadPreferences(
+          window.MENU_CUSTOMIZER_STATE.navigation,
+          { items: [] }
+        );
+        menuCustomizerRenderItems();
+      })
+      .withFailureHandler(function(error) {
+        if (btn) btn.disabled = false;
+        alert('Error resetting preferences: ' + (error.message || error));
+      })
+      .resetUserMenuPreferencesToDefault(window.MENU_CUSTOMIZER_STATE.sessionKey);
+  }
+
+  function bindMenuCustomizerEvents() {
+    const saveBtn = document.getElementById('menu-customizer-save-btn');
+    const cancelBtn = document.getElementById('menu-customizer-cancel-btn');
+    const restoreBtn = document.getElementById('menu-customizer-restore-btn');
+
+    if (saveBtn) saveBtn.onclick = menuCustomizerSave;
+    if (cancelBtn) cancelBtn.onclick = menuCustomizerClose;
+    if (restoreBtn) restoreBtn.onclick = menuCustomizerRestoreDefaults;
+  }
+
+  window.addEventListener('load', bindMenuCustomizerEvents);
+</script>
+
+</body>
+</html>
