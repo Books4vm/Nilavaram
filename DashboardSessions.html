@@ -232,16 +232,18 @@
       '<h2>Workspace</h2>' +
       '<div class="workspace-intro">' +
         '<p>This is your main workspace window.</p>' +
-        '<p>Complete Step 1 and Step 2 below, then choose a menu item from the left panel.</p>' +
+        '<p id="workspace-context-instructions">Complete Step 1 and Step 2 below, then choose a menu item from the left panel.</p>' +
         '<p>A new window will open for the module you choose.</p>' +
       '</div>' +
       '<section id="workspace-context-steps" class="workspace-context-host"></section>' +
-      '<section id="workspace-selection" class="workspace-selection">' +
-        '<h3>Current selection</h3>' +
-        '<p><b>Client:</b> <span id="workspace-client-name">Not selected</span></p>' +
-        '<p><b>Business:</b> <span id="workspace-business-name">Not selected</span></p>' +
-        '<p><b>Accounting year:</b> <span id="workspace-accounting-year-display">2026</span></p>' +
-      '</section>' +
+      '<div id="workspace-load-status" class="workspace-load-status">' +
+        '<p id="workspace-loading" class="help-meta">Connecting securely...</p>' +
+        '<div id="workspace-progress-wrap" hidden>' +
+          '<progress id="workspace-progress" max="100"></progress>' +
+          '<p id="workspace-progress-label" class="help-meta"></p>' +
+        '</div>' +
+        '<p id="workspace-error" class="error" hidden></p>' +
+      '</div>' +
       '<section class="workspace-selection" aria-labelledby="my-access-title">' +
         '<h3 id="my-access-title">My accessible businesses</h3>' +
         '<p class="help-meta">Find a business you can access without remembering which client contains it.</p>' +
@@ -268,14 +270,6 @@
         '</div>' +
         '<p id="dashboard-overview-status" class="help-meta" aria-live="polite"></p>' +
       '</section>' +
-      '<div id="workspace-load-status" class="workspace-load-status">' +
-        '<p id="workspace-loading" class="help-meta">Connecting securely...</p>' +
-        '<div id="workspace-progress-wrap" hidden>' +
-          '<progress id="workspace-progress" max="100"></progress>' +
-          '<p id="workspace-progress-label" class="help-meta"></p>' +
-        '</div>' +
-        '<p id="workspace-error" class="error" hidden></p>' +
-      '</div>' +
       '<div id="inactivity-extend-panel" class="inactivity-extend-panel" hidden>' +
         '<p>You have been inactive for 9 minutes. Still working?</p>' +
         '<button id="inactivity-extend-yes" class="primary-button" type="button">YES — extend session</button>' +

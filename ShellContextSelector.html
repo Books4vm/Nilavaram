@@ -78,22 +78,28 @@
     if (loading) loading.hidden = enabled;
   }
 
-  function onShellContextComplete() {
+  function refreshShellContextDisplay_(saveDefault, showContextNotice) {
     window.nilavaramContextStep = 'done';
     syncContextHeader();
     updateMainWorkspaceContextSession();
     setMenuPanelEnabled(true);
     renderWorkspaceContextSteps();
-    saveCurrentWorkspaceDefault_();
+    if (saveDefault) {
+      saveCurrentWorkspaceDefault_();
+    }
     if (typeof reloadNavigationForCurrentSelection === 'function') {
       reloadNavigationForCurrentSelection();
     }
-    if (typeof showWorkspaceNotice === 'function') {
+    if (showContextNotice && typeof showWorkspaceNotice === 'function') {
       showWorkspaceNotice(
         'Context set: ' + window.nilavaramSelectedClient.name + ' / ' +
           window.nilavaramSelectedEntity.name + '. Choose a menu item.'
       );
     }
+  }
+
+  function onShellContextComplete() {
+    refreshShellContextDisplay_(true, true);
   }
 
   function startShellContextFlow(clients, defaultContext) {
@@ -157,6 +163,12 @@
   function renderWorkspaceContextSteps() {
     const host = document.getElementById('workspace-context-steps');
     if (!host) return;
+    const instructions = document.getElementById(
+      'workspace-context-instructions'
+    );
+    if (instructions) {
+      instructions.hidden = isShellContextComplete();
+    }
 
     if (isShellContextComplete()) {
       host.innerHTML =
@@ -272,7 +284,11 @@
     } catch (error) {}
     syncContextHeader();
     window.nilavaramContextLoadingBusinesses = true;
-    renderWorkspaceContextSteps();
+    if (document.getElementById('popup-context-host')) {
+      renderContextChangePopup();
+    } else {
+      renderWorkspaceContextSteps();
+    }
     if (typeof showWorkspaceProgress === 'function') {
       showWorkspaceProgress('Step 2: Loading businesses for ' + clientName + '…', 30);
     }
@@ -281,7 +297,11 @@
         window.nilavaramContextLoadingBusinesses = false;
         window.nilavaramShellEntities = entities || [];
         if (typeof hideWorkspaceProgress === 'function') hideWorkspaceProgress();
-        renderWorkspaceContextSteps();
+        if (document.getElementById('popup-context-host')) {
+          renderContextChangePopup();
+        } else {
+          renderWorkspaceContextSteps();
+        }
         if (typeof showWorkspaceNotice === 'function') {
           showWorkspaceNotice(
             'Client: ' + clientName + '. Now choose a business (Step 2).'
@@ -290,7 +310,11 @@
       })
       .withFailureHandler(function(error) {
         window.nilavaramContextLoadingBusinesses = false;
-        renderWorkspaceContextSteps();
+        if (document.getElementById('popup-context-host')) {
+          renderContextChangePopup();
+        } else {
+          renderWorkspaceContextSteps();
+        }
         if (typeof showWorkspaceError === 'function') {
           showWorkspaceError(
             'Could not load businesses.',
@@ -305,6 +329,10 @@
     if (!entityId) return;
     saveSelectedBusiness(entityId, entityName);
     syncContextHeader();
+    if (document.getElementById('popup-context-host')) {
+      renderContextChangePopup();
+      return;
+    }
     onShellContextComplete();
   }
 
@@ -332,18 +360,125 @@
       );
   }
 
+  function refreshSavedShellContext_() {
+    google.script.run
+      .withSuccessHandler(function(shell) {
+        const context = shell && shell.defaultContext;
+        if (!context) {
+          if (typeof showWorkspaceError === 'function') {
+            showWorkspaceError(
+              'Saved context could not be refreshed.',
+              'No saved client and business context was returned.'
+            );
+          }
+          return;
+        }
+        window.nilavaramShellClients = shell.clients || [];
+        saveSelectedClient(context.clientId, context.clientName);
+        saveSelectedBusiness(context.entityId, context.entityName);
+        const accountingYear = String(context.accountingYear || '').trim();
+        if (/^\d{4}$/.test(accountingYear)) {
+          saveSelectedAccountingYear(accountingYear);
+        } else if (typeof showWorkspaceNotice === 'function') {
+          showWorkspaceNotice(
+            'Saved context did not include a valid accounting year; ' +
+            'the currently displayed year was left unchanged.'
+          );
+        }
+        refreshShellContextDisplay_(false, false);
+      })
+      .withFailureHandler(function(error) {
+        if (typeof showWorkspaceError === 'function') {
+          showWorkspaceError(
+            'Saved context could not be refreshed.',
+            error && error.message ? error.message : String(error)
+          );
+        }
+      })
+      .getDashboardShell(nilavaramSessionKey());
+  }
+
+  function stopContextPopupMonitor_() {
+    const monitor = window.nilavaramContextPopupMonitor;
+    if (monitor && monitor.timer) {
+      window.clearInterval(monitor.timer);
+    }
+    window.nilavaramContextPopupMonitor = null;
+  }
+
+  function monitorContextPopup_(popup) {
+    const activeMonitor = window.nilavaramContextPopupMonitor;
+    if (activeMonitor && activeMonitor.timer) return;
+    const monitor = { popup: popup, timer: null };
+    monitor.timer = window.setInterval(function() {
+      if (!popup.closed) return;
+      window.clearInterval(monitor.timer);
+      if (window.nilavaramContextPopupMonitor === monitor) {
+        window.nilavaramContextPopupMonitor = null;
+      }
+      refreshSavedShellContext_();
+    }, 500);
+    window.nilavaramContextPopupMonitor = monitor;
+  }
+
   function openContextChangePopup() {
-    const baseUrl = window.location.href.split('?')[0];
+    if (window.nilavaramContextPopupMonitor) {
+      if (typeof showWorkspaceNotice === 'function') {
+        showWorkspaceNotice(
+          'Close the existing Change client / business popup before opening another.'
+        );
+      }
+      return;
+    }
+
+    // Open popup synchronously to avoid popup blockers
     const popup = window.open(
-      baseUrl + '?contextWindow=1',
+      'about:blank',
       'NilavaramContext',
       'popup=yes,width=520,height=720,resizable=yes,scrollbars=yes'
     );
+
     if (!popup || popup.closed) {
       if (typeof showWorkspaceNotice === 'function') {
         showWorkspaceNotice('Allow pop-ups to change client and business.');
       }
+      return;
     }
+    monitorContextPopup_(popup);
+
+    // Fetch the actual URL and navigate the popup
+    google.script.run
+      .withSuccessHandler(function(webAppUrl) {
+        const baseUrl = String(webAppUrl || '').split('?')[0];
+        const targetUrl = baseUrl + '?contextWindow=1';
+
+        // Navigate the opened popup to the target URL
+        if (popup && !popup.closed) {
+          try {
+            popup.location.href = targetUrl;
+          } catch (error) {
+            if (typeof showWorkspaceNotice === 'function') {
+              showWorkspaceNotice(
+                'Could not navigate popup: ' +
+                (error && error.message ? error.message : String(error))
+              );
+            }
+          }
+        }
+      })
+      .withFailureHandler(function(error) {
+        if (typeof showWorkspaceNotice === 'function') {
+          showWorkspaceNotice(
+            'Unable to retrieve context URL: ' +
+            (error && error.message ? error.message : String(error))
+          );
+        }
+        // Close the blank popup if URL retrieval failed
+        if (popup && !popup.closed) {
+          popup.close();
+        }
+      })
+      .getNilavaramWebAppUrl();
   }
 
   function renderContextChangePopup() {
@@ -367,11 +502,15 @@
       '<label>Default accounting year<input id="context-popup-accounting-year" ' +
       'inputmode="numeric" maxlength="4" pattern="[0-9]{4}" value="' +
       escapeHtml(window.nilavaramSelectedAccountingYear || '') + '"></label>';
+    host.insertAdjacentHTML('beforeend',
+      '<p id="context-popup-save-status" class="help-meta" role="status" ' +
+      'aria-live="polite"></p>');
     bindContextListHandlers(host);
     document.getElementById('context-popup-cancel').onclick = function() {
-      window.close();
+      window.top.close();
     };
     document.getElementById('context-popup-apply').onclick = function() {
+      if (window.nilavaramContextApplyPending) return;
       if (!isShellContextComplete()) {
         output.insertAdjacentHTML('beforeend',
           '<p class="error">Select both a client and a business before Apply.</p>');
@@ -384,36 +523,49 @@
           '<p class="error">Enter the accounting year as four digits.</p>');
         return;
       }
-      saveSelectedAccountingYear(accountingYear);
-      if (window.opener && !window.opener.closed) {
-        window.opener.nilavaramSelectedClient = window.nilavaramSelectedClient;
-        window.opener.nilavaramSelectedEntity = window.nilavaramSelectedEntity;
-        window.opener.nilavaramSelectedAccountingYear =
-          window.nilavaramSelectedAccountingYear || '';
-        try {
-          window.opener.sessionStorage.setItem(
-            'nilavaramSelectedClientId', window.nilavaramSelectedClient.id);
-          window.opener.sessionStorage.setItem(
-            'nilavaramSelectedClientName', window.nilavaramSelectedClient.name);
-          window.opener.sessionStorage.setItem(
-            'nilavaramSelectedEntityId', window.nilavaramSelectedEntity.id);
-          window.opener.sessionStorage.setItem(
-            'nilavaramSelectedEntityName', window.nilavaramSelectedEntity.name);
-          window.opener.sessionStorage.setItem(
-            'nilavaramSelectedAccountingYear',
-            window.nilavaramSelectedAccountingYear || '');
-        } catch (error) {}
-        if (typeof window.opener.syncContextHeader === 'function') {
-          window.opener.syncContextHeader();
-        }
-        if (typeof window.opener.saveCurrentWorkspaceDefault_ === 'function') {
-          window.opener.saveCurrentWorkspaceDefault_();
-        }
-        if (typeof window.opener.onShellContextComplete === 'function') {
-          window.opener.onShellContextComplete();
-        }
-      }
-      window.close();
+      const applyButton = document.getElementById('context-popup-apply');
+      const status = document.getElementById('context-popup-save-status');
+      window.nilavaramContextApplyPending = true;
+      applyButton.disabled = true;
+      applyButton.textContent = 'Applying...';
+      if (status) status.textContent = 'Saving selected context...';
+      google.script.run
+        .withSuccessHandler(function(context) {
+          const savedYear = String(
+            context && context.accountingYear || ''
+          ).trim();
+          if (!context ||
+              context.clientId !== window.nilavaramSelectedClient.id ||
+              context.entityId !== window.nilavaramSelectedEntity.id ||
+              !/^\d{4}$/.test(savedYear)) {
+            if (status) {
+              status.className = 'error';
+              status.textContent =
+                'The save response could not confirm the selected context and ' +
+                'accounting year. The popup will remain open; do not retry Apply.';
+            }
+            return;
+          }
+          saveSelectedAccountingYear(savedYear);
+          window.top.close();
+        })
+        .withFailureHandler(function(error) {
+          window.nilavaramContextApplyPending = false;
+          applyButton.disabled = false;
+          applyButton.textContent = 'Apply';
+          if (status) {
+            status.className = 'error';
+            status.textContent =
+              'Context was not saved: ' +
+              (error && error.message ? error.message : String(error));
+          }
+        })
+        .saveUserDefaultWorkspaceContext(
+          window.nilavaramSelectedClient.id,
+          window.nilavaramSelectedEntity.id,
+          accountingYear,
+          nilavaramSessionKey()
+        );
     };
   }
 

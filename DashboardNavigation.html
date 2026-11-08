@@ -85,9 +85,11 @@
 
     startShellContextFlow(shell.clients || [], shell.defaultContext || null);
 
-    showWorkspaceNotice(
-      'Complete Step 1 and Step 2 in the workspace, then choose a menu item.'
-    );
+    if (!isShellContextComplete()) {
+      showWorkspaceNotice(
+        'Complete Step 1 and Step 2 in the workspace, then choose a menu item.'
+      );
+    }
   }
 
   if (inviteToken) {

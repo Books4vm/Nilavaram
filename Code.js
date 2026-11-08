@@ -46,6 +46,16 @@ function getNilavaramWebAppUrl_() {
 }
 
 /**
+ * Public wrapper for client-side URL retrieval.
+ * Browser cannot call private (underscore-suffixed) functions via google.script.run.
+ *
+ * @returns {string}
+ */
+function getNilavaramWebAppUrl() {
+  return getNilavaramWebAppUrl_();
+}
+
+/**
  * Query params to carry from Login to Dashboard (?workspace=1).
  *
  * @param {Object} parameters doGet parameters.

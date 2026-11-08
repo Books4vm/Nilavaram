@@ -13,7 +13,7 @@
     }
 
     .menu-customizer-dialog {
-      background: var(--background);
+      background: var(--surface-strong);
       border-radius: 8px;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
       max-width: 500px;
@@ -21,7 +21,7 @@
       max-height: 80vh;
       display: flex;
       flex-direction: column;
-      color: var(--text-primary);
+      color: var(--text);
     }
 
     .menu-customizer-header {
@@ -34,13 +34,13 @@
       margin: 0;
       font-size: 18px;
       font-weight: 700;
-      color: var(--text-primary);
+      color: var(--text);
     }
 
     .menu-customizer-header p {
       margin: 4px 0 0 0;
       font-size: 13px;
-      color: var(--text-secondary);
+      color: var(--muted-text);
     }
 
     .menu-customizer-items {
@@ -57,7 +57,7 @@
       align-items: center;
       gap: 12px;
       padding: 12px;
-      background: var(--panel-background, #f5f5f5);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 6px;
       font-size: 14px;
@@ -79,12 +79,12 @@
 
     .menu-customizer-item-name {
       font-weight: 500;
-      color: var(--text-primary);
+      color: var(--text);
     }
 
     .menu-customizer-item-desc {
       font-size: 12px;
-      color: var(--text-secondary);
+      color: var(--muted-text);
     }
 
     .menu-customizer-item-controls {
@@ -98,18 +98,18 @@
       height: 32px;
       padding: 0;
       border: 1px solid var(--border);
-      background: var(--button-background, #fff);
+      background: var(--surface-strong);
       border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
       font-weight: 600;
-      color: var(--text-secondary);
+      color: var(--muted-text);
       transition: all 0.2s ease;
     }
 
     .menu-customizer-item-controls button:hover {
-      background: var(--button-hover, #f0f0f0);
-      color: var(--text-primary);
+      background: var(--hover);
+      color: var(--text);
     }
 
     .menu-customizer-item-controls button:disabled {
@@ -137,32 +137,37 @@
     }
 
     .menu-customizer-footer button.primary {
-      background: var(--primary-button-bg, #0b5cab);
-      color: white;
-      border-color: var(--primary-button-bg, #0b5cab);
+      background: var(--primary);
+      color: var(--primary-text);
+      border-color: var(--primary);
     }
 
     .menu-customizer-footer button.primary:hover {
-      background: var(--primary-button-hover, #093d80);
+      background: var(--focus);
+      border-color: var(--focus);
     }
 
     .menu-customizer-footer button.secondary {
-      background: var(--secondary-button-bg, #f5f5f5);
-      color: var(--text-primary);
+      background: var(--surface);
+      color: var(--text);
+      border-color: var(--border);
     }
 
     .menu-customizer-footer button.secondary:hover {
-      background: var(--secondary-button-hover, #e8e8e8);
+      background: var(--hover);
+      border-color: var(--border);
     }
 
     .menu-customizer-footer button.danger {
-      background: var(--danger-bg, #fce8e8);
-      color: var(--danger-text, #d32f2f);
-      border-color: var(--danger-border, #f5c6c6);
+      background: var(--surface);
+      color: var(--error);
+      border-color: var(--error);
     }
 
     .menu-customizer-footer button.danger:hover {
-      background: var(--danger-hover, #f9d5d5);
+      background: var(--error);
+      color: var(--surface-strong);
+      border-color: var(--error);
     }
 
     .menu-customizer-footer button:disabled {
@@ -173,7 +178,7 @@
     .menu-customizer-empty {
       padding: 40px 20px;
       text-align: center;
-      color: var(--text-secondary);
+      color: var(--muted-text);
       font-size: 14px;
     }
 
@@ -183,8 +188,6 @@
       margin-left: 6px;
     }
   </style>
-</head>
-<body style="background: transparent; margin: 0; padding: 0;">
 
 <div id="menu-customizer-overlay" class="menu-customizer-overlay" style="display: none;">
   <div class="menu-customizer-dialog">
